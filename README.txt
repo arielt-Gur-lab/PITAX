@@ -1,27 +1,25 @@
-PITAX v3.0.0-alpha.3 — Stage 1
+PITAX v3.0.0-alpha.4 — Stage 1 gate-closing build
 ================================
 
 Purpose
 -------
 Development branch build for the first PITAX 3.0 gate: validating the AB1 evidence model without changing the established v2.14.2 trimming, curation, BLAST or taxonomy decisions.
 
-Normal workflow remains:
+User-facing workflow:
 
-AB1 upload -> Assay & trimming -> QC -> Rename -> Export -> NCBI BLAST -> Taxonomic summary
+AB1 upload -> Assay & trimming -> Rename -> QC -> Export -> NCBI BLAST -> Taxonomic summary
 
 Stage 1 adds an observational AB1 evidence audit inside QC.
 
-alpha.3 changes
+alpha.4 changes
 ----------------
-- Keeps the corrected alpha.2 ABIF evidence model and export synchronization.
-- Adds explicit auto-trim start, end and length to the Stage 1 run audit.
-- Adds `In_auto_trim` to every exported per-base audit row.
-- Adds a same-length PCON-only quality-window proposal for comparison. It is ranked by Q>=20, then Q>=30, median quality, mean quality and coverage.
-- Shows legacy auto trim and the PCON-only proposal side by side for the selected sample.
-- Adds `In_quality_proposed_window` to the per-base table and CSV.
-- The proposed quality window is observational only: it does not change trimming, FASTA, curation, BLAST or taxonomy.
-- Simplifies the Plotly title to the sample ID, avoiding the Windows byte-marker rendering of the em dash.
-- Moves the chromatogram legend outside the data area and separates called-base labels from QC markers.
+- Moves Rename before QC so chromatograms and QC tables use resolved sample names.
+- Trimming now continues directly to Rename; validated names continue to QC; QC continues to Export.
+- QC selectors, tables, chromatogram titles and audit displays show the resolved name while preserving the original sample ID in audit exports.
+- Reorders checkpoints: A = renamed sequences; B = renamed and curated QC state.
+- Cleans the chromatogram navigator by clipping base letters and QC markers from its compressed overview.
+- Keeps the validated alpha.3 AB1 evidence model and same-length PCON comparison unchanged and observational only.
+- Adds an automated workflow-order regression test.
 
 Testing
 -------
@@ -29,9 +27,9 @@ Run `run_tests.bat`.
 
 Expected final line:
 
-  All PITAX v3.0.0-alpha.3 tests passed.
+  All PITAX v3.0.0-alpha.4 tests passed.
 
-Then follow `V3_STAGE1.md`. The key manual regression is to process `265DMAA001_customer`, confirm its active auto trim remains unchanged, and compare it with the observational PCON-only window.
+Then follow `V3_STAGE1.md`. The final manual regression is the Rename -> QC transition and resolved-name display. Once that is green, Stage 1 is closed.
 
 Branching
 ---------

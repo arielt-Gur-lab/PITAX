@@ -1,12 +1,12 @@
 # PITAX 3.0 — Stage 1 validation
 
-Version: `3.0.0-alpha.3`
+Version: `3.0.0-alpha.4`
 
 ## Purpose
 
 Stage 1 validates the AB1 evidence model before PITAX changes trimming or builds Forward/Reverse consensus. The established v2.14.2 processing path remains authoritative in this alpha.
 
-alpha.3 follows the review of `265DMAA001_customer`. It keeps the corrected alpha.2 evidence model, fixes the chromatogram title/legend layout, records explicit auto-trim boundaries, and adds a same-length PCON-only comparison window. No trimming, curation, BLAST, or taxonomy decision rule is changed.
+alpha.4 is the gate-closing build. It keeps the validated alpha.3 evidence model unchanged, moves Rename before QC, carries resolved names into the QC display, reorders checkpoints, and simplifies the chromatogram navigator. No trimming, curation, BLAST, or taxonomy decision rule is changed.
 
 ## What alpha.1 taught us
 
@@ -26,11 +26,11 @@ For every newly processed AB1, when available:
 - Per-base called signal, strongest alternative signal, called/alternative ratio, and whether the called base is the strongest trace channel.
 - Auto-trim quality summaries: median quality, Q>=20 %, Q>=30 %, call-is-max %, and median called/alternative ratio.
 
-No Stage 1 evidence value changes the sequence in alpha.3.
+No Stage 1 evidence value changes the sequence in alpha.4.
 
 ## Same-length PCON comparison
 
-alpha.3 compares the established v2 auto trim with every contiguous PCON-quality window of the same length. Candidate windows require at least 90% available PCON scores and are ranked deterministically by:
+alpha.4 retains the alpha.3 comparison of the established v2 auto trim with every contiguous PCON-quality window of the same length. Candidate windows require at least 90% available PCON scores and are ranked deterministically by:
 
 1. Q>=20 percentage;
 2. Q>=30 percentage;
@@ -48,6 +48,7 @@ The selected sample is now one source of truth for QC and audit export.
 - Clicking a row in the run-audit table selects that sample in the QC workspace.
 - The selected-sample note shows the sample ID explicitly.
 - Selected-base CSV includes a `Sample_ID` column on every row.
+- QC displays the resolved final name; audit exports preserve both `Sample_ID` and `Final_Name`.
 - Selected-base CSV includes `In_auto_trim` and `In_quality_proposed_window` on every evidence row.
 - Filename is derived from the same result object used to create the CSV.
 - If selected key and result sample ID disagree, PITAX blocks the download rather than producing a misleading file.
@@ -63,14 +64,14 @@ run_tests.bat
 Expected final line:
 
 ```text
-All PITAX v3.0.0-alpha.3 tests passed.
+All PITAX v3.0.0-alpha.4 tests passed.
 ```
 
-The Stage 1 test verifies PLOC.2 conversion, PCON indexing, canonical trace mapping, per-base signal evidence, auto-trim quality summaries, selected-sample export identity, window membership and the non-mutating same-length PCON proposal.
+Five test groups verify taxonomy logic, ambiguous-peak logic, manual curation, the AB1 evidence model, and the Rename-before-QC workflow contract.
 
 ## Manual acceptance test
 
-Use the same batch of 13 real AB1 files used for alpha.1 if possible.
+The user accepted the three-sample batch (000, 001 and 002) as sufficient for the Stage 1 gate.
 
 ### A. Regression
 
@@ -80,12 +81,12 @@ Confirm that:
 2. Active trim start/end and trimmed sequence are unchanged from alpha.2.
 3. Chromatogram and ambiguous-peak review still work.
 4. Manual curation still works.
-5. Rename, Export, BLAST and Taxonomy are not blocked by the Stage 1 audit.
+5. Rename, QC, Export, BLAST and Taxonomy are not blocked by the Stage 1 audit.
 6. The PCON-only proposal never replaces the active trim or processed sequence.
 
 ### B. Corrected run audit
 
-Open **3 · QC & Chromatogram → Stage 1 · AB1 evidence audit**.
+Open **4 · QC & Chromatogram → Stage 1 · AB1 evidence audit**.
 
 Expected findings for normal ABI files:
 
@@ -98,45 +99,61 @@ Quality fields are observations, not pass/fail thresholds yet.
 
 ### C. Chromatogram display regression
 
-1. The plot title shows only the selected sample ID; it must not contain `<e2><80><94>` or a duplicate `interactive chromatogram` label.
+1. The plot title shows the resolved sample name; it must not contain `<e2><80><94>` or a duplicate `interactive chromatogram` label.
 2. The A/C/G/T and QC-marker legend is outside the data area on the right.
 3. Called-base labels and QC triangles occupy separate vertical bands and do not overlap.
+4. The bottom navigator shows a compact signal overview without compressed base letters or QC markers.
 
-### D. Trim comparison and export regression
+### D. Rename-before-QC regression
 
-This is required for alpha.3:
+This is required for alpha.4:
 
-1. Select `265DMAA001_customer` in the Sample dropdown.
-2. Confirm the audit note says `Selected sample: 265DMAA001_customer`.
+1. Run trimming; PITAX must continue to **3 · Rename**.
+2. Apply a rename key or batch edit and confirm names are valid.
+3. Continue to **4 · QC & Chromatogram**.
+4. The QC sample selector, trimming table, chromatogram title and audit display must show the resolved name.
+5. The audit CSV must preserve the original `Sample_ID` and include the resolved `Final_Name`.
+6. Back/Continue navigation must follow Rename → QC → Export.
+7. Checkpoint A must be the renamed state; Checkpoint B must include the renamed and curated QC state.
+
+### E. Trim comparison regression
+
+1. Select the resolved name corresponding to `265DMAA001_customer` in the Sample dropdown.
+2. Confirm the audit note shows the resolved name and preserves the original ID.
 3. Confirm the run audit reports the active auto trim start, end and length. For the previously supplied 001 audit these were 28, 420 and 393.
 4. In **Legacy auto trim vs PCON-only comparison**, the legacy row must say `Active output`; the PCON row must say `Observational only` and have the same length.
 5. For the previously supplied 001 data, the PCON proposal is expected near bases 265–657 and should improve the displayed Q20/Q30 metrics. This is a regression expectation, not a new trimming rule.
-6. Click **Download selected-base audit CSV**. Filename must start with `265DMAA001_customer`.
-7. Open the CSV: every row in `Sample_ID` must identify 001; `In_auto_trim` must be TRUE only for positions 28–420; `In_quality_proposed_window` must mark the displayed PCON window.
+6. Click **Download selected-base audit CSV**. The filename uses the resolved name.
+7. Open the CSV: `Sample_ID` must preserve 001, `Final_Name` must contain the resolved name, `In_auto_trim` must be TRUE only for positions 28–420, and `In_quality_proposed_window` must mark positions 265–657.
 8. Click a different row in the run-audit table. The Sample dropdown, selected-sample note and comparison table must all change to that sample.
 
-### E. Files to send back
+### F. Accepted Stage 1 evidence
 
-After the checks, send:
+The accepted real-data validation consists of:
 
-- the new **Run audit CSV**;
-- the **selected-base audit CSV for 265DMAA001_customer**.
+- a three-sample run audit for 000, 001 and 002;
+- a detailed 000 audit validating both 500-base memberships;
+- a detailed 001 audit validating active positions 28–420 and proposed positions 265–657;
+- successful alpha.3 automated tests;
+- chromatogram confirmation that the title and external legend were corrected.
 
-That is enough for the final Stage 1 evidence review. A second clean sample is optional because alpha.1 already supplied a clean example.
+No additional AB1 batch is required for this gate.
 
-## Stage 1 alpha.3 is green when
+## Stage 1 alpha.4 is green when
 
-- all four automated test groups pass;
+- all five automated test groups pass;
 - no v2 workflow regression is observed;
 - raw PLOC primary positions agree with the established PITAX positions on the tested AB1 files, or any disagreement is understood;
 - selected-sample export identity is correct;
 - auto-trim and proposed-window memberships match their displayed boundaries;
 - chromatogram title, legend and QC markers render without overlap or byte markers;
 - the PCON proposal remains observational and does not change the established output;
-- PCON behavior in 001 and the rest of the batch is reviewed without turning one problematic read into a universal trimming rule;
+- PCON behavior in 001 and the accepted three-sample batch is reviewed without turning one problematic read into a universal trimming rule;
+- Rename precedes QC and resolved names appear consistently throughout QC;
+- the chromatogram navigator no longer displays compressed base letters or QC markers;
 - cloud deployment is not required for the branch gate unless you intentionally deploy the v3 branch.
 
-Do not start Stage 2 until this gate is reviewed.
+After the alpha.4 workflow and navigator checks pass, Stage 1 is closed and Stage 2 may begin.
 
 ## Primary implementation reference
 

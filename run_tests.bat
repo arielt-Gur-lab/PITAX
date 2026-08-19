@@ -15,27 +15,32 @@ echo Using R from:
 echo %RDIR%
 echo.
 
-echo [1/4] Taxonomy logic smoke tests
+echo [1/5] Taxonomy logic smoke tests
 "%RDIR%\bin\Rscript.exe" "tests\taxonomy_logic_smoke.R"
 if errorlevel 1 goto :failed
 
 echo.
-echo [2/4] QC ambiguous-peak smoke tests
+echo [2/5] QC ambiguous-peak smoke tests
 "%RDIR%\bin\Rscript.exe" "tests\qc_peak_flags_smoke.R"
 if errorlevel 1 goto :failed
 
 echo.
-echo [3/4] Manual curation / undo-redo smoke tests
+echo [3/5] Manual curation / undo-redo smoke tests
 "%RDIR%\bin\Rscript.exe" "tests\manual_curation_smoke.R"
 if errorlevel 1 goto :failed
 
 echo.
-echo [4/4] Stage 1 AB1 evidence helper tests
+echo [4/5] Stage 1 AB1 evidence helper tests
 "%RDIR%\bin\Rscript.exe" "tests\ab1_evidence_smoke.R"
 if errorlevel 1 goto :failed
 
 echo.
-echo All PITAX v3.0.0-alpha.3 tests passed.
+echo [5/5] Workflow order and QC naming smoke tests
+"%RDIR%\bin\Rscript.exe" "tests\workflow_order_smoke.R"
+if errorlevel 1 goto :failed
+
+echo.
+echo All PITAX v3.0.0-alpha.4 tests passed.
 pause
 exit /b 0
 

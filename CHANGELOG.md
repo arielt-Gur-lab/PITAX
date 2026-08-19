@@ -2,6 +2,16 @@
 
 This file records changes that affect the way the pipeline behaves, presents results, or stores project data. Small internal refactors are omitted unless they change something visible or scientifically relevant.
 
+## 3.0.0-alpha.4
+**Stage 1 gate-closing workflow order**
+- Moved Rename before QC in the user-facing workflow: Upload → Assay & Trim → Rename → QC → Export.
+- Trimming now opens Rename; validated names open QC; QC continues to Export.
+- QC selectors, trimming tables, chromatogram titles and audit displays use resolved names while audit CSVs preserve both original `Sample_ID` and `Final_Name`.
+- Reordered checkpoints: Checkpoint A stores renamed sequences; Checkpoint B stores the renamed and curated QC state.
+- Simplified the Plotly range navigator by clipping compressed base letters and QC markers from its overview.
+- Added an automated workflow-order and QC-naming regression test.
+- Retained the validated alpha.3 AB1 evidence model and observational PCON comparison without changing trimming, curation, FASTA, BLAST or taxonomy decisions.
+
 ## 3.0.0-alpha.3
 **Stage 1 trim comparison and chromatogram layout correction**
 - Added explicit auto-trim start, end and length to the run-level AB1 audit.

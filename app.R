@@ -1,5 +1,5 @@
 # ============================================================
-# PITAX v3.0.0-alpha.3
+# PITAX v3.0.0-alpha.4
 # Stage 1: evidence foundation / compatibility audit
 # ============================================================
 
@@ -30,8 +30,8 @@ source(file.path("R", "sequence_tools.R"), local = TRUE)
 source(file.path("R", "export_tools.R"), local = TRUE)
 source(file.path("R", "taxonomy_tools.R"), local = TRUE)
 
-APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.0.0-alpha.3")
-APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "3.0.0-alpha.3", APP_VERSION)
+APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.0.0-alpha.4")
+APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "3.0.0-alpha.4", APP_VERSION)
 PROJECT_SCHEMA_VERSION <- 1L
 
 # ============================================================
@@ -83,8 +83,8 @@ pipeline_stage_footer <- function(current_step) {
   labels <- c(
     "Upload",
     "Assay & Trim",
-    "QC",
     "Rename",
+    "QC",
     "Export",
     "NCBI BLAST",
     "Taxonomic summary"
@@ -515,6 +515,18 @@ ui <- fluidPage(
         .taxonomy-why { grid-column:auto; margin-left:0; }
         .taxonomy-metric-grid { grid-template-columns:1fr; }
       }
+    ")),
+    tags$script(HTML("
+      // The source keeps the large QC panel before Rename for maintainability,
+      // while the user-facing workflow is Rename -> QC.
+      function pitaxOrderWorkflowTabs() {
+        var nav = $('#pipeline_step');
+        var renameTab = nav.find('a[data-value=\"rename\"]').parent();
+        var qcTab = nav.find('a[data-value=\"qc\"]').parent();
+        if (renameTab.length && qcTab.length) renameTab.insertBefore(qcTab);
+      }
+      $(pitaxOrderWorkflowTabs);
+      $(document).on('shiny:connected', pitaxOrderWorkflowTabs);
     "))
   ),
 
@@ -627,14 +639,14 @@ ui <- fluidPage(
         pipeline_stage_footer(2)
       ),
       # --------------------------------------------------------
-      # 3. QC, chromatogram & sequence preview
+      # 4. QC, chromatogram & sequence preview
       # --------------------------------------------------------
-      tabPanel("3 · QC & Chromatogram", value = "qc",
-        stage_heading("bar-chart", "Quality control & curation", "Review automatic trimming, inspect chromatograms, and document any manual sequence curation.", "Step 3 of 7"),
+      tabPanel("4 · QC & Chromatogram", value = "qc",
+        stage_heading("bar-chart", "Quality control & curation", "Review renamed samples, inspect chromatograms, and document any manual sequence curation.", "Step 4 of 7"),
         stage_topbar(
-          actionButton("back_settings", "Back to Assay & Trim", icon = icon("arrow-left")),
+          actionButton("back_rename_from_qc", "Back to Rename", icon = icon("arrow-left")),
           div(class = "stage-topbar-spacer"),
-          actionButton("to_rename", "Continue to Rename", icon = icon("arrow-right"), class = "btn-primary")
+          actionButton("to_export", "Continue to Export", icon = icon("arrow-right"), class = "btn-primary")
         ),
         uiOutput("qc_summary_cards"),
         div(class = "panel-box stage-table-card",
@@ -672,7 +684,7 @@ ui <- fluidPage(
             tags$summary(class = "stage1-audit-toggle", "Open evidence audit"),
             div(class = "status-note",
                 tags$strong("Validation mode only. "),
-                "The active v2.14.2 trimming/QC path is still the decision path. alpha.3 adds a same-length PCON-only comparison window, but it does not apply that proposal to the processed sequence, FASTA or BLAST output."),
+                "The active v2.14.2 trimming/QC path is still the decision path. alpha.4 keeps the same-length PCON-only comparison observational; it does not apply that proposal to the processed sequence, FASTA or BLAST output."),
             div(class = "subsection-title", "Run-level audit"),
             DTOutput("ab1_evidence_run_table"),
             div(class = "blast-action-row",
@@ -721,26 +733,26 @@ ui <- fluidPage(
           )
         ),
         div(class = "panel-box sequence-preview-card",
-          card_title("Curated sequence", "This exact sequence is carried forward to rename, export and BLAST.", "file-text"),
+          card_title("Curated sequence", "This exact sequence retains its resolved sample name and is carried forward to export and BLAST.", "file-text"),
           textAreaInput("trimmed_sequence_preview", NULL, value = "", rows = 8, width = "100%")
         ),
         div(class = "panel-box checkpoint checkpoint-modern",
           div(class = "checkpoint-copy",
-            card_title("Checkpoint A · Processed sequences", "Save the QC/curation state before renaming.", "save")
+            card_title("Checkpoint B · Renamed and curated sequences", "Save the resolved naming and QC/curation state before export.", "save")
           ),
           downloadButton("download_trim_checkpoint", "Download checkpoint ZIP")
         ),
-        pipeline_stage_footer(3)
+        pipeline_stage_footer(4)
       ),
       # --------------------------------------------------------
-      # 4. Rename
+      # 3. Rename
       # --------------------------------------------------------
-      tabPanel("4 · Rename", value = "rename",
-        stage_heading("tags", "Resolve sample names", "Apply a naming key or batch rules, then verify the final sequence names.", "Step 4 of 7"),
+      tabPanel("3 · Rename", value = "rename",
+        stage_heading("tags", "Resolve sample names", "Name samples before QC so every chromatogram and review table is easier to identify.", "Step 3 of 7"),
         stage_topbar(
-          actionButton("back_qc", "Back to QC", icon = icon("arrow-left")),
+          actionButton("back_settings_from_rename", "Back to Assay & Trim", icon = icon("arrow-left")),
           div(class = "stage-topbar-spacer"),
-          actionButton("to_export", "Continue to Export", icon = icon("arrow-right"), class = "btn-primary")
+          actionButton("to_qc", "Continue to QC", icon = icon("arrow-right"), class = "btn-primary")
         ),
         div(class = "stage-grid stage-grid-rename",
           div(class = "panel-box",
@@ -772,10 +784,10 @@ ui <- fluidPage(
           uiOutput("rename_validation")
         ),
         div(class = "panel-box checkpoint checkpoint-modern",
-          div(class = "checkpoint-copy", card_title("Checkpoint B · Renamed sequences", "Save the resolved naming state before export.", "save")),
+          div(class = "checkpoint-copy", card_title("Checkpoint A · Renamed sequences", "Save the resolved naming state before QC and curation.", "save")),
           downloadButton("download_rename_checkpoint", "Download checkpoint ZIP")
         ),
-        pipeline_stage_footer(4)
+        pipeline_stage_footer(3)
       ),
       # --------------------------------------------------------
       # 5. Export
@@ -783,7 +795,7 @@ ui <- fluidPage(
       tabPanel("5 · Export", value = "export",
         stage_heading("download", "Export processed sequences", "Create working FASTA files or an auditable package of the complete processing run.", "Step 5 of 7"),
         stage_topbar(
-          actionButton("back_rename", "Back to Rename", icon = icon("arrow-left")),
+          actionButton("back_qc_from_export", "Back to QC", icon = icon("arrow-left")),
           div(class = "stage-topbar-spacer"),
           actionButton("to_blast", "Continue to NCBI BLAST", icon = icon("arrow-right"), class = "btn-primary")
         ),
@@ -941,7 +953,7 @@ ui <- fluidPage(
           p(class="about-lead",
             "Documentation for the laboratory workflow, the BLAST/taxonomy interpretation logic, and the scientific sources used to guide the application. Published evidence and application-specific heuristics are labeled separately."),
           div(class="help-flow",
-              "AB1 upload  →  Assay & trimming  →  QC  →  Rename  →  Export  →  NCBI BLAST  →  Taxonomic interpretation")
+              "AB1 upload  →  Assay & trimming  →  Rename  →  QC  →  Export  →  NCBI BLAST  →  Taxonomic interpretation")
         ),
 
         div(class="about-section",
@@ -1433,7 +1445,7 @@ server <- function(input, output, session) {
     result_names <- names(rv$results)
     saved_ui <- obj$ui_state
     inspect_selected <- if (!is.null(saved_ui$inspect_sample) && saved_ui$inspect_sample %in% result_names) saved_ui$inspect_sample else if (length(result_names)) result_names[1] else character()
-    updateSelectInput(session, "inspect_sample", choices = result_names, selected = inspect_selected)
+    sync_qc_sample_choices(inspect_selected)
 
     final_names <- if (!is.null(rv$rename) && nrow(rv$rename)) setNames(rv$rename$Original_name, rv$rename$New_name) else setNames(result_names, result_names)
     blast_selected <- if (!is.null(saved_ui$blast_sample) && saved_ui$blast_sample %in% unname(final_names)) saved_ui$blast_sample else if (length(final_names)) unname(final_names)[1] else character()
@@ -1452,7 +1464,7 @@ server <- function(input, output, session) {
       updateSelectInput(session, "tax_sample", choices = character())
     }
 
-    active <- if (!is.null(obj$active_tab) && obj$active_tab %in% c("upload","settings","qc","rename","export","blast","taxonomy","help")) obj$active_tab else if (nrow(rv$taxonomy_summary)) "taxonomy" else if (nrow(rv$blast_hits)) "blast" else if (length(rv$results)) "qc" else "upload"
+    active <- if (!is.null(obj$active_tab) && obj$active_tab %in% c("upload","settings","qc","rename","export","blast","taxonomy","help")) obj$active_tab else if (nrow(rv$taxonomy_summary)) "taxonomy" else if (nrow(rv$blast_hits)) "blast" else if (length(rv$results)) "rename" else "upload"
     updateTabsetPanel(session, "pipeline_step", selected = active)
 
     rv$project_loaded_name <- input$load_project$name
@@ -1479,9 +1491,9 @@ server <- function(input, output, session) {
     updateTabsetPanel(session, "pipeline_step", selected="settings")
   })
   observeEvent(input$back_upload, updateTabsetPanel(session,"pipeline_step",selected="upload"))
-  observeEvent(input$back_settings, updateTabsetPanel(session,"pipeline_step",selected="settings"))
-  observeEvent(input$back_qc, updateTabsetPanel(session,"pipeline_step",selected="qc"))
-  observeEvent(input$back_rename, updateTabsetPanel(session,"pipeline_step",selected="rename"))
+  observeEvent(input$back_settings_from_rename, updateTabsetPanel(session,"pipeline_step",selected="settings"))
+  observeEvent(input$back_rename_from_qc, updateTabsetPanel(session,"pipeline_step",selected="rename"))
+  observeEvent(input$back_qc_from_export, updateTabsetPanel(session,"pipeline_step",selected="qc"))
   observeEvent(input$back_export, updateTabsetPanel(session,"pipeline_step",selected="export"))
   observeEvent(input$back_blast, updateTabsetPanel(session,"pipeline_step",selected="blast"))
 
@@ -1537,11 +1549,25 @@ server <- function(input, output, session) {
     rv$results <- all_results
     rv$summary <- Reduce(rbind_fill, summaries); rownames(rv$summary) <- NULL
     rv$rename <- data.frame(Original_name=rv$summary$sample_id, New_name=rv$summary$sample_id, stringsAsFactors=FALSE)
-    choices <- names(rv$results)
-    updateSelectInput(session,"inspect_sample",choices=choices,selected=if(length(choices)) choices[1] else character())
-    session$sendCustomMessage("showLoader", list(text = "Loading QC workspace…"))
-    updateTabsetPanel(session,"pipeline_step",selected="qc")
+    session$sendCustomMessage("showLoader", list(text = "Loading Rename workspace…"))
+    updateTabsetPanel(session,"pipeline_step",selected="rename")
   })
+
+  qc_display_name <- function(original_name) {
+    original_name <- as.character(original_name)[1]
+    if (is.null(rv$rename) || !nrow(rv$rename)) return(original_name)
+    idx <- match(original_name, rv$rename$Original_name)
+    if (is.na(idx) || !nzchar(trimws(rv$rename$New_name[idx]))) original_name else as.character(rv$rename$New_name[idx])
+  }
+
+  sync_qc_sample_choices <- function(preferred = NULL) {
+    keys <- names(rv$results)
+    labels <- vapply(keys, qc_display_name, character(1))
+    choices <- stats::setNames(keys, labels)
+    current <- if (!is.null(preferred) && preferred %in% keys) preferred else isolate(input$inspect_sample)
+    selected <- if (!is.null(current) && length(current) == 1L && current %in% keys) current else if (length(keys)) keys[1] else character()
+    updateSelectInput(session, "inspect_sample", choices = choices, selected = selected)
+  }
 
   # ---------------- QC summary ----------------
   output$qc_summary_cards <- renderUI({
@@ -1558,6 +1584,7 @@ server <- function(input, output, session) {
   output$summary_table <- renderDT({
     req(rv$summary)
     df <- rv$summary[,c("sample_id","target","raw_length","trimmed_length","trim_start","trim_end","collapse_index","reason","median_peak_ratio_trimmed","status")]
+    df$sample_id <- vapply(df$sample_id, qc_display_name, character(1))
     names(df) <- c("Sample","Target","Raw length","Trimmed length","Start","End","Collapse","Reason","Median peak ratio","Status")
     datatable(df, rownames=FALSE, filter="top", options=list(pageLength=15,scrollX=TRUE))
   })
@@ -1593,6 +1620,7 @@ server <- function(input, output, session) {
                        rownames = FALSE, selection = "none", options = list(dom = "t")))
     }
     display <- df
+    display$Sample <- vapply(display$Sample, qc_display_name, character(1))
     names(display) <- c(
       "Sample", "Evidence", "Quality tag", "Quality coverage (%)",
       "Auto trim start", "Auto trim end", "Auto trim length", "Median quality · auto trim",
@@ -1629,27 +1657,29 @@ server <- function(input, output, session) {
     key <- selected_sample_key()
     r <- selected_result()
     sid <- pitax_result_sample_id(r, key)
+    display_name <- qc_display_name(key)
+    sample_label <- if (!identical(display_name, sid)) paste0(display_name, " (original: ", sid, ")") else sid
     ev <- r$ab1_evidence
     if (is.null(ev)) {
       return(div(class = "status-note",
-                 tags$strong(paste0("Selected sample: ", sid, ". ")),
-                 "This sample has no Stage 1 evidence object. Reprocess the original AB1 with alpha.3 to create the audit."))
+                 tags$strong(paste0("Selected sample: ", sample_label, ". ")),
+                 "This sample has no Stage 1 evidence object. Reprocess the original AB1 with alpha.4 to create the audit."))
     }
     if (!is.null(ev$error) && nzchar(as.character(ev$error)[1])) {
-      return(div(class = "status-error", tags$strong(paste0("Selected sample: ", sid, ". ")),
+      return(div(class = "status-error", tags$strong(paste0("Selected sample: ", sample_label, ". ")),
                  paste0("Evidence audit error: ", as.character(ev$error)[1],
                         ". The established trimming result was preserved.")))
     }
     sm <- ab1_evidence_result_summary(r)
     tagList(
-      div(class = "compact-hint", tags$strong(paste0("Selected sample: ", sid))),
+      div(class = "compact-hint", tags$strong(paste0("Selected sample: ", sample_label))),
       div(class = "peak-flag-summary",
           div(class = "peak-flag-pill", tags$strong(sm$Quality_tag[1]), " quality tag"),
           div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Median_quality_auto_trim[1]), sm$Median_quality_auto_trim[1], "NA")), " median quality in auto trim"),
           div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Q20_auto_trim_percent[1]), paste0(sm$Q20_auto_trim_percent[1], "%"), "NA")), " Q≥20 in auto trim"),
           div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Primary_position_difference_percent[1]), paste0(sm$Primary_position_difference_percent[1], "%"), "NA")), " PLOC vs legacy positions differ")),
       div(class = "compact-hint",
-          "alpha.3 compares the active legacy auto trim with a same-length PCON-only window. The comparison is observational and does not change the processed sequence.")
+          "alpha.4 compares the active legacy auto trim with a same-length PCON-only window. The comparison is observational and does not change the processed sequence.")
     )
   })
 
@@ -1672,8 +1702,9 @@ server <- function(input, output, session) {
     }
     d <- pitax_add_trim_membership(ev$detail, r)
     d$Sample_ID <- pitax_result_sample_id(r, key)
+    d$Final_Name <- qc_display_name(key)
     keep <- c(
-      "Sample_ID", "Position", "Base", "In_auto_trim", "In_quality_proposed_window", "Basecaller_quality",
+      "Sample_ID", "Final_Name", "Position", "Base", "In_auto_trim", "In_quality_proposed_window", "Basecaller_quality",
       "Legacy_primary_peak_pos", "Raw_ABIF_primary_peak_pos", "Primary_peak_pos_delta",
       "Legacy_called_signal", "Legacy_called_is_max",
       "Canonical_called_signal", "Canonical_best_alt_signal", "Canonical_called_to_alt_ratio",
@@ -1690,6 +1721,8 @@ server <- function(input, output, session) {
     filename = function() paste0("PITAX_v3_stage1_AB1_run_audit_", format(Sys.Date(), "%Y%m%d"), ".csv"),
     content = function(file) {
       df <- ab1_evidence_run_summary(rv$results)
+      df$Final_Name <- vapply(df$Sample, qc_display_name, character(1))
+      df <- df[, c("Sample", "Final_Name", setdiff(names(df), c("Sample", "Final_Name"))), drop = FALSE]
       utils::write.csv(df, file, row.names = FALSE, na = "")
     }
   )
@@ -1698,13 +1731,15 @@ server <- function(input, output, session) {
     filename = function() {
       key <- selected_sample_key()
       r <- selected_result()
-      sid <- pitax_assert_export_identity(r, key)
-      paste0(clean_fasta_name(sid), "_PITAX_v3_stage1_AB1_base_audit.csv")
+      pitax_assert_export_identity(r, key)
+      paste0(clean_fasta_name(qc_display_name(key)), "_PITAX_v3_stage1_AB1_base_audit.csv")
     },
     content = function(file) {
       key <- selected_sample_key()
       r <- selected_result()
       d <- pitax_evidence_detail_export(r, key)
+      d$Final_Name <- qc_display_name(key)
+      d <- d[, c("Sample_ID", "Final_Name", setdiff(names(d), c("Sample_ID", "Final_Name"))), drop = FALSE]
       utils::write.csv(d, file, row.names = FALSE, na = "")
     }
   )
@@ -2161,8 +2196,10 @@ server <- function(input, output, session) {
   }, ignoreInit = TRUE)
 
   output$chromatogram_plot <- plotly::renderPlotly({
+    plot_result <- selected_result()
+    plot_result$display_name <- qc_display_name(selected_sample_key())
     make_chromatogram_plotly(
-      selected_result(), rv$settings,
+      plot_result, rv$settings,
       flags = current_peak_flags(),
       show_flags = isTRUE(input$show_peak_flags)
     )
@@ -2171,8 +2208,6 @@ server <- function(input, output, session) {
   output$qc_plot <- renderPlot({
     draw_qc_metrics(selected_result(), rv$settings)
   })
-
-  observeEvent(input$to_rename, { req(rv$summary); updateTabsetPanel(session,"pipeline_step",selected="rename") })
 
   # ---------------- Rename key ----------------
   rename_key_data <- reactive({
@@ -2236,6 +2271,14 @@ server <- function(input, output, session) {
     e <- rename_error(); if(is.null(e)) div(class="status-ok","✓ Sequence names are valid.") else div(class="status-error",paste0("⚠ ",e))
   })
 
+  observeEvent(input$to_qc, {
+    e <- rename_error()
+    if (!is.null(e)) { showNotification(e, type = "error"); return() }
+    sync_qc_sample_choices()
+    session$sendCustomMessage("showLoader", list(text = "Loading renamed QC workspace…"))
+    updateTabsetPanel(session, "pipeline_step", selected = "qc")
+  })
+
   # ---------------- Export records ----------------
   export_records <- reactive({
     req(rv$results,rv$rename)
@@ -2273,13 +2316,12 @@ server <- function(input, output, session) {
 
   # ---------------- Checkpoints ----------------
   output$download_trim_checkpoint <- downloadHandler(
-    filename=function() paste0(clean_fasta_name(rv$settings$target),"_checkpoint_A_trim.zip"),
+    filename=function() paste0(clean_fasta_name(rv$settings$target),"_checkpoint_B_qc.zip"),
     content=function(file){
-      rec <- export_records(); for(n in names(rec)) rec[[n]]$final_name <- n
-      write_checkpoint_zip(file,"trim",rec,rv$summary,rv$settings,results=rv$results)
+      write_checkpoint_zip(file,"qc",export_records(),export_summary_df(),rv$settings,rv$rename,results=rv$results)
     })
   output$download_rename_checkpoint <- downloadHandler(
-    filename=function() paste0(clean_fasta_name(rv$settings$target),"_checkpoint_B_rename.zip"),
+    filename=function() paste0(clean_fasta_name(rv$settings$target),"_checkpoint_A_rename.zip"),
     content=function(file) write_checkpoint_zip(file,"renamed",export_records(),export_summary_df(),rv$settings,rv$rename,results=rv$results))
 
   output$download_blast_fasta <- downloadHandler(

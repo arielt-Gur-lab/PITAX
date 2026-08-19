@@ -3897,10 +3897,10 @@
   },
   "files": {
     "app.R": {
-      "checksum": "6a80f1f588da31ddc2b9a8d558e31d89"
+      "checksum": "5720ef87a151906a3a0b7fb78cf8c286"
     },
     "CHANGELOG.md": {
-      "checksum": "1133e4de0714d89ec73f0e4d0291e488"
+      "checksum": "9e81d383c67851459995eaba4147fa75"
     },
     "DEPLOYMENT.md": {
       "checksum": "b1d95c7b85a425daec686ba3cbaba436"
@@ -3918,31 +3918,31 @@
       "checksum": "51cdca309fc3903a1375bbe95f7e907c"
     },
     "R/ab1_evidence.R": {
-      "checksum": "e32ef6f89c9d382999651c71878e6fc8"
+      "checksum": "e45fbf4bd2ae9560073811ce16f5a1b2"
     },
     "R/core_sanger.R": {
-      "checksum": "a8632ce7926a4676dba01a5481252b99"
+      "checksum": "ec5756e96bb3a2de7e5b44356f2748f1"
     },
     "R/export_tools.R": {
       "checksum": "a15f44236bd6679104d231805d880cf9"
     },
     "R/sequence_tools.R": {
-      "checksum": "261ef7df9a49fc76ec81ca82c74322a2"
+      "checksum": "43bf50d3a4fae57324b864cd1217e288"
     },
     "R/taxonomy_tools.R": {
       "checksum": "7acc5a3befc0f17f7eeca489ce28440a"
     },
     "README.txt": {
-      "checksum": "6f0c5b8fd4346617c5b24aed63b1221a"
+      "checksum": "19b9e578a7f17118728db12485c60caa"
     },
     "run_app.bat": {
       "checksum": "e747f1c11fc42fde571e1ec7e14cd626"
     },
     "run_tests.bat": {
-      "checksum": "162209da72aa6fb4d46958c6b1a39eb5"
+      "checksum": "4cbcff0bed5f34f9d52ac0f2965b28c1"
     },
     "tests/ab1_evidence_smoke.R": {
-      "checksum": "2bb8949568f66d61afdfbfb9cb22ef03"
+      "checksum": "41951b2ee240457c9396b88f34e2c780"
     },
     "tests/manual_curation_smoke.R": {
       "checksum": "2385057d4f1ecbfa2243a5ee46f81307"
@@ -3953,14 +3953,17 @@
     "tests/taxonomy_logic_smoke.R": {
       "checksum": "b70df61aa963b37bffb0e00c990ff2a3"
     },
+    "tests/workflow_order_smoke.R": {
+      "checksum": "1c9c78022c5edeb1cea27e87eae1e885"
+    },
     "V3_ROADMAP.md": {
-      "checksum": "60e79e832a726d372bc2b0cc03759f74"
+      "checksum": "19e1759ff36d6fdabefacc020f9e6fc2"
     },
     "V3_STAGE1.md": {
-      "checksum": "aa8acf46684dc9bd6c62ea2f3c5ea4d7"
+      "checksum": "4504bbc51e6eca21b14e16f2b72b0e07"
     },
     "VERSION.txt": {
-      "checksum": "109e8c94ccb89c869af0ff1e953be401"
+      "checksum": "821eba462b8a242e2cdfd88e8188666f"
     }
   },
   "users": null

@@ -982,7 +982,10 @@ make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags 
     p,
     # Keep the internal title to the sample ID only. The previous em dash was
     # rendered as byte markers on some Windows/R locale combinations.
-    title = list(text = as.character(result$sample_id)[1], x = 0),
+    title = list(
+      text = if (!is.null(result$display_name) && nzchar(as.character(result$display_name)[1])) as.character(result$display_name)[1] else as.character(result$sample_id)[1],
+      x = 0
+    ),
     dragmode = "pan",
     hovermode = "x unified",
     margin = list(l = 65, r = 125, t = 75, b = 55),
@@ -995,7 +998,16 @@ make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags 
     xaxis = list(
       title = "Base position",
       range = c(initial_start, initial_end),
-      rangeslider = list(visible = TRUE, thickness = 0.10)
+      rangeslider = list(
+        visible = TRUE,
+        thickness = 0.055,
+        bgcolor = "#f8fafc",
+        bordercolor = "#cbd5e1",
+        borderwidth = 1,
+        # Clip base letters and QC markers from the navigator. Only the signal
+        # overview remains, avoiding the dense black annotation band.
+        yaxis = list(rangemode = "fixed", range = c(0, ymax))
+      )
     ),
     yaxis = list(title = "Signal", range = c(0, ymax * 1.22), fixedrange = FALSE),
     shapes = shapes,

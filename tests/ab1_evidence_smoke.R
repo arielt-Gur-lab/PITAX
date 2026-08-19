@@ -1,4 +1,4 @@
-# PITAX v3.0.0-alpha.3 - Stage 1 AB1 evidence helper tests.
+# PITAX v3.0.0-alpha.4 - Stage 1 AB1 evidence helper tests.
 # Synthetic tests for corrected raw-ABIF interpretation, export identity and
 # the observational same-length PCON window comparison.
 
@@ -113,4 +113,4 @@ shift_summary <- ab1_evidence_result_summary(res_shift)
 stopifnot(shift_summary$Auto_trim_start == 1L, shift_summary$Auto_trim_end == 2L, shift_summary$Auto_trim_length == 2L)
 stopifnot(shift_summary$Quality_window_start == 4L, shift_summary$Quality_window_end == 5L)
 
-cat("v3.0.0-alpha.3 AB1 evidence helper tests passed.\n")
+cat("v3.0.0-alpha.4 AB1 evidence helper tests passed.\n")

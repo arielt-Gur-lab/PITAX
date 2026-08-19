@@ -1,6 +1,6 @@
 # ============================================================
 # PITAX 3.0 Stage 1 - AB1 evidence audit helpers
-# v3.0.0-alpha.3
+# v3.0.0-alpha.4
 # ============================================================
 #
 # Stage 1 remains observational.  alpha.2 corrects an assumption made in

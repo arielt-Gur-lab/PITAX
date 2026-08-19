@@ -5,12 +5,12 @@ PITAX 3.0 will be built as five gated stages. A stage advances only after its te
 ## Stage 1 — Read evidence foundation
 Goal: validate the raw AB1 evidence model before changing any biological decision.
 
-- Preserve v2.14.2 production behavior.
+- Preserve v2.14.2 biological decision behavior; the deliberate Rename-before-QC workflow change is presentation/state flow only.
 - Capture basecaller quality, raw ABIF primary-call coordinates and canonical A/C/G/T trace evidence.
 - Validate the legacy PITAX primary positions against ABIF PLOC.2 and the inferred channel map against the canonical trace order on real AB1 files.
 - Establish regression tests and an audit export.
 
-Gate: existing workflow remains unchanged and real laboratory AB1 files produce interpretable audit evidence without processing failures.
+Gate: real laboratory AB1 files produce interpretable audit evidence without processing failures; original and resolved sample identities remain traceable through Rename → QC; trimming, curation, BLAST and taxonomy decisions remain unchanged.
 
 ## Stage 2 — Isolate / locus / read architecture
 Goal: make the isolate the primary biological object while preserving single-read workflows.
