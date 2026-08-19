@@ -1,6 +1,6 @@
 # ============================================================
-# PITAX v2.14.2
-# Modular Shiny application
+# PITAX v3.0.0-alpha.1.1
+# Stage 1: evidence foundation / compatibility audit
 # ============================================================
 
 required_cran <- c("shiny", "DT", "zip", "readxl", "httr2", "plotly", "xml2", "rentrez", "taxize", "openxlsx")
@@ -24,13 +24,14 @@ if (PITAX_LOGO_AVAILABLE) {
   addResourcePath("pitax-assets", PITAX_ASSET_DIR)
 }
 
+source(file.path("R", "ab1_evidence.R"), local = TRUE)
 source(file.path("R", "core_sanger.R"), local = TRUE)
 source(file.path("R", "sequence_tools.R"), local = TRUE)
 source(file.path("R", "export_tools.R"), local = TRUE)
 source(file.path("R", "taxonomy_tools.R"), local = TRUE)
 
-APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "2.14.2")
-APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "2.14.2", APP_VERSION)
+APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.0.0-alpha.1.1")
+APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "3.0.0-alpha.1.1", APP_VERSION)
 PROJECT_SCHEMA_VERSION <- 1L
 
 # ============================================================
@@ -178,6 +179,10 @@ ui <- fluidPage(
       textarea.form-control { font-family:Consolas,Monaco,monospace; }
       .btn { border-radius:7px; margin-right:6px; margin-bottom:6px; }
       .experimental-box { background:#fffdf5; border:1px solid #f1dfae; border-radius:8px; padding:10px 12px; margin-top:8px; }
+      .stage1-evidence-card { border-style:dashed; }
+      .stage1-audit-details { margin-top:8px; }
+      .stage1-audit-toggle { cursor:pointer; font-weight:600; padding:10px 0; color:#374151; }
+      .stage1-audit-details[open] .stage1-audit-toggle { margin-bottom:10px; }
       .stage-topbar { background:#ffffff; border:1px solid #dbe3ee; border-radius:10px; padding:12px 14px; margin:0 0 16px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
       .stage-topbar .btn { margin-bottom:0; }
       .pipeline-schema-wrap { margin:30px 4px 12px; padding:8px 4px 4px; }
@@ -658,6 +663,26 @@ ui <- fluidPage(
               card_title("Interactive chromatogram", "X axis = raw called-base position. Zoom, pan, or click a flagged position to inspect it.", "line-chart"),
               plotly::plotlyOutput("chromatogram_plot", height = "540px")
             )
+          )
+        ),
+        div(class = "panel-box stage1-evidence-card",
+          card_title("Stage 1 · AB1 evidence audit", "Observational comparison of the established PITAX v2 read model with additional evidence exposed by sangerseqR. This panel does not alter trimming, curation, BLAST or taxonomy in this alpha.", "microscope"),
+          tags$details(
+            class = "stage1-audit-details",
+            tags$summary(class = "stage1-audit-toggle", "Open evidence audit"),
+            div(class = "status-note",
+                tags$strong("Validation mode only. "),
+                "The active v2.14.2 trimming/QC path is still the decision path. Stage 1 captures ABIF basecaller quality (PCON when present), the documented A/C/G/T channel model, and called-base-specific peak positions so they can be compared on real laboratory traces before any engine change."),
+            div(class = "subsection-title", "Run-level audit"),
+            DTOutput("ab1_evidence_run_table"),
+            div(class = "blast-action-row",
+              downloadButton("download_ab1_evidence_run", "Download run audit CSV", class = "btn-default"),
+              downloadButton("download_ab1_evidence_detail", "Download selected-base audit CSV", class = "btn-default")
+            ),
+            div(class = "subsection-divider"),
+            div(class = "subsection-title", "Selected sample · per-base evidence"),
+            uiOutput("ab1_evidence_selected_note"),
+            DTOutput("ab1_evidence_detail_table")
           )
         ),
         div(class = "panel-box peak-review-card",
@@ -1548,6 +1573,97 @@ server <- function(input, output, session) {
   output$sequence_metrics <- renderDT({
     datatable(make_sequence_preview(selected_result()), rownames = FALSE, options = list(dom = "t"))
   })
+
+  # ---------------- PITAX 3.0 Stage 1: AB1 evidence audit ----------------
+  output$ab1_evidence_run_table <- renderDT({
+    req(rv$results)
+    df <- ab1_evidence_run_summary(rv$results)
+    if (!nrow(df)) {
+      return(datatable(data.frame(Message = "No AB1 evidence has been captured in this run."),
+                       rownames = FALSE, selection = "none", options = list(dom = "t")))
+    }
+    display <- df
+    names(display) <- c(
+      "Sample", "Evidence", "Quality tag", "Quality coverage (%)", "Median quality · auto trim",
+      "Legacy map", "Documented map", "Peak positions different (%)", "Median |peak Δ|",
+      "Legacy call is max (%)", "Called-base position call is max (%)", "PeakAmp call is max (%)"
+    )
+    datatable(display, rownames = FALSE, filter = "top",
+              options = list(pageLength = 12, scrollX = TRUE, dom = "tip"))
+  })
+
+  output$ab1_evidence_selected_note <- renderUI({
+    r <- selected_result()
+    ev <- r$ab1_evidence
+    if (is.null(ev)) {
+      return(div(class = "status-note",
+                 "This sample has no Stage 1 evidence object. This is expected for projects processed before v3.0.0-alpha.1.1; reprocess the original AB1 to create the audit."))
+    }
+    if (!is.null(ev$error) && nzchar(as.character(ev$error)[1])) {
+      return(div(class = "status-error", paste0("Evidence audit error: ", as.character(ev$error)[1],
+                                                 ". The established trimming result was preserved.")))
+    }
+    sm <- ab1_evidence_result_summary(r)
+    tagList(
+      div(class = "peak-flag-summary",
+          div(class = "peak-flag-pill", tags$strong(sm$Quality_tag[1]), " quality tag"),
+          div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Median_quality_auto_trim[1]), sm$Median_quality_auto_trim[1], "NA")), " median quality in auto trim"),
+          div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Peak_position_difference_percent[1]), paste0(sm$Peak_position_difference_percent[1], "%"), "NA")), " legacy vs called-base peak positions differ")),
+      div(class = "compact-hint",
+          "Interpret these values as an audit, not a new QC score. A high difference between legacy and called-base-specific peak positions is exactly what Stage 1 is designed to quantify before the v3 read engine changes.")
+    )
+  })
+
+  output$ab1_evidence_detail_table <- renderDT({
+    r <- selected_result()
+    ev <- r$ab1_evidence
+    if (is.null(ev) || !is.data.frame(ev$detail) || !nrow(ev$detail)) {
+      return(datatable(data.frame(Message = "No per-base Stage 1 evidence available for this sample."),
+                       rownames = FALSE, selection = "none", options = list(dom = "t")))
+    }
+    d <- ev$detail
+    st <- suppressWarnings(as.integer(r$curation$auto_trim_start))
+    en <- suppressWarnings(as.integer(r$curation$auto_trim_end))
+    d$In_auto_trim <- if (is.finite(st) && is.finite(en)) d$Position >= st & d$Position <= en else NA
+    keep <- c(
+      "Position", "Base", "In_auto_trim", "Basecaller_quality",
+      "Legacy_peak_pos", "Called_base_peak_pos", "Peak_pos_delta",
+      "Legacy_called_signal", "Legacy_called_is_max",
+      "Called_base_signal", "Called_base_best_alt_signal", "Called_base_to_alt_ratio",
+      "Called_base_best_channel", "Called_base_is_max",
+      "PeakAmp_called_signal", "PeakAmp_best_alt_signal", "PeakAmp_called_to_alt_ratio",
+      "PeakAmp_best_channel", "PeakAmp_called_is_max"
+    )
+    d <- d[, intersect(keep, names(d)), drop = FALSE]
+    numeric_cols <- names(d)[vapply(d, is.numeric, logical(1))]
+    for (nm in numeric_cols) d[[nm]] <- round(d[[nm]], 3)
+    datatable(d, rownames = FALSE, filter = "top",
+              options = list(pageLength = 15, scrollX = TRUE, dom = "tip"))
+  })
+
+  output$download_ab1_evidence_run <- downloadHandler(
+    filename = function() paste0("PITAX_v3_stage1_AB1_run_audit_", format(Sys.Date(), "%Y%m%d"), ".csv"),
+    content = function(file) {
+      df <- ab1_evidence_run_summary(rv$results)
+      utils::write.csv(df, file, row.names = FALSE, na = "")
+    }
+  )
+
+  output$download_ab1_evidence_detail <- downloadHandler(
+    filename = function() {
+      sid <- if (!is.null(input$inspect_sample) && nzchar(input$inspect_sample)) clean_fasta_name(input$inspect_sample) else "sample"
+      paste0(sid, "_PITAX_v3_stage1_AB1_base_audit.csv")
+    },
+    content = function(file) {
+      r <- selected_result()
+      ev <- r$ab1_evidence
+      if (is.null(ev) || !is.data.frame(ev$detail) || !nrow(ev$detail)) {
+        utils::write.csv(data.frame(Message = "No Stage 1 evidence available."), file, row.names = FALSE)
+      } else {
+        utils::write.csv(ev$detail, file, row.names = FALSE, na = "")
+      }
+    }
+  )
   output$primer_match_table <- renderDT({
     req(isTRUE(input$enable_primer_mapping))
     datatable(primer_match_table(selected_result(), rv$settings), rownames = FALSE,

@@ -670,6 +670,28 @@ trim_one_ab1 <- function(
     max_index =
       settings$absolute_max_base_index
   )
+
+
+  # Stage 1 / PITAX 3.0: capture the richer AB1 evidence in parallel with
+  # the established v2 processing path. This is observational only in
+  # 3.0.0-alpha.1.1; trim/QC decisions below still use the legacy metrics.
+  ab1_evidence <- tryCatch(
+    build_ab1_evidence(
+      sanger_object = s,
+      seq_string = seq_string,
+      trace = trace,
+      legacy_peak_pos = peak_pos,
+      legacy_channel_map = inferred$map,
+      abif_object = tryCatch(read.abif(file), error = function(e) NULL)
+    ),
+    error = function(e) list(
+      schema = "ab1-evidence-audit-v1",
+      mode = "observational-only",
+      error = conditionMessage(e),
+      detail = data.frame(),
+      summary = data.frame()
+    )
+  )
   
   
   metrics <- calculate_metrics(
@@ -1012,6 +1034,9 @@ trim_one_ab1 <- function(
 
     channel_map =
       inferred$map,
+
+    ab1_evidence =
+      ab1_evidence,
     
     summary =
       summary

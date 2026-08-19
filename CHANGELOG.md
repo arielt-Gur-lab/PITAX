@@ -2,6 +2,22 @@
 
 This file records changes that affect the way the pipeline behaves, presents results, or stores project data. Small internal refactors are omitted unless they change something visible or scientifically relevant.
 
+## 3.0.0-alpha.1.1
+
+- Test-only hotfix for Stage 1. The synthetic AB1 evidence test now accepts a called/alternative signal ratio exactly equal to 10.0.
+- No trimming, QC, curation, BLAST, taxonomy, or AB1 evidence calculation logic changed.
+
+## 3.0.0-alpha.1
+**Stage 1 · AB1 evidence foundation**
+- Starts the PITAX 3.0 migration without changing the established v2.14.2 trimming, curation, BLAST or taxonomy decision paths.
+- Captures ABIF basecaller quality values from `PCON.2`/`PCON.1` when present.
+- Captures the full `peakPosMatrix` and `peakAmpMatrix` supplied by `sangerseqR`.
+- Adds an observational A/C/G/T evidence model that selects the peak-position column corresponding to the called base and compares it with the v2 legacy first-column position model.
+- Adds a collapsed **Stage 1 · AB1 evidence audit** panel in QC with run-level and per-base diagnostics plus CSV downloads.
+- Evidence-audit failures are isolated from the production read path: an audit error is reported but does not invalidate a trimming result that the v2.14.2 engine can process.
+- Adds a synthetic regression test for documented A/C/G/T channel mapping, called-base peak positions, signal evidence, `peakAmpMatrix` handling and quality-vector alignment.
+- Adds the five-stage v3 roadmap and a manual real-AB1 validation checklist.
+
 ## 2.14.2
 **PITAX branding and deployment preparation**
 - Added the PITAX logo to the application header. The source image remains `logo.png` in the project root and is served without exposing the source directory.

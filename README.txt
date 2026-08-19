@@ -1,11 +1,25 @@
-PITAX v2.14.2
-============
+PITAX v3.0.0-alpha.1.1
+==================
 
 Purpose
 -------
-Shiny application for Sanger AB1 processing and taxonomic identification. It can run locally or be deployed as a web application:
+Stage 1 alpha of the PITAX 3.0 migration. The application remains a Shiny workflow for Sanger AB1 processing and fungal taxonomic identification and can run locally or online.
 
 AB1 upload -> Assay & trimming -> QC -> Rename -> Export -> NCBI BLAST -> Taxonomic summary
+
+
+PITAX 3.0 Stage 1
+-----------------
+This alpha is intentionally conservative. The v2.14.2 trimming, curation, BLAST and taxonomic decision paths remain active. Stage 1 only captures additional AB1 evidence in parallel so the read model can be validated on real laboratory chromatograms before the v3 consensus engine is built.
+
+New evidence includes:
+- ABIF basecaller quality values from PCON.2/PCON.1 when available.
+- Full sangerseqR peakPosMatrix and peakAmpMatrix.
+- A documented A/C/G/T channel model.
+- Called-base-specific peak positions compared with the v2 legacy first-column peak position.
+- Run and per-base audit CSV exports from QC.
+
+See V3_STAGE1.md for the exact validation checklist.
 
 
 Key v2.14 identification update
@@ -32,7 +46,7 @@ Use the Project bar near the top of the app:
   Save project  -> downloads a .sangerproject file
   Load project  -> restores a previously saved project
 
-Projects retain processed/curated sequences, chromatogram data, automatic trim state, manual curation history, QC, rename mapping, RIDs, retrieved BLAST hits and taxonomic analyses. v2.14.2 remains backward-compatible with earlier v2 project state; older projects simply begin with an empty curation history.
+Projects retain processed/curated sequences, chromatogram data, automatic trim state, manual curation history, QC, rename mapping, RIDs, retrieved BLAST hits and taxonomic analyses. Stage 1 keeps project schema version 1 and remains backward-compatible with v2 project state. Older projects simply have no Stage 1 AB1 evidence object until the original AB1 files are reprocessed.
 
 Run
 ---

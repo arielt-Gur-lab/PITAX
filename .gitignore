@@ -8,6 +8,10 @@
 desktop.ini
 Thumbs.db
 .DS_Store
+
+# Local archive folders (keep on workstation, not in Git)
+old/
+Old/
 .old/
 
 # Raw sequencing files
