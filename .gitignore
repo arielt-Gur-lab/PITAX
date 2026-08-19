@@ -1,0 +1,35 @@
+# R local/session files
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+
+# Windows / OS junk
+desktop.ini
+Thumbs.db
+.DS_Store
+
+# Raw sequencing files
+*.ab1
+
+# PITAX project/session files
+*.sangerproject
+*.rds
+
+# Generated exports
+*_checkpoint_*.zip
+*_results.zip
+*_Sanger_pipeline_results.zip
+*_BLAST.fasta
+*_trimmed_sequences.fasta
+*_summary.csv
+*_summary.xlsx
+*_team_identification_summary.csv
+*_team_identification_summary.xlsx
+*_taxonomic_summary.csv
+*_taxonomy_enriched_hits.csv
+
+# Temporary / cache files
+*.tmp
+*.temp
+~$*
