@@ -1,5 +1,5 @@
 # ============================================================
-# PITAX v3.0.0-alpha.2
+# PITAX v3.0.0-alpha.3
 # Stage 1: evidence foundation / compatibility audit
 # ============================================================
 
@@ -30,8 +30,8 @@ source(file.path("R", "sequence_tools.R"), local = TRUE)
 source(file.path("R", "export_tools.R"), local = TRUE)
 source(file.path("R", "taxonomy_tools.R"), local = TRUE)
 
-APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.0.0-alpha.2")
-APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "3.0.0-alpha.2", APP_VERSION)
+APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.0.0-alpha.3")
+APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "3.0.0-alpha.3", APP_VERSION)
 PROJECT_SCHEMA_VERSION <- 1L
 
 # ============================================================
@@ -660,19 +660,19 @@ ui <- fluidPage(
               uiOutput("expected_amplicon_note")
             ),
             div(class = "panel-box chromatogram-card",
-              card_title("Interactive chromatogram", "X axis = raw called-base position. Zoom, pan, or click a flagged position to inspect it.", "line-chart"),
+              card_title("Chromatogram", "X axis = raw called-base position. Zoom, pan, or click a flagged position to inspect it.", "line-chart"),
               plotly::plotlyOutput("chromatogram_plot", height = "540px")
             )
           )
         ),
         div(class = "panel-box stage1-evidence-card",
-          card_title("Stage 1 · AB1 evidence audit", "Corrected observational audit of the established PITAX v2 read model against raw ABIF primary-call coordinates, basecaller quality and canonical A/C/G/T trace evidence. This panel does not alter trimming, curation, BLAST or taxonomy.", "microscope"),
+          card_title("Stage 1 · AB1 evidence audit", "Observational audit of the established PITAX v2 read model against raw ABIF primary-call coordinates, basecaller quality and canonical A/C/G/T trace evidence. This panel does not alter trimming, curation, BLAST or taxonomy.", "microscope"),
           tags$details(
             class = "stage1-audit-details",
             tags$summary(class = "stage1-audit-toggle", "Open evidence audit"),
             div(class = "status-note",
                 tags$strong("Validation mode only. "),
-                "The active v2.14.2 trimming/QC path is still the decision path. alpha.2 captures ABIF PCON quality, raw primary base-call positions (PLOC.2 + 1), and the canonical A/C/G/T trace model. The incorrect alpha.1 interpretation of raw peakPosMatrix/peakAmpMatrix columns has been removed."),
+                "The active v2.14.2 trimming/QC path is still the decision path. alpha.3 adds a same-length PCON-only comparison window, but it does not apply that proposal to the processed sequence, FASTA or BLAST output."),
             div(class = "subsection-title", "Run-level audit"),
             DTOutput("ab1_evidence_run_table"),
             div(class = "blast-action-row",
@@ -682,6 +682,8 @@ ui <- fluidPage(
             div(class = "subsection-divider"),
             div(class = "subsection-title", "Selected sample · per-base evidence"),
             uiOutput("ab1_evidence_selected_note"),
+            div(class = "subsection-title", "Legacy auto trim vs PCON-only comparison"),
+            DTOutput("ab1_trim_comparison_table"),
             DTOutput("ab1_evidence_detail_table")
           )
         ),
@@ -1592,8 +1594,12 @@ server <- function(input, output, session) {
     }
     display <- df
     names(display) <- c(
-      "Sample", "Evidence", "Quality tag", "Quality coverage (%)", "Median quality · auto trim",
-      "Q≥20 · auto trim (%)", "Q≥30 · auto trim (%)", "Primary position source",
+      "Sample", "Evidence", "Quality tag", "Quality coverage (%)",
+      "Auto trim start", "Auto trim end", "Auto trim length", "Median quality · auto trim",
+      "Q≥20 · auto trim (%)", "Q≥30 · auto trim (%)",
+      "PCON window start", "PCON window end", "PCON window length", "PCON window shift",
+      "Median quality · PCON window", "Q≥20 · PCON window (%)", "Q≥30 · PCON window (%)",
+      "Primary position source",
       "Primary position coverage (%)", "Primary positions different (%)", "Median |position Δ|",
       "Legacy map", "Canonical A/C/G/T map", "Maps match",
       "Legacy call is max (%)", "Canonical call is max (%)",
@@ -1627,7 +1633,7 @@ server <- function(input, output, session) {
     if (is.null(ev)) {
       return(div(class = "status-note",
                  tags$strong(paste0("Selected sample: ", sid, ". ")),
-                 "This sample has no Stage 1 evidence object. Reprocess the original AB1 with alpha.2 to create the corrected audit."))
+                 "This sample has no Stage 1 evidence object. Reprocess the original AB1 with alpha.3 to create the audit."))
     }
     if (!is.null(ev$error) && nzchar(as.character(ev$error)[1])) {
       return(div(class = "status-error", tags$strong(paste0("Selected sample: ", sid, ". ")),
@@ -1643,8 +1649,17 @@ server <- function(input, output, session) {
           div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Q20_auto_trim_percent[1]), paste0(sm$Q20_auto_trim_percent[1], "%"), "NA")), " Q≥20 in auto trim"),
           div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Primary_position_difference_percent[1]), paste0(sm$Primary_position_difference_percent[1], "%"), "NA")), " PLOC vs legacy positions differ")),
       div(class = "compact-hint",
-          "alpha.2 validates the raw ABIF primary-call coordinates (PLOC.2 + 1), PCON quality and A/C/G/T trace evidence. It no longer interprets raw peakPosMatrix/peakAmpMatrix columns as A/C/G/T peaks.")
+          "alpha.3 compares the active legacy auto trim with a same-length PCON-only window. The comparison is observational and does not change the processed sequence.")
     )
+  })
+
+  output$ab1_trim_comparison_table <- renderDT({
+    d <- pitax_trim_window_comparison(selected_result())
+    names(d) <- c(
+      "Window", "Status", "Start", "End", "Length", "Quality coverage (%)",
+      "Median quality", "Q≥20 (%)", "Q≥30 (%)", "Start shift"
+    )
+    datatable(d, rownames = FALSE, selection = "none", options = list(dom = "t", scrollX = TRUE))
   })
 
   output$ab1_evidence_detail_table <- renderDT({
@@ -1655,13 +1670,10 @@ server <- function(input, output, session) {
       return(datatable(data.frame(Message = "No per-base Stage 1 evidence available for this sample."),
                        rownames = FALSE, selection = "none", options = list(dom = "t")))
     }
-    d <- ev$detail
-    st <- suppressWarnings(as.integer(r$curation$auto_trim_start))
-    en <- suppressWarnings(as.integer(r$curation$auto_trim_end))
-    d$In_auto_trim <- if (is.finite(st) && is.finite(en)) d$Position >= st & d$Position <= en else NA
+    d <- pitax_add_trim_membership(ev$detail, r)
     d$Sample_ID <- pitax_result_sample_id(r, key)
     keep <- c(
-      "Sample_ID", "Position", "Base", "In_auto_trim", "Basecaller_quality",
+      "Sample_ID", "Position", "Base", "In_auto_trim", "In_quality_proposed_window", "Basecaller_quality",
       "Legacy_primary_peak_pos", "Raw_ABIF_primary_peak_pos", "Primary_peak_pos_delta",
       "Legacy_called_signal", "Legacy_called_is_max",
       "Canonical_called_signal", "Canonical_best_alt_signal", "Canonical_called_to_alt_ratio",

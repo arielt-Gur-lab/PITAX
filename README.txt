@@ -1,4 +1,4 @@
-PITAX v3.0.0-alpha.2 — Stage 1
+PITAX v3.0.0-alpha.3 — Stage 1
 ================================
 
 Purpose
@@ -11,16 +11,17 @@ AB1 upload -> Assay & trimming -> QC -> Rename -> Export -> NCBI BLAST -> Taxono
 
 Stage 1 adds an observational AB1 evidence audit inside QC.
 
-alpha.2 changes
+alpha.3 changes
 ----------------
-- Corrected the alpha.1 interpretation of raw sangerseqR peak matrices.
-- Raw ABIF primary positions are now read from PLOC.2 (+1 to match R/sangerseqR coordinates).
-- PCON.2/PCON.1 basecaller quality is recorded when available.
-- traceMatrix is treated as canonical A,C,G,T evidence.
-- Existing PITAX inferred mapping and primary positions are compared against those raw/canonical sources without changing trimming.
-- Added auto-trim quality summaries (median quality, Q>=20, Q>=30, called-base dominance and called/alternative signal ratio).
-- Fixed selected-base audit export: selection, result content and filename now use one sample identity; every exported row includes Sample_ID; mismatches are blocked.
-- Clicking a run-audit row selects that same sample in the QC workspace.
+- Keeps the corrected alpha.2 ABIF evidence model and export synchronization.
+- Adds explicit auto-trim start, end and length to the Stage 1 run audit.
+- Adds `In_auto_trim` to every exported per-base audit row.
+- Adds a same-length PCON-only quality-window proposal for comparison. It is ranked by Q>=20, then Q>=30, median quality, mean quality and coverage.
+- Shows legacy auto trim and the PCON-only proposal side by side for the selected sample.
+- Adds `In_quality_proposed_window` to the per-base table and CSV.
+- The proposed quality window is observational only: it does not change trimming, FASTA, curation, BLAST or taxonomy.
+- Simplifies the Plotly title to the sample ID, avoiding the Windows byte-marker rendering of the em dash.
+- Moves the chromatogram legend outside the data area and separates called-base labels from QC markers.
 
 Testing
 -------
@@ -28,9 +29,9 @@ Run `run_tests.bat`.
 
 Expected final line:
 
-  All PITAX v3.0.0-alpha.2 tests passed.
+  All PITAX v3.0.0-alpha.3 tests passed.
 
-Then follow `V3_STAGE1.md`. The key manual regression is to select `265DMAA001_customer`, download the selected-base audit CSV and confirm both filename and every Sample_ID row identify 001.
+Then follow `V3_STAGE1.md`. The key manual regression is to process `265DMAA001_customer`, confirm its active auto trim remains unchanged, and compare it with the observational PCON-only window.
 
 Branching
 ---------

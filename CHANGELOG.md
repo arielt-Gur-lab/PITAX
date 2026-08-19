@@ -2,6 +2,17 @@
 
 This file records changes that affect the way the pipeline behaves, presents results, or stores project data. Small internal refactors are omitted unless they change something visible or scientifically relevant.
 
+## 3.0.0-alpha.3
+**Stage 1 trim comparison and chromatogram layout correction**
+- Added explicit auto-trim start, end and length to the run-level AB1 audit.
+- Added `In_auto_trim` to every per-base audit export row.
+- Added a same-length PCON-only comparison window ranked by Q>=20, Q>=30, median quality, mean quality and coverage, with deterministic proximity tie-breaking.
+- Added a selected-sample comparison table for the active legacy trim and the observational PCON window.
+- Added `In_quality_proposed_window` to the per-base audit table and CSV.
+- Kept the quality-window proposal strictly observational; it does not modify sequence processing, FASTA, curation, BLAST or taxonomy.
+- Simplified the Plotly title to the sample ID to avoid Windows byte-marker rendering of the em dash.
+- Moved the chromatogram legend outside the data area and separated called-base labels from QC markers.
+
 ## 3.0.0-alpha.2
 **Stage 1 evidence correction and export synchronization**
 - Corrected the Stage 1 ABIF model: fresh `sangerseqR` `peakPosMatrix[,1]` is treated as the primary ABIF base-call coordinate rather than an A-channel peak column.

@@ -3897,10 +3897,10 @@
   },
   "files": {
     "app.R": {
-      "checksum": "191c14b3edabe8245b54ae4111d2b605"
+      "checksum": "6a80f1f588da31ddc2b9a8d558e31d89"
     },
     "CHANGELOG.md": {
-      "checksum": "c52af07912573080ad49f0854e024594"
+      "checksum": "1133e4de0714d89ec73f0e4d0291e488"
     },
     "DEPLOYMENT.md": {
       "checksum": "b1d95c7b85a425daec686ba3cbaba436"
@@ -3918,31 +3918,31 @@
       "checksum": "51cdca309fc3903a1375bbe95f7e907c"
     },
     "R/ab1_evidence.R": {
-      "checksum": "8af435a8902c252f8f18a6df866d3ac3"
+      "checksum": "e32ef6f89c9d382999651c71878e6fc8"
     },
     "R/core_sanger.R": {
-      "checksum": "290a1543ebfe1bdecf7d84d9d83de6f5"
+      "checksum": "a8632ce7926a4676dba01a5481252b99"
     },
     "R/export_tools.R": {
       "checksum": "a15f44236bd6679104d231805d880cf9"
     },
     "R/sequence_tools.R": {
-      "checksum": "cd3a2bf21010c46034096b95996e5b30"
+      "checksum": "261ef7df9a49fc76ec81ca82c74322a2"
     },
     "R/taxonomy_tools.R": {
       "checksum": "7acc5a3befc0f17f7eeca489ce28440a"
     },
     "README.txt": {
-      "checksum": "5d59f6e5e6032bb85bff59f42248ace1"
+      "checksum": "6f0c5b8fd4346617c5b24aed63b1221a"
     },
     "run_app.bat": {
       "checksum": "e747f1c11fc42fde571e1ec7e14cd626"
     },
     "run_tests.bat": {
-      "checksum": "4525827bb96d2cda746ea998b824f70b"
+      "checksum": "162209da72aa6fb4d46958c6b1a39eb5"
     },
     "tests/ab1_evidence_smoke.R": {
-      "checksum": "d1069253266c07d8709c94525225f8d1"
+      "checksum": "2bb8949568f66d61afdfbfb9cb22ef03"
     },
     "tests/manual_curation_smoke.R": {
       "checksum": "2385057d4f1ecbfa2243a5ee46f81307"
@@ -3957,10 +3957,10 @@
       "checksum": "60e79e832a726d372bc2b0cc03759f74"
     },
     "V3_STAGE1.md": {
-      "checksum": "a4f64e89829a9a55700938e344920208"
+      "checksum": "aa8acf46684dc9bd6c62ea2f3c5ea4d7"
     },
     "VERSION.txt": {
-      "checksum": "15cfb842fb2a5422dfbbfe0a7266a02c"
+      "checksum": "109e8c94ccb89c869af0ff1e953be401"
     }
   },
   "users": null

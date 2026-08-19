@@ -1,6 +1,6 @@
 # ============================================================
 # PITAX 3.0 Stage 1 - AB1 evidence audit helpers
-# v3.0.0-alpha.2
+# v3.0.0-alpha.3
 # ============================================================
 #
 # Stage 1 remains observational.  alpha.2 corrects an assumption made in
@@ -18,8 +18,9 @@
 #   * the existing PITAX peakPosMatrix[,1] and inferred channel map as the
 #     legacy path to be validated, not changed.
 #
-# Nothing in this file changes trimming boundaries, curated bases, BLAST input
-# or taxonomic interpretation.
+# alpha.3 adds a same-length, PCON-only window comparison.  It is diagnostic:
+# it never changes trimming boundaries, curated bases, BLAST input or taxonomic
+# interpretation.
 # ============================================================
 
 pitax_safe_slot <- function(object, slot_name) {
@@ -197,6 +198,147 @@ pitax_median_finite <- function(x, digits = 2L) {
   round(stats::median(x), digits)
 }
 
+pitax_mean_finite <- function(x, digits = 2L) {
+  x <- suppressWarnings(as.numeric(x))
+  x <- x[is.finite(x)]
+  if (!length(x)) return(NA_real_)
+  round(mean(x), digits)
+}
+
+pitax_auto_trim_bounds <- function(result) {
+  st <- NA_integer_
+  en <- NA_integer_
+  if (!is.null(result$curation) && is.list(result$curation)) {
+    if (!is.null(result$curation$auto_trim_start)) st <- suppressWarnings(as.integer(result$curation$auto_trim_start[1]))
+    if (!is.null(result$curation$auto_trim_end)) en <- suppressWarnings(as.integer(result$curation$auto_trim_end[1]))
+  }
+  if ((!is.finite(st) || !is.finite(en)) && is.data.frame(result$summary) && nrow(result$summary)) {
+    st <- suppressWarnings(as.integer(result$summary$trim_start[1]))
+    en <- suppressWarnings(as.integer(result$summary$trim_end[1]))
+  }
+  len <- if (is.finite(st) && is.finite(en) && en >= st) en - st + 1L else NA_integer_
+  list(start = st, end = en, length = len)
+}
+
+pitax_window_quality_metrics <- function(quality, start, end) {
+  quality <- suppressWarnings(as.numeric(quality))
+  start <- suppressWarnings(as.integer(start[1]))
+  end <- suppressWarnings(as.integer(end[1]))
+  if (!length(quality) || !is.finite(start) || !is.finite(end) || end < start || start < 1L || end > length(quality)) {
+    return(data.frame(
+      Coverage_percent = NA_real_, Median_quality = NA_real_, Mean_quality = NA_real_,
+      Q20_percent = NA_real_, Q30_percent = NA_real_, stringsAsFactors = FALSE
+    ))
+  }
+  x <- quality[seq.int(start, end)]
+  usable <- is.finite(x)
+  data.frame(
+    Coverage_percent = round(100 * mean(usable), 2),
+    Median_quality = pitax_median_finite(x),
+    Mean_quality = pitax_mean_finite(x),
+    Q20_percent = pitax_pct_threshold(x, 20),
+    Q30_percent = pitax_pct_threshold(x, 30),
+    stringsAsFactors = FALSE
+  )
+}
+
+# Compare every contiguous PCON window with the same length as the established
+# automatic trim.  Candidates require at least 90% quality coverage. Ranking is
+# deterministic and deliberately simple: Q20, Q30, median, mean, coverage, then
+# the smallest shift from the established start. Missing scores count against a
+# candidate during ranking. The result is audit evidence only.
+pitax_quality_window_proposal <- function(quality, auto_start, auto_end, min_coverage = 0.90) {
+  quality <- suppressWarnings(as.numeric(quality))
+  auto_start <- suppressWarnings(as.integer(auto_start[1]))
+  auto_end <- suppressWarnings(as.integer(auto_end[1]))
+  n <- length(quality)
+  win_len <- if (is.finite(auto_start) && is.finite(auto_end) && auto_end >= auto_start) auto_end - auto_start + 1L else NA_integer_
+  unavailable <- list(
+    available = FALSE, method = "PCON same-length window; observational only",
+    start = NA_integer_, end = NA_integer_, length = win_len,
+    coverage_percent = NA_real_, median_quality = NA_real_, mean_quality = NA_real_,
+    q20_percent = NA_real_, q30_percent = NA_real_, start_shift = NA_integer_
+  )
+  if (!is.finite(win_len) || win_len < 1L || n < win_len || !any(is.finite(quality))) return(unavailable)
+
+  starts <- seq_len(n - win_len + 1L)
+  candidates <- lapply(starts, function(st) {
+    en <- st + win_len - 1L
+    x <- quality[seq.int(st, en)]
+    usable <- is.finite(x)
+    coverage <- mean(usable)
+    finite_x <- x[usable]
+    data.frame(
+      start = st,
+      end = en,
+      coverage = coverage,
+      q20_score = sum(finite_x >= 20) / win_len,
+      q30_score = sum(finite_x >= 30) / win_len,
+      median_quality = if (length(finite_x)) stats::median(finite_x) else -Inf,
+      mean_quality = if (length(finite_x)) mean(finite_x) else -Inf,
+      shift = abs(st - auto_start),
+      stringsAsFactors = FALSE
+    )
+  })
+  candidates <- do.call(rbind, candidates)
+  candidates <- candidates[candidates$coverage >= min_coverage, , drop = FALSE]
+  if (!nrow(candidates)) return(unavailable)
+
+  ord <- order(
+    -candidates$q20_score, -candidates$q30_score,
+    -candidates$median_quality, -candidates$mean_quality,
+    -candidates$coverage, candidates$shift, candidates$start
+  )
+  best <- candidates[ord[1], , drop = FALSE]
+  metrics <- pitax_window_quality_metrics(quality, best$start, best$end)
+  list(
+    available = TRUE, method = "PCON same-length window; observational only",
+    start = as.integer(best$start), end = as.integer(best$end), length = as.integer(win_len),
+    coverage_percent = metrics$Coverage_percent[1],
+    median_quality = metrics$Median_quality[1], mean_quality = metrics$Mean_quality[1],
+    q20_percent = metrics$Q20_percent[1], q30_percent = metrics$Q30_percent[1],
+    start_shift = as.integer(best$start - auto_start)
+  )
+}
+
+pitax_result_quality_window <- function(result) {
+  bounds <- pitax_auto_trim_bounds(result)
+  detail <- if (!is.null(result$ab1_evidence)) result$ab1_evidence$detail else NULL
+  quality <- if (is.data.frame(detail) && "Basecaller_quality" %in% names(detail)) detail$Basecaller_quality else numeric()
+  pitax_quality_window_proposal(quality, bounds$start, bounds$end)
+}
+
+pitax_add_trim_membership <- function(detail, result) {
+  if (!is.data.frame(detail) || !nrow(detail)) return(detail)
+  bounds <- pitax_auto_trim_bounds(result)
+  proposal <- pitax_result_quality_window(result)
+  pos <- if ("Position" %in% names(detail)) suppressWarnings(as.integer(detail$Position)) else seq_len(nrow(detail))
+  detail$In_auto_trim <- if (is.finite(bounds$start) && is.finite(bounds$end)) pos >= bounds$start & pos <= bounds$end else NA
+  detail$In_quality_proposed_window <- if (isTRUE(proposal$available)) pos >= proposal$start & pos <= proposal$end else NA
+  detail
+}
+
+pitax_trim_window_comparison <- function(result) {
+  bounds <- pitax_auto_trim_bounds(result)
+  detail <- if (!is.null(result$ab1_evidence)) result$ab1_evidence$detail else NULL
+  quality <- if (is.data.frame(detail) && "Basecaller_quality" %in% names(detail)) detail$Basecaller_quality else numeric()
+  legacy <- pitax_window_quality_metrics(quality, bounds$start, bounds$end)
+  proposal <- pitax_quality_window_proposal(quality, bounds$start, bounds$end)
+  data.frame(
+    Window = c("Legacy v2 auto trim", "PCON-only proposal"),
+    Status = c("Active output", if (isTRUE(proposal$available)) "Observational only" else "Unavailable"),
+    Start = c(bounds$start, proposal$start),
+    End = c(bounds$end, proposal$end),
+    Length = c(bounds$length, proposal$length),
+    Quality_coverage_percent = c(legacy$Coverage_percent[1], proposal$coverage_percent),
+    Median_quality = c(legacy$Median_quality[1], proposal$median_quality),
+    Q20_percent = c(legacy$Q20_percent[1], proposal$q20_percent),
+    Q30_percent = c(legacy$Q30_percent[1], proposal$q30_percent),
+    Start_shift = c(0L, proposal$start_shift),
+    stringsAsFactors = FALSE
+  )
+}
+
 pitax_result_sample_id <- function(result, fallback = "") {
   x <- if (!is.null(result$sample_id)) as.character(result$sample_id)[1] else ""
   if (is.na(x) || !nzchar(x)) x <- as.character(fallback)[1]
@@ -221,7 +363,10 @@ pitax_evidence_detail_export <- function(result, selected_key) {
   if (is.null(ev) || !is.data.frame(ev$detail) || !nrow(ev$detail)) {
     return(data.frame(Sample_ID = sid, Message = "No Stage 1 evidence available.", stringsAsFactors = FALSE))
   }
-  data.frame(Sample_ID = rep(sid, nrow(ev$detail)), ev$detail, check.names = FALSE, stringsAsFactors = FALSE)
+  detail <- pitax_add_trim_membership(ev$detail, result)
+  preferred <- c("Position", "Base", "In_auto_trim", "In_quality_proposed_window")
+  detail <- detail[, c(intersect(preferred, names(detail)), setdiff(names(detail), preferred)), drop = FALSE]
+  data.frame(Sample_ID = rep(sid, nrow(detail)), detail, check.names = FALSE, stringsAsFactors = FALSE)
 }
 
 pitax_result_key_for_sample <- function(results, sample_id) {
@@ -319,9 +464,19 @@ ab1_evidence_result_summary <- function(result) {
     Evidence = "Unavailable",
     Quality_tag = "Unavailable",
     Quality_coverage_percent = NA_real_,
+    Auto_trim_start = NA_integer_,
+    Auto_trim_end = NA_integer_,
+    Auto_trim_length = NA_integer_,
     Median_quality_auto_trim = NA_real_,
     Q20_auto_trim_percent = NA_real_,
     Q30_auto_trim_percent = NA_real_,
+    Quality_window_start = NA_integer_,
+    Quality_window_end = NA_integer_,
+    Quality_window_length = NA_integer_,
+    Quality_window_start_shift = NA_integer_,
+    Median_quality_quality_window = NA_real_,
+    Q20_quality_window_percent = NA_real_,
+    Q30_quality_window_percent = NA_real_,
     Primary_position_source = "",
     Primary_position_coverage_percent = NA_real_,
     Primary_position_difference_percent = NA_real_,
@@ -358,18 +513,23 @@ ab1_evidence_result_summary <- function(result) {
   base$Legacy_called_is_max_percent <- suppressWarnings(as.numeric(sm$legacy_called_is_max_percent))
   base$Canonical_called_is_max_percent <- suppressWarnings(as.numeric(sm$canonical_called_is_max_percent))
 
+  bounds <- pitax_auto_trim_bounds(result)
+  proposal <- pitax_result_quality_window(result)
+  base$Auto_trim_start <- bounds$start
+  base$Auto_trim_end <- bounds$end
+  base$Auto_trim_length <- bounds$length
+  base$Quality_window_start <- proposal$start
+  base$Quality_window_end <- proposal$end
+  base$Quality_window_length <- proposal$length
+  base$Quality_window_start_shift <- proposal$start_shift
+  base$Median_quality_quality_window <- proposal$median_quality
+  base$Q20_quality_window_percent <- proposal$q20_percent
+  base$Q30_quality_window_percent <- proposal$q30_percent
+
   detail <- ev$detail
   if (is.data.frame(detail) && nrow(detail)) {
-    st <- NA_integer_
-    en <- NA_integer_
-    if (!is.null(result$curation) && is.list(result$curation)) {
-      if (!is.null(result$curation$auto_trim_start)) st <- suppressWarnings(as.integer(result$curation$auto_trim_start[1]))
-      if (!is.null(result$curation$auto_trim_end)) en <- suppressWarnings(as.integer(result$curation$auto_trim_end[1]))
-    }
-    if (!is.finite(st) || !is.finite(en)) {
-      st <- suppressWarnings(as.integer(result$summary$trim_start[1]))
-      en <- suppressWarnings(as.integer(result$summary$trim_end[1]))
-    }
+    st <- bounds$start
+    en <- bounds$end
     if (is.finite(st) && is.finite(en) && en >= st) {
       idx <- seq.int(max(1L, st), min(nrow(detail), en))
       if (length(idx)) {

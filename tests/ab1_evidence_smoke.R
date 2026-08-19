@@ -1,5 +1,6 @@
-# PITAX v3.0.0-alpha.2 - Stage 1 AB1 evidence helper tests.
-# Synthetic tests for corrected raw-ABIF interpretation and export identity.
+# PITAX v3.0.0-alpha.3 - Stage 1 AB1 evidence helper tests.
+# Synthetic tests for corrected raw-ABIF interpretation, export identity and
+# the observational same-length PCON window comparison.
 
 get_this_script_dir <- function() {
   args <- commandArgs(trailingOnly = FALSE)
@@ -76,6 +77,9 @@ stopifnot(sm$Canonical_called_is_max_auto_trim_percent[1] == 100)
 d <- pitax_evidence_detail_export(res, "S001")
 stopifnot("Sample_ID" %in% names(d))
 stopifnot(all(d$Sample_ID == "S001"))
+stopifnot("In_auto_trim" %in% names(d))
+stopifnot(identical(which(d$In_auto_trim), 2:4))
+stopifnot("In_quality_proposed_window" %in% names(d))
 blocked <- tryCatch({ pitax_evidence_detail_export(res, "S999"); FALSE }, error = function(e) TRUE)
 stopifnot(blocked)
 
@@ -83,4 +87,30 @@ stopifnot(blocked)
 results <- list(S001 = res, S002 = modifyList(res, list(sample_id = "S002")))
 stopifnot(pitax_result_key_for_sample(results, "S002") == "S002")
 
-cat("v3.0.0-alpha.2 AB1 evidence helper tests passed.\n")
+# 8. The PCON comparison keeps the legacy window length, proposes the best
+# quality window, records membership, and never mutates active trim bounds.
+ev_shift <- ev
+ev_shift$detail$Basecaller_quality <- c(5, 5, 10, 35, 40)
+res_shift <- list(
+  sample_id = "SHIFT",
+  ab1_evidence = ev_shift,
+  curation = list(auto_trim_start = 1L, auto_trim_end = 2L),
+  summary = data.frame(trim_start = 1L, trim_end = 2L)
+)
+proposal <- pitax_result_quality_window(res_shift)
+stopifnot(isTRUE(proposal$available))
+stopifnot(proposal$start == 4L, proposal$end == 5L, proposal$length == 2L)
+stopifnot(proposal$q20_percent == 100, proposal$q30_percent == 100)
+stopifnot(res_shift$curation$auto_trim_start == 1L, res_shift$curation$auto_trim_end == 2L)
+comparison <- pitax_trim_window_comparison(res_shift)
+stopifnot(nrow(comparison) == 2L)
+stopifnot(identical(comparison$Status, c("Active output", "Observational only")))
+shift_export <- pitax_evidence_detail_export(res_shift, "SHIFT")
+stopifnot(identical(which(shift_export$In_auto_trim), 1:2))
+stopifnot(identical(which(shift_export$In_quality_proposed_window), 4:5))
+
+shift_summary <- ab1_evidence_result_summary(res_shift)
+stopifnot(shift_summary$Auto_trim_start == 1L, shift_summary$Auto_trim_end == 2L, shift_summary$Auto_trim_length == 2L)
+stopifnot(shift_summary$Quality_window_start == 4L, shift_summary$Quality_window_end == 5L)
+
+cat("v3.0.0-alpha.3 AB1 evidence helper tests passed.\n")

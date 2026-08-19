@@ -887,7 +887,9 @@ make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags 
   # zooms in. At a wide overview they may overlap by design; the range slider is
   # intended for navigation rather than detailed base reading.
   bases <- curated_raw_calls(result)
-  label_y <- rep(ymax * 1.035, n)
+  # Reserve separate vertical bands for called bases and QC markers so they do
+  # not collide with each other or with the legend.
+  label_y <- rep(ymax * 1.055, n)
   p <- plotly::add_trace(
     p,
     x = seq_len(n),
@@ -958,7 +960,7 @@ make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags 
     p <- plotly::add_trace(
       p,
       x = flags$Position,
-      y = rep(ymax * 1.075, nrow(flags)),
+      y = rep(ymax * 1.155, nrow(flags)),
       type = "scatter",
       mode = "markers",
       name = "QC flags",
@@ -978,17 +980,24 @@ make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags 
 
   p <- plotly::layout(
     p,
-    title = list(text = paste0(result$sample_id, " — interactive chromatogram"), x = 0),
+    # Keep the internal title to the sample ID only. The previous em dash was
+    # rendered as byte markers on some Windows/R locale combinations.
+    title = list(text = as.character(result$sample_id)[1], x = 0),
     dragmode = "pan",
     hovermode = "x unified",
-    margin = list(l = 65, r = 20, t = 60, b = 55),
-    legend = list(orientation = "h", x = 0, y = 1.15),
+    margin = list(l = 65, r = 125, t = 75, b = 55),
+    legend = list(
+      orientation = "v", x = 1.02, xanchor = "left",
+      y = 1, yanchor = "top",
+      bgcolor = "rgba(255,255,255,0.92)",
+      bordercolor = "#e5e7eb", borderwidth = 1
+    ),
     xaxis = list(
       title = "Base position",
       range = c(initial_start, initial_end),
       rangeslider = list(visible = TRUE, thickness = 0.10)
     ),
-    yaxis = list(title = "Signal", range = c(0, ymax * 1.10), fixedrange = FALSE),
+    yaxis = list(title = "Signal", range = c(0, ymax * 1.22), fixedrange = FALSE),
     shapes = shapes,
     annotations = annotations
   )

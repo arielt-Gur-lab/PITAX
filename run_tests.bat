@@ -35,7 +35,7 @@ echo [4/4] Stage 1 AB1 evidence helper tests
 if errorlevel 1 goto :failed
 
 echo.
-echo All PITAX v3.0.0-alpha.2 tests passed.
+echo All PITAX v3.0.0-alpha.3 tests passed.
 pause
 exit /b 0
 
