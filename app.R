@@ -1,5 +1,5 @@
 # ============================================================
-# PITAX v3.0.0-alpha.1.1
+# PITAX v3.0.0-alpha.2
 # Stage 1: evidence foundation / compatibility audit
 # ============================================================
 
@@ -30,8 +30,8 @@ source(file.path("R", "sequence_tools.R"), local = TRUE)
 source(file.path("R", "export_tools.R"), local = TRUE)
 source(file.path("R", "taxonomy_tools.R"), local = TRUE)
 
-APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.0.0-alpha.1.1")
-APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "3.0.0-alpha.1.1", APP_VERSION)
+APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.0.0-alpha.2")
+APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "3.0.0-alpha.2", APP_VERSION)
 PROJECT_SCHEMA_VERSION <- 1L
 
 # ============================================================
@@ -666,13 +666,13 @@ ui <- fluidPage(
           )
         ),
         div(class = "panel-box stage1-evidence-card",
-          card_title("Stage 1 · AB1 evidence audit", "Observational comparison of the established PITAX v2 read model with additional evidence exposed by sangerseqR. This panel does not alter trimming, curation, BLAST or taxonomy in this alpha.", "microscope"),
+          card_title("Stage 1 · AB1 evidence audit", "Corrected observational audit of the established PITAX v2 read model against raw ABIF primary-call coordinates, basecaller quality and canonical A/C/G/T trace evidence. This panel does not alter trimming, curation, BLAST or taxonomy.", "microscope"),
           tags$details(
             class = "stage1-audit-details",
             tags$summary(class = "stage1-audit-toggle", "Open evidence audit"),
             div(class = "status-note",
                 tags$strong("Validation mode only. "),
-                "The active v2.14.2 trimming/QC path is still the decision path. Stage 1 captures ABIF basecaller quality (PCON when present), the documented A/C/G/T channel model, and called-base-specific peak positions so they can be compared on real laboratory traces before any engine change."),
+                "The active v2.14.2 trimming/QC path is still the decision path. alpha.2 captures ABIF PCON quality, raw primary base-call positions (PLOC.2 + 1), and the canonical A/C/G/T trace model. The incorrect alpha.1 interpretation of raw peakPosMatrix/peakAmpMatrix columns has been removed."),
             div(class = "subsection-title", "Run-level audit"),
             DTOutput("ab1_evidence_run_table"),
             div(class = "blast-action-row",
@@ -1560,9 +1560,17 @@ server <- function(input, output, session) {
     datatable(df, rownames=FALSE, filter="top", options=list(pageLength=15,scrollX=TRUE))
   })
 
+  selected_sample_key <- reactive({
+    sid <- input$inspect_sample
+    req(!is.null(sid), length(sid) == 1L, nzchar(sid), sid %in% names(rv$results))
+    sid
+  })
+
   selected_result <- reactive({
-    req(input$inspect_sample, rv$results[[input$inspect_sample]])
-    rv$results[[input$inspect_sample]]
+    sid <- selected_sample_key()
+    r <- rv$results[[sid]]
+    req(!is.null(r))
+    r
   })
 
   observeEvent(input$inspect_sample, {
@@ -1585,36 +1593,62 @@ server <- function(input, output, session) {
     display <- df
     names(display) <- c(
       "Sample", "Evidence", "Quality tag", "Quality coverage (%)", "Median quality · auto trim",
-      "Legacy map", "Documented map", "Peak positions different (%)", "Median |peak Δ|",
-      "Legacy call is max (%)", "Called-base position call is max (%)", "PeakAmp call is max (%)"
+      "Q≥20 · auto trim (%)", "Q≥30 · auto trim (%)", "Primary position source",
+      "Primary position coverage (%)", "Primary positions different (%)", "Median |position Δ|",
+      "Legacy map", "Canonical A/C/G/T map", "Maps match",
+      "Legacy call is max (%)", "Canonical call is max (%)",
+      "Canonical call is max · auto trim (%)", "Median called/alternative ratio · auto trim"
     )
-    datatable(display, rownames = FALSE, filter = "top",
-              options = list(pageLength = 12, scrollX = TRUE, dom = "tip"))
+    datatable(
+      display,
+      rownames = FALSE,
+      filter = "top",
+      selection = "single",
+      options = list(pageLength = 12, scrollX = TRUE, dom = "tip")
+    )
   })
 
+  # The run-audit table and the Sample dropdown now share one source of truth.
+  # Clicking an audit row selects the same sample throughout the QC workspace.
+  observeEvent(input$ab1_evidence_run_table_rows_selected, {
+    idx <- input$ab1_evidence_run_table_rows_selected
+    if (is.null(idx) || length(idx) != 1L || idx < 1L) return()
+    df <- ab1_evidence_run_summary(rv$results)
+    if (idx > nrow(df)) return()
+    key <- pitax_result_key_for_sample(rv$results, df$Sample[idx])
+    if (nzchar(key)) updateSelectInput(session, "inspect_sample", selected = key)
+  }, ignoreInit = TRUE)
+
   output$ab1_evidence_selected_note <- renderUI({
+    key <- selected_sample_key()
     r <- selected_result()
+    sid <- pitax_result_sample_id(r, key)
     ev <- r$ab1_evidence
     if (is.null(ev)) {
       return(div(class = "status-note",
-                 "This sample has no Stage 1 evidence object. This is expected for projects processed before v3.0.0-alpha.1.1; reprocess the original AB1 to create the audit."))
+                 tags$strong(paste0("Selected sample: ", sid, ". ")),
+                 "This sample has no Stage 1 evidence object. Reprocess the original AB1 with alpha.2 to create the corrected audit."))
     }
     if (!is.null(ev$error) && nzchar(as.character(ev$error)[1])) {
-      return(div(class = "status-error", paste0("Evidence audit error: ", as.character(ev$error)[1],
-                                                 ". The established trimming result was preserved.")))
+      return(div(class = "status-error", tags$strong(paste0("Selected sample: ", sid, ". ")),
+                 paste0("Evidence audit error: ", as.character(ev$error)[1],
+                        ". The established trimming result was preserved.")))
     }
     sm <- ab1_evidence_result_summary(r)
     tagList(
+      div(class = "compact-hint", tags$strong(paste0("Selected sample: ", sid))),
       div(class = "peak-flag-summary",
           div(class = "peak-flag-pill", tags$strong(sm$Quality_tag[1]), " quality tag"),
           div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Median_quality_auto_trim[1]), sm$Median_quality_auto_trim[1], "NA")), " median quality in auto trim"),
-          div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Peak_position_difference_percent[1]), paste0(sm$Peak_position_difference_percent[1], "%"), "NA")), " legacy vs called-base peak positions differ")),
+          div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Q20_auto_trim_percent[1]), paste0(sm$Q20_auto_trim_percent[1], "%"), "NA")), " Q≥20 in auto trim"),
+          div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Primary_position_difference_percent[1]), paste0(sm$Primary_position_difference_percent[1], "%"), "NA")), " PLOC vs legacy positions differ")),
       div(class = "compact-hint",
-          "Interpret these values as an audit, not a new QC score. A high difference between legacy and called-base-specific peak positions is exactly what Stage 1 is designed to quantify before the v3 read engine changes.")
+          "alpha.2 validates the raw ABIF primary-call coordinates (PLOC.2 + 1), PCON quality and A/C/G/T trace evidence. It no longer interprets raw peakPosMatrix/peakAmpMatrix columns as A/C/G/T peaks.")
     )
   })
 
   output$ab1_evidence_detail_table <- renderDT({
+    key <- selected_sample_key()
     r <- selected_result()
     ev <- r$ab1_evidence
     if (is.null(ev) || !is.data.frame(ev$detail) || !nrow(ev$detail)) {
@@ -1625,14 +1659,13 @@ server <- function(input, output, session) {
     st <- suppressWarnings(as.integer(r$curation$auto_trim_start))
     en <- suppressWarnings(as.integer(r$curation$auto_trim_end))
     d$In_auto_trim <- if (is.finite(st) && is.finite(en)) d$Position >= st & d$Position <= en else NA
+    d$Sample_ID <- pitax_result_sample_id(r, key)
     keep <- c(
-      "Position", "Base", "In_auto_trim", "Basecaller_quality",
-      "Legacy_peak_pos", "Called_base_peak_pos", "Peak_pos_delta",
+      "Sample_ID", "Position", "Base", "In_auto_trim", "Basecaller_quality",
+      "Legacy_primary_peak_pos", "Raw_ABIF_primary_peak_pos", "Primary_peak_pos_delta",
       "Legacy_called_signal", "Legacy_called_is_max",
-      "Called_base_signal", "Called_base_best_alt_signal", "Called_base_to_alt_ratio",
-      "Called_base_best_channel", "Called_base_is_max",
-      "PeakAmp_called_signal", "PeakAmp_best_alt_signal", "PeakAmp_called_to_alt_ratio",
-      "PeakAmp_best_channel", "PeakAmp_called_is_max"
+      "Canonical_called_signal", "Canonical_best_alt_signal", "Canonical_called_to_alt_ratio",
+      "Canonical_best_channel", "Canonical_called_is_max"
     )
     d <- d[, intersect(keep, names(d)), drop = FALSE]
     numeric_cols <- names(d)[vapply(d, is.numeric, logical(1))]
@@ -1651,17 +1684,16 @@ server <- function(input, output, session) {
 
   output$download_ab1_evidence_detail <- downloadHandler(
     filename = function() {
-      sid <- if (!is.null(input$inspect_sample) && nzchar(input$inspect_sample)) clean_fasta_name(input$inspect_sample) else "sample"
-      paste0(sid, "_PITAX_v3_stage1_AB1_base_audit.csv")
+      key <- selected_sample_key()
+      r <- selected_result()
+      sid <- pitax_assert_export_identity(r, key)
+      paste0(clean_fasta_name(sid), "_PITAX_v3_stage1_AB1_base_audit.csv")
     },
     content = function(file) {
+      key <- selected_sample_key()
       r <- selected_result()
-      ev <- r$ab1_evidence
-      if (is.null(ev) || !is.data.frame(ev$detail) || !nrow(ev$detail)) {
-        utils::write.csv(data.frame(Message = "No Stage 1 evidence available."), file, row.names = FALSE)
-      } else {
-        utils::write.csv(ev$detail, file, row.names = FALSE, na = "")
-      }
+      d <- pitax_evidence_detail_export(r, key)
+      utils::write.csv(d, file, row.names = FALSE, na = "")
     }
   )
   output$primer_match_table <- renderDT({

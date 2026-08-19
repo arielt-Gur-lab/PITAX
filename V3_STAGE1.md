@@ -1,26 +1,42 @@
 # PITAX 3.0 — Stage 1 validation
 
-Version: `3.0.0-alpha.1.1`
+Version: `3.0.0-alpha.2`
 
 ## Purpose
 
-Stage 1 validates the AB1 evidence model before PITAX changes trimming or builds Forward/Reverse consensus. The existing v2.14.2 processing path remains authoritative in this alpha.
+Stage 1 validates the AB1 evidence model before PITAX changes trimming or builds Forward/Reverse consensus. The established v2.14.2 processing path remains authoritative in this alpha.
 
-This means that a successful Stage 1 test should give the same trimming, curation, BLAST and taxonomy behavior you already know, plus a new audit panel in QC.
+alpha.2 follows the first real-lab audit. It corrects the interpretation of `sangerseqR` objects and fixes selected-sample CSV export synchronization. No trimming, curation, BLAST, or taxonomy decision rule is changed.
 
-## What the new audit captures
+## What alpha.1 taught us
 
-For every newly processed AB1 file PITAX now stores, when available:
+The first real batch showed that PCON.2 quality was available across the tested AB1 files and that the inferred PITAX channel map agreed with A/C/G/T. Reviewing the `sangerseqR` constructor also clarified an important detail: for freshly read ABIF files, `peakPosMatrix[,1]` is the primary ABIF base-call position (`PLOC.2 + 1`). The remaining raw `peakPosMatrix`/`peakAmpMatrix` columns must not be interpreted as A/C/G/T peak columns unless `makeBaseCalls()` has rebuilt them.
 
-- ABIF basecaller quality values (`PCON.2`, then `PCON.1` as fallback).
-- The complete `sangerseqR` `peakPosMatrix`.
-- The complete `sangerseqR` `peakAmpMatrix`.
-- The established PITAX v2 peak-position vector (`peakPosMatrix[,1]`).
-- A called-base-specific peak-position vector: A uses the A column, C the C column, G the G column and T the T column.
-- Signal/competition evidence at both position models.
-- A direct comparison between the inferred v2 channel map and the canonical A/C/G/T model.
+Therefore alpha.2 removes the invalid alpha.1 A/C/G/T peak-matrix comparison.
 
-No Stage 1 evidence value is used to change a base or trim boundary in this alpha.
+## What the corrected audit captures
+
+For every newly processed AB1, when available:
+
+- ABIF basecaller quality (`PCON.2`, then `PCON.1` fallback).
+- Raw ABIF primary base-call position (`PLOC.2 + 1`).
+- The established PITAX primary position (`peakPosMatrix[,1]`).
+- Canonical A/C/G/T trace evidence from `traceMatrix`.
+- Existing PITAX inferred channel map versus canonical A/C/G/T map.
+- Per-base called signal, strongest alternative signal, called/alternative ratio, and whether the called base is the strongest trace channel.
+- Auto-trim quality summaries: median quality, Q>=20 %, Q>=30 %, call-is-max %, and median called/alternative ratio.
+
+No Stage 1 evidence value changes the sequence in alpha.2.
+
+## Export fix
+
+The selected sample is now one source of truth for QC and audit export.
+
+- Clicking a row in the run-audit table selects that sample in the QC workspace.
+- The selected-sample note shows the sample ID explicitly.
+- Selected-base CSV includes a `Sample_ID` column on every row.
+- Filename is derived from the same result object used to create the CSV.
+- If selected key and result sample ID disagree, PITAX blocks the download rather than producing a misleading file.
 
 ## Automated test
 
@@ -33,106 +49,71 @@ run_tests.bat
 Expected final line:
 
 ```text
-All PITAX v3.0.0-alpha.1.1 tests passed.
+All PITAX v3.0.0-alpha.2 tests passed.
 ```
 
-There are now four test groups; the fourth is the Stage 1 AB1 evidence helper test.
+The Stage 1 test now verifies PLOC.2 conversion, PCON indexing, canonical trace mapping, per-base signal evidence, auto-trim quality summaries, and selected-sample export identity.
 
-## Manual acceptance test — real AB1 files
+## Manual acceptance test
 
-Use a small but varied batch, ideally 6–12 files:
+Use the same batch of real AB1 files used for alpha.1 if possible.
 
-- at least two clean reads;
-- at least two reads with weak/noisy ends;
-- at least one read with visible competing/double peaks;
-- if available, files from more than one sequencing run.
+### A. Regression
 
-### A. Regression check
+Confirm that:
 
-Process the files with the same assay/trimming settings used in v2.14.2.
+1. Files process normally.
+2. Trim start/end and trimmed sequence are unchanged from v2.14.2/alpha.1.
+3. Chromatogram and ambiguous-peak review still work.
+4. Manual curation still works.
+5. Rename, Export, BLAST and Taxonomy are not blocked by the Stage 1 audit.
 
-Confirm:
+### B. Corrected run audit
 
-1. All files that processed in v2.14.2 still process.
-2. Trim start/end and trimmed sequence look unchanged.
-3. Chromatogram, ambiguous-peak review and manual curation still work.
-4. Existing Pleurotus/taxonomy behavior is unchanged.
-5. No new Stage 1 warning prevents continuing to Rename, Export or BLAST.
+Open **3 · QC & Chromatogram → Stage 1 · AB1 evidence audit**.
 
-### B. Open the new audit
+Expected findings for normal ABI files:
 
-In **3 · QC & Chromatogram**, open:
+- `Quality tag`: usually `PCON.2` if present.
+- `Primary position source`: `ABIF PLOC.2 + 1`.
+- `Primary positions different (%)`: normally 0% if sangerseqR and raw ABIF positions agree.
+- `Maps match`: TRUE when the existing inferred map is A=1,C=2,G=3,T=4.
 
-**Stage 1 · AB1 evidence audit → Open evidence audit**
+Quality fields are observations, not pass/fail thresholds yet.
 
-For each sample check:
+### C. Selection/export regression
 
-1. `Evidence` should normally be `Captured`.
-2. `Quality tag` should usually be `PCON.2` on ABI files that contain basecaller confidence values. `Unavailable` is allowed and should not fail the read.
-3. `Quality coverage (%)` should be inspected for unexpected truncation/misalignment.
-4. Compare `Legacy map` with `Documented map`.
-5. Inspect `Peak positions different (%)` and `Median |peak Δ|`.
-6. Compare:
-   - `Legacy call is max (%)`
-   - `Called-base position call is max (%)`
-   - `PeakAmp call is max (%)`
+This is required for alpha.2:
 
-The goal is not to require a specific percentage in alpha.1. We are collecting evidence to decide which representation should become authoritative in the next Stage 1 iteration.
+1. Select `265DMAA001_customer` in the Sample dropdown.
+2. Confirm the audit note says `Selected sample: 265DMAA001_customer`.
+3. Click **Download selected-base audit CSV**.
+4. Filename must start with `265DMAA001_customer`.
+5. Open the CSV: every row in `Sample_ID` must be `265DMAA001_customer`.
+6. Then click a different row in the run-audit table. The Sample dropdown and selected-sample note must change to that same sample.
 
-### C. Inspect several known positions
+### D. Files to send back
 
-For one clean read and one problematic read:
+After the checks, send:
 
-1. Find 3–5 visually clean bases in the chromatogram.
-2. Find 2–3 ambiguous/competing positions if available.
-3. In the per-base audit table compare the base, quality value, legacy peak position, called-base peak position and which channel is strongest.
-4. Make sure the row numbering matches the chromatogram base numbering.
+- the new **Run audit CSV**;
+- the **selected-base audit CSV for 265DMAA001_customer**.
 
-### D. Export the audit
+That is enough for the final Stage 1 evidence review. A second clean sample is optional because alpha.1 already supplied a clean example.
 
-Download:
-
-- **Run audit CSV** — required for Stage 1 review.
-- **Selected-base audit CSV** for at least one clean and one problematic read — strongly preferred.
-
-Send those CSV files back for analysis. They contain numeric evidence only, not the original AB1 binary.
-
-## Cloud check
-
-After local tests are green, regenerate `manifest.json` because Stage 1 adds a new R source file:
-
-```r
-source("prepare_connect_cloud.R")
-```
-
-Then commit/push. Confirm the online app opens and can process at least one AB1 through QC. The new audit panel must appear online as well.
-
-## Stage 1 alpha.1 is green when
+## Stage 1 alpha.2 is green when
 
 - all four automated test groups pass;
-- the normal v2 workflow shows no regression;
-- real AB1 files produce an audit without stopping processing;
-- exported run evidence is available for review;
-- the Connect Cloud build and one online AB1 run succeed.
+- no v2 workflow regression is observed;
+- raw PLOC primary positions agree with the established PITAX positions on the tested AB1 files, or any disagreement is understood;
+- selected-sample export identity is correct;
+- PCON behavior in the problematic sample is reviewed;
+- cloud deployment is not required for the branch gate unless you intentionally deploy the v3 branch.
 
-Do not start Stage 2 yet. The first decision after this gate is whether Stage 1 evidence validates changing the authoritative peak-position/channel model and whether basecaller quality can be safely incorporated into the future read/consensus model.
+Do not start Stage 2 until this gate is reviewed.
 
-## Technical basis for the audit
+## Primary implementation reference
 
-The Stage 1 audit follows the `sangerseqR` class documentation rather than inferring these structures from observed data:
+The `sangerseqR` ABIF constructor builds `traceMatrix` in A,C,G,T order and initializes `peakPosMatrix` from primary/secondary ABIF base-call positions. `makeBaseCalls()` later rebuilds peak position/amplitude matrices as A,C,G,T per-window peaks, but PITAX does not call it in the established v2 processing path.
 
-- `traceMatrix`: four normalized trace-signal columns in A,C,G,T order.
-- `peakPosMatrix`: within each base-call window, the position of the maximum A/C/G/T peak, in A,C,G,T column order.
-- `peakAmpMatrix`: corresponding maximum A/C/G/T peak amplitudes, in A,C,G,T column order.
-- `read.abif()`: exposes the raw ABIF data-field list; available fields vary by instrument/basecaller version. Stage 1 therefore treats PCON as optional evidence, not as a required input.
-
-Primary documentation:
-
-- https://github.com/bioc/sangerseqR/blob/devel/man/sangerseq-class.Rd
-- https://github.com/bioc/sangerseqR/blob/devel/man/abif-class.Rd
-
-Stage 1 deliberately labels PCON as **basecaller quality** rather than assuming that every instrument/basecaller/version supplies an identically calibrated Phred implementation. The empirical behavior on the laboratory's own AB1 files will be reviewed before quality is used in consensus decisions.
-
-## alpha.1.1 test hotfix
-
-The original alpha.1 synthetic signal fixture used A=100 and strongest alternative=10 for its first base, which is exactly a 10.0 ratio. The test incorrectly asserted `> 10`. alpha.1.1 corrects the boundary assertion to `>= 10`. Application and evidence-calculation behavior are unchanged.
+This distinction is now encoded explicitly in the Stage 1 audit and its regression tests.

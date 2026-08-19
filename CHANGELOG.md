@@ -2,10 +2,14 @@
 
 This file records changes that affect the way the pipeline behaves, presents results, or stores project data. Small internal refactors are omitted unless they change something visible or scientifically relevant.
 
-## 3.0.0-alpha.1.1
-
-- Test-only hotfix for Stage 1. The synthetic AB1 evidence test now accepts a called/alternative signal ratio exactly equal to 10.0.
-- No trimming, QC, curation, BLAST, taxonomy, or AB1 evidence calculation logic changed.
+## 3.0.0-alpha.2
+**Stage 1 evidence correction and export synchronization**
+- Corrected the Stage 1 ABIF model: fresh `sangerseqR` `peakPosMatrix[,1]` is treated as the primary ABIF base-call coordinate rather than an A-channel peak column.
+- Raw primary positions are audited against `PLOC.2 + 1`; the invalid alpha.1 A/C/G/T interpretation of raw `peakPosMatrix`/`peakAmpMatrix` was removed.
+- Added auto-trim PCON summaries (median, Q>=20, Q>=30) and canonical trace competition metrics.
+- Fixed selected-base audit downloads so sample selection, filename and file contents share one identity; CSV rows now include `Sample_ID` and mismatches are blocked.
+- Run-audit row selection now updates the QC sample selector.
+- No change to the v2.14.2 trimming, manual curation, BLAST or taxonomy decision paths.
 
 ## 3.0.0-alpha.1
 **Stage 1 · AB1 evidence foundation**

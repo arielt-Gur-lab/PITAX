@@ -1,95 +1,45 @@
-PITAX v3.0.0-alpha.1.1
-==================
+PITAX v3.0.0-alpha.2 — Stage 1
+================================
 
 Purpose
 -------
-Stage 1 alpha of the PITAX 3.0 migration. The application remains a Shiny workflow for Sanger AB1 processing and fungal taxonomic identification and can run locally or online.
+Development branch build for the first PITAX 3.0 gate: validating the AB1 evidence model without changing the established v2.14.2 trimming, curation, BLAST or taxonomy decisions.
+
+Normal workflow remains:
 
 AB1 upload -> Assay & trimming -> QC -> Rename -> Export -> NCBI BLAST -> Taxonomic summary
 
+Stage 1 adds an observational AB1 evidence audit inside QC.
 
-PITAX 3.0 Stage 1
------------------
-This alpha is intentionally conservative. The v2.14.2 trimming, curation, BLAST and taxonomic decision paths remain active. Stage 1 only captures additional AB1 evidence in parallel so the read model can be validated on real laboratory chromatograms before the v3 consensus engine is built.
+alpha.2 changes
+----------------
+- Corrected the alpha.1 interpretation of raw sangerseqR peak matrices.
+- Raw ABIF primary positions are now read from PLOC.2 (+1 to match R/sangerseqR coordinates).
+- PCON.2/PCON.1 basecaller quality is recorded when available.
+- traceMatrix is treated as canonical A,C,G,T evidence.
+- Existing PITAX inferred mapping and primary positions are compared against those raw/canonical sources without changing trimming.
+- Added auto-trim quality summaries (median quality, Q>=20, Q>=30, called-base dominance and called/alternative signal ratio).
+- Fixed selected-base audit export: selection, result content and filename now use one sample identity; every exported row includes Sample_ID; mismatches are blocked.
+- Clicking a run-audit row selects that same sample in the QC workspace.
 
-New evidence includes:
-- ABIF basecaller quality values from PCON.2/PCON.1 when available.
-- Full sangerseqR peakPosMatrix and peakAmpMatrix.
-- A documented A/C/G/T channel model.
-- Called-base-specific peak positions compared with the v2 legacy first-column peak position.
-- Run and per-base audit CSV exports from QC.
+Testing
+-------
+Run `run_tests.bat`.
 
-See V3_STAGE1.md for the exact validation checklist.
+Expected final line:
 
+  All PITAX v3.0.0-alpha.2 tests passed.
 
-Key v2.14 identification update
---------------------------------
-- Taxonomic interpretation now starts from the best molecular match rather than a primary Bit-score cluster.
-- Near-full-length matches are preferred over short partial alignments. Within the preferred coverage tier, only hits within 2 percentage points of the best query coverage remain candidates for the leading match; Identity is then ranked first, with coverage, Bit score and E-value as tie-breakers.
-- A different species is treated as a close alternative when its best comparable match is within 0.5 Identity percentage points and no more than 2 query-coverage points below the best match. These are application review heuristics, not universal species thresholds.
-- If close alternatives remain within one genus, the species stays unresolved while the genus can remain a strong recommendation. If close alternatives cross genera, genus confidence is withheld.
-- Species evidence profile reports one row per resolved species, including its best accession, Identity, coverage, reference quality and accession count. Counts describe database representation only; they do not vote on the identification.
-- Sequence evidence and locus discrimination are separate. A high-quality read can therefore be flagged as having poor species discrimination when several species are nearly indistinguishable with the selected locus.
-- The BLAST score landscape colors points by genus when several genera occur and by species when uncertainty is confined to one genus.
-- Team and taxonomy tables were compacted; the Team Comment field now receives a wider display column.
+Then follow `V3_STAGE1.md`. The key manual regression is to select `265DMAA001_customer`, download the selected-base audit CSV and confirm both filename and every Sample_ID row identify 001.
 
-Interface and QC retained from v2.13
------------------------------------
-- Aptos is the preferred UI font when available.
-- Manual chromatogram curation, editable high-confidence auto-correction criteria, Undo/Redo, audit logging, stale-BLAST protection, batch BLAST retrieval and project Save/Load remain unchanged.
-- The v2.14 release changes taxonomic interpretation and presentation; trimming, QC and manual-curation logic are not changed.
-
-Project files
--------------
-Use the Project bar near the top of the app:
-
-  Save project  -> downloads a .sangerproject file
-  Load project  -> restores a previously saved project
-
-Projects retain processed/curated sequences, chromatogram data, automatic trim state, manual curation history, QC, rename mapping, RIDs, retrieved BLAST hits and taxonomic analyses. Stage 1 keeps project schema version 1 and remains backward-compatible with v2 project state. Older projects simply have no Stage 1 AB1 evidence object until the original AB1 files are reprocessed.
-
-Run
----
-Double-click run_app.bat, or from R:
-
-  shiny::runApp('.', launch.browser = TRUE)
-
-First run
+Branching
 ---------
-Missing R packages are installed automatically.
+Keep this alpha on the v3 development branch. Do not replace the stable 2.14.2 `main` deployment while Stage 1 is under validation.
 
 Online deployment
 -----------------
-The recommended deployment path for the GitHub repository is Posit Connect Cloud.
-Run `prepare_connect_cloud.R` once from the project root to create `manifest.json`, commit that file, then publish the GitHub repository as a Shiny for R application. See DEPLOYMENT.md for the exact steps.
+The stable app can remain on `main` in Posit Connect Cloud. If you intentionally deploy this branch separately, regenerate `manifest.json` locally with:
 
-Scientific interpretation
--------------------------
-BLAST similarity and database agreement support an identification hypothesis; they are not formal taxonomic validation. Species-level resolution depends on locus, clade and reference-database quality. The app exposes each decision component so the user can audit why a genus/species recommendation was made.
+  source("prepare_connect_cloud.R")
 
-Scientific basis highlighted in Help / About
--------------------------------------------
-- Schoch et al. (2012): ITS as the universal fungal barcode marker.
-- Vu et al. (2018): broad fungal ITS identity benchmarks (~99.6% species, ~94.3% genus).
-- NCBI RefSeq Targeted Loci: curated fungal ITS reference resources, largely type-derived.
-- NCBI BLAST documentation: Bit scores and HSP/accession-level alignment structure.
-
-Roadmap
--------
-v3.0: isolate-level evidence integration, including Forward/Reverse consensus and multi-locus identification.
-
-
-TESTING
--------
-Regression tests can be run from any working directory. Easiest option on Windows: double-click run_tests.bat. It runs taxonomy logic, ambiguous-peak detection, and manual curation/undo-redo smoke tests. These tests are not required for normal app startup.
-
-
-v2.11 manual curation
----------------------
-The QC & Chromatogram stage now separates three layers: immutable raw AB1 evidence, the automatic trim/base calls, and the current curated sequence. Left-click a flag to inspect it and right-click to open curation actions. Sequence-changing actions are confirmed, reversible, logged, exported, and automatically invalidate downstream BLAST/taxonomy results that were generated from an older sequence version.
-
-
-v2.14.2 note
-- PITAX branding and the selected logo are now part of the main application header.
-- Cloud deployment helper files are included. See DEPLOYMENT.md.
-- The v2.14.1 loading, curation-count and best-match selection fixes remain unchanged.
+See DEPLOYMENT.md for the stable deployment workflow.

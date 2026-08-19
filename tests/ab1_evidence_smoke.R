@@ -1,5 +1,5 @@
-# PITAX v3.0.0-alpha.1.1 - Stage 1 AB1 evidence helper tests.
-# These are synthetic tests; the Stage 1 manual checklist validates real AB1 files.
+# PITAX v3.0.0-alpha.2 - Stage 1 AB1 evidence helper tests.
+# Synthetic tests for corrected raw-ABIF interpretation and export identity.
 
 get_this_script_dir <- function() {
   args <- commandArgs(trailingOnly = FALSE)
@@ -12,64 +12,75 @@ test_dir <- get_this_script_dir()
 app_dir <- normalizePath(file.path(test_dir, ".."), mustWork = TRUE)
 source(file.path(app_dir, "R", "ab1_evidence.R"))
 
-# 1. Canonical A/C/G/T mapping is explicit and does not need permutation inference.
-x <- matrix(0, nrow = 4, ncol = 4)
-colnames(x) <- c("A", "C", "G", "T")
-map <- pitax_canonical_channel_map(x)
-stopifnot(identical(unname(as.integer(map[c("A","C","G","T")])), 1:4))
-
-# 2. A called base selects its own column from peakPosMatrix.
-seq_string <- "ACGTN"
-pm <- matrix(
-  c(
-    10,11,12,13,
-    20,21,22,23,
-    30,31,32,33,
-    40,41,42,43,
-    50,51,52,53
-  ),
-  nrow = 5, byrow = TRUE
+if (!methods::isClass("PitaxTestAbif")) methods::setClass("PitaxTestAbif", slots = c(data = "list"))
+abif <- methods::new(
+  "PitaxTestAbif",
+  data = list(
+    "PLOC.2" = c(9, 19, 29, 39, 49),
+    "PCON.2" = c(5, 25, 40, 35, 10),
+    "FWO.1" = "GATC"
+  )
 )
-colnames(pm) <- c("A","C","G","T")
-pos <- pitax_called_peak_positions(seq_string, pm)
-stopifnot(identical(as.numeric(pos[1:4]), c(10,21,32,43)))
-stopifnot(is.na(pos[5]))
 
-# 3. Signal evidence is evaluated at the supplied called-base-specific position.
+# 1. Raw ABIF PLOC.2 is converted to the same 1-based coordinate system used
+# by sangerseqR's primary peak positions.
+pos <- pitax_abif_primary_positions(abif, 5)
+stopifnot(identical(pos$tag, "ABIF PLOC.2 + 1"))
+stopifnot(identical(as.numeric(pos$values), c(10,20,30,40,50)))
+
+# 2. PCON.2 is retained by base index without shifting.
+q <- pitax_abif_quality(abif, 5)
+stopifnot(identical(q$tag, "PCON.2"))
+stopifnot(identical(as.numeric(q$values), c(5,25,40,35,10)))
+
+# 3. sangerseqR traceMatrix is treated as canonical A/C/G/T.
 trace <- matrix(1, nrow = 60, ncol = 4)
 colnames(trace) <- c("A","C","G","T")
+map <- pitax_canonical_channel_map(trace)
+stopifnot(identical(unname(as.integer(map[c("A","C","G","T")])), 1:4))
+stopifnot(pitax_maps_identical(map, setNames(1:4, c("A","C","G","T"))))
+
+# 4. Evidence is evaluated at the primary ABIF base-call positions, not by
+# treating peakPosMatrix columns as A/C/G/T.
+seq_string <- "ACGTN"
 trace[10,] <- c(100,10,8,5)
-trace[21,] <- c(8,110,9,7)
-trace[32,] <- c(6,8,120,9)
-trace[43,] <- c(7,6,8,130)
-met <- pitax_signal_metrics(seq_string, trace, pos, map)
-stopifnot(all(met$called_is_max[1:4] %in% TRUE))
-stopifnot(identical(met$best_channel[1:4], c("A","C","G","T")))
-stopifnot(all(met$called_to_alt_ratio[1:4] >= 10))
+trace[20,] <- c(8,110,9,7)
+trace[30,] <- c(6,8,120,9)
+trace[40,] <- c(7,6,8,130)
+legacy_pos <- c(10,20,30,40,50)
+legacy_map <- setNames(1:4, c("A","C","G","T"))
+ev <- build_ab1_evidence(NULL, seq_string, trace, legacy_pos, legacy_map, abif)
+stopifnot(identical(ev$schema, "ab1-evidence-audit-v2"))
+stopifnot(all(ev$detail$Primary_peak_pos_delta == 0))
+stopifnot(all(ev$detail$Canonical_called_is_max[1:4] %in% TRUE))
+stopifnot(identical(ev$detail$Canonical_best_channel[1:4], c("A","C","G","T")))
+stopifnot(ev$summary$channel_maps_match[1] %in% TRUE)
+stopifnot(ev$summary$different_primary_position_percent[1] == 0)
 
-# 4. The legacy first-column peak positions are demonstrably different for C/G/T.
-legacy_pos <- as.numeric(pm[,1])
-comparable <- is.finite(legacy_pos) & is.finite(pos)
-stopifnot(sum(legacy_pos[comparable] != pos[comparable]) == 3L)
-
-# 5. peakAmpMatrix is interpreted in the same documented A/C/G/T column model.
-pam <- matrix(
-  c(
-    100,10,8,5,
-    8,110,9,7,
-    6,8,120,9,
-    7,6,8,130,
-    1,1,1,1
-  ),
-  nrow = 5, byrow = TRUE
+# 5. Run summary computes quality metrics specifically inside auto trim.
+res <- list(
+  sample_id = "S001",
+  ab1_evidence = ev,
+  curation = list(auto_trim_start = 2L, auto_trim_end = 4L),
+  summary = data.frame(trim_start = 2L, trim_end = 4L)
 )
-colnames(pam) <- c("A","C","G","T")
-amp <- pitax_peak_amplitude_metrics(seq_string, pam)
-stopifnot(all(amp$peakamp_called_is_max[1:4] %in% TRUE))
-stopifnot(identical(amp$peakamp_best_channel[1:4], c("A","C","G","T")))
+sm <- ab1_evidence_result_summary(res)
+stopifnot(sm$Sample[1] == "S001")
+stopifnot(sm$Median_quality_auto_trim[1] == 35)
+stopifnot(sm$Q20_auto_trim_percent[1] == 100)
+stopifnot(sm$Q30_auto_trim_percent[1] == round(100 * 2/3, 2))
+stopifnot(sm$Canonical_called_is_max_auto_trim_percent[1] == 100)
 
-# 6. Quality vectors are padded/truncated without shifting the base index.
-stopifnot(identical(pitax_normalize_numeric(c(10,20), 4), c(10,20,NA_real_,NA_real_)))
-stopifnot(identical(pitax_normalize_numeric(c(10,20,30), 2), c(10,20)))
+# 6. Selected-base export contains its Sample_ID and refuses a selection/result
+# mismatch instead of silently writing a misleading filename/content pair.
+d <- pitax_evidence_detail_export(res, "S001")
+stopifnot("Sample_ID" %in% names(d))
+stopifnot(all(d$Sample_ID == "S001"))
+blocked <- tryCatch({ pitax_evidence_detail_export(res, "S999"); FALSE }, error = function(e) TRUE)
+stopifnot(blocked)
 
-cat("v3.0.0-alpha.1.1 AB1 evidence helper tests passed.\n")
+# 7. Run-table row selection resolves back to the actual result key.
+results <- list(S001 = res, S002 = modifyList(res, list(sample_id = "S002")))
+stopifnot(pitax_result_key_for_sample(results, "S002") == "S002")
+
+cat("v3.0.0-alpha.2 AB1 evidence helper tests passed.\n")

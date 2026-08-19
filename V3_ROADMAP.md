@@ -6,8 +6,8 @@ PITAX 3.0 will be built as five gated stages. A stage advances only after its te
 Goal: validate the raw AB1 evidence model before changing any biological decision.
 
 - Preserve v2.14.2 production behavior.
-- Capture basecaller quality, full peak-position/amplitude matrices and canonical A/C/G/T evidence.
-- Compare the legacy peak-position model with called-base-specific peak positions on real AB1 files.
+- Capture basecaller quality, raw ABIF primary-call coordinates and canonical A/C/G/T trace evidence.
+- Validate the legacy PITAX primary positions against ABIF PLOC.2 and the inferred channel map against the canonical trace order on real AB1 files.
 - Establish regression tests and an audit export.
 
 Gate: existing workflow remains unchanged and real laboratory AB1 files produce interpretable audit evidence without processing failures.

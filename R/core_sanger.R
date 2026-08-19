@@ -672,9 +672,10 @@ trim_one_ab1 <- function(
   )
 
 
-  # Stage 1 / PITAX 3.0: capture the richer AB1 evidence in parallel with
-  # the established v2 processing path. This is observational only in
-  # 3.0.0-alpha.1.1; trim/QC decisions below still use the legacy metrics.
+  # Stage 1 / PITAX 3.0: capture ABIF primary-call positions, PCON quality and canonical A/C/G/T
+  # trace evidence in parallel with the established v2 processing path. This
+  # is observational only in 3.0.0-alpha.2; trim/QC decisions below still use
+  # the legacy metrics.
   ab1_evidence <- tryCatch(
     build_ab1_evidence(
       sanger_object = s,
@@ -685,7 +686,7 @@ trim_one_ab1 <- function(
       abif_object = tryCatch(read.abif(file), error = function(e) NULL)
     ),
     error = function(e) list(
-      schema = "ab1-evidence-audit-v1",
+      schema = "ab1-evidence-audit-v2",
       mode = "observational-only",
       error = conditionMessage(e),
       detail = data.frame(),
