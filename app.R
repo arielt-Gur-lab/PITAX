@@ -1,5 +1,5 @@
 # ============================================================
-# Sanger Sequence Pipeline v2.13.0
+# PITAX v2.14.2
 # Modular Shiny application
 # ============================================================
 
@@ -15,13 +15,22 @@ library(DT)
 library(sangerseqR)
 options(shiny.maxRequestSize = 500 * 1024^2)
 
+# Serve the PITAX logo from the project root without exposing the rest of the source tree.
+PITAX_LOGO_AVAILABLE <- file.exists("logo.png")
+if (PITAX_LOGO_AVAILABLE) {
+  PITAX_ASSET_DIR <- file.path(tempdir(), "pitax-assets")
+  dir.create(PITAX_ASSET_DIR, recursive = TRUE, showWarnings = FALSE)
+  file.copy("logo.png", file.path(PITAX_ASSET_DIR, "logo.png"), overwrite = TRUE)
+  addResourcePath("pitax-assets", PITAX_ASSET_DIR)
+}
+
 source(file.path("R", "core_sanger.R"), local = TRUE)
 source(file.path("R", "sequence_tools.R"), local = TRUE)
 source(file.path("R", "export_tools.R"), local = TRUE)
 source(file.path("R", "taxonomy_tools.R"), local = TRUE)
 
-APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "2.14.0")
-APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "2.14.0", APP_VERSION)
+APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "2.14.2")
+APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "2.14.2", APP_VERSION)
 PROJECT_SCHEMA_VERSION <- 1L
 
 # ============================================================
@@ -104,6 +113,7 @@ pipeline_stage_footer <- function(current_step) {
 
 ui <- fluidPage(
   tags$head(
+    tags$title("PITAX — Taxonomic Identification Tool"),
     tags$script(HTML("
       Shiny.addCustomMessageHandler('openUrl', function(message) {
         window.open(message.url, '_blank');
@@ -111,6 +121,38 @@ ui <- fluidPage(
       Shiny.addCustomMessageHandler('copyText', function(message) {
         navigator.clipboard.writeText(message.text);
       });
+
+      (function() {
+        var loaderShownAt = 0;
+        var loaderFallback = null;
+        function showStepLoader(text) {
+          loaderShownAt = Date.now();
+          $('#app_loading_text').text(text || 'Loading workspace…');
+          $('#app_loading_overlay').addClass('visible').attr('aria-hidden', 'false');
+          clearTimeout(loaderFallback);
+          loaderFallback = setTimeout(hideStepLoader, 20000);
+        }
+        function hideStepLoader() {
+          var elapsed = Date.now() - loaderShownAt;
+          var wait = Math.max(0, 280 - elapsed);
+          setTimeout(function() {
+            $('#app_loading_overlay').removeClass('visible').attr('aria-hidden', 'true');
+          }, wait);
+          clearTimeout(loaderFallback);
+        }
+        Shiny.addCustomMessageHandler('showLoader', function(message) {
+          showStepLoader(message && message.text ? message.text : 'Loading workspace…');
+        });
+        Shiny.addCustomMessageHandler('hideLoader', function() { hideStepLoader(); });
+        $(document).on('shiny:busy', function() { $('#shiny_activity_bar').addClass('visible'); });
+        $(document).on('shiny:idle', function() {
+          $('#shiny_activity_bar').removeClass('visible');
+          if ($('#app_loading_overlay').hasClass('visible')) hideStepLoader();
+        });
+        $(document).on('click', '#pipeline_step > li > a', function() {
+          showStepLoader('Loading step…');
+        });
+      })();
 
     ")),
     tags$style(HTML("
@@ -217,6 +259,15 @@ ui <- fluidPage(
       .project-bar .form-group { margin-bottom:0; }
       .project-bar .shiny-input-container { width:300px; max-width:100%; }
       .project-status { color:#64748b; font-size:12px; flex:1 1 260px; }
+      #shiny_activity_bar { position:fixed; top:0; left:0; right:0; height:3px; z-index:10020; opacity:0; pointer-events:none; overflow:hidden; background:transparent; transition:opacity .12s ease; }
+      #shiny_activity_bar.visible { opacity:1; }
+      #shiny_activity_bar::after { content:''; display:block; width:34%; height:100%; background:#2563eb; animation:activitySlide 1.05s ease-in-out infinite; }
+      @keyframes activitySlide { 0% { transform:translateX(-110%); } 100% { transform:translateX(320%); } }
+      .app-loading-overlay { position:fixed; inset:0; z-index:10010; display:flex; align-items:center; justify-content:center; background:rgba(244,247,251,.82); backdrop-filter:blur(2px); opacity:0; visibility:hidden; pointer-events:none; transition:opacity .14s ease, visibility .14s ease; }
+      .app-loading-overlay.visible { opacity:1; visibility:visible; pointer-events:auto; }
+      .app-loading-card { display:flex; align-items:center; gap:14px; min-width:250px; padding:16px 20px; border-radius:14px; background:#fff; border:1px solid #dfe6ef; box-shadow:0 12px 34px rgba(15,23,42,.12); color:#334155; font-weight:650; }
+      .app-loading-spinner { width:25px; height:25px; border-radius:50%; border:3px solid #dbeafe; border-top-color:#2563eb; animation:spinLoader .72s linear infinite; flex:0 0 auto; }
+      @keyframes spinLoader { to { transform:rotate(360deg); } }
 
       /* v2.12 visual system ------------------------------------------------ */
       :root {
@@ -274,11 +325,12 @@ ui <- fluidPage(
       }
       textarea.form-control, .mono, pre, code { font-family:Consolas,'Courier New',monospace !important; }
       .pipeline-container { max-width:1580px; padding:0 18px 34px; }
-      .app-shell-header { display:flex; align-items:center; gap:15px; min-height:88px; padding:18px 24px; }
+      .app-shell-header { display:flex; align-items:center; gap:18px; min-height:104px; padding:16px 24px; }
       .app-brand-mark { width:48px; height:48px; border-radius:14px; background:#eff6ff; color:#2563eb; display:flex; align-items:center; justify-content:center; font-size:21px; flex:0 0 auto; }
+      .app-brand-logo { display:block; width:min(420px,48vw); max-height:82px; object-fit:contain; object-position:left center; }
       .app-brand-copy { flex:1 1 auto; min-width:0; }
       .app-brand-copy h2 { margin:0 0 2px; font-size:25px; }
-      .app-brand-copy p { font-size:13px; color:#6b7c92; letter-spacing:.01em; }
+      .app-brand-copy p { margin:2px 0 0; font-size:12.5px; color:#6b7c92; letter-spacing:.01em; }
       .app-version-badge { padding:6px 10px; border-radius:999px; background:#f1f5f9; color:#52647a; font-size:12px; font-weight:750; }
       .project-session-card { padding:10px 13px; gap:9px; }
       .project-bar-title { display:flex; align-items:center; gap:7px; min-width:max-content; }
@@ -450,6 +502,9 @@ ui <- fluidPage(
         .taxonomy-workspace-status { min-width:0; }
       }
       @media (max-width:620px) {
+        .app-shell-header { min-height:88px; padding:14px 16px; gap:10px; }
+        .app-brand-logo { width:min(300px,70vw); max-height:66px; }
+        .app-version-badge { margin-left:auto; }
         .taxonomy-result-hero { grid-template-columns:1fr; padding:18px; }
         .taxonomy-hero-icon-wrap { min-height:0; justify-content:flex-start; background:none; }
         .taxonomy-why { grid-column:auto; margin-left:0; }
@@ -458,12 +513,25 @@ ui <- fluidPage(
     "))
   ),
 
+  div(id = "shiny_activity_bar", `aria-hidden` = "true"),
+  div(id = "app_loading_overlay", class = "app-loading-overlay", `aria-hidden` = "true",
+      div(class = "app-loading-card",
+          div(class = "app-loading-spinner"),
+          div(id = "app_loading_text", "Loading workspace…")
+      )
+  ),
+
   div(class = "pipeline-container",
     div(class = "app-header app-shell-header",
-      div(class = "app-brand-mark", icon("flask")),
+      if (PITAX_LOGO_AVAILABLE)
+        tags$img(src = "pitax-assets/logo.png", class = "app-brand-logo", alt = "PITAX — Taxonomic Identification Tool")
+      else
+        tagList(
+          div(class = "app-brand-mark", icon("flask")),
+          div(class = "app-brand-copy", h2("PITAX"), p("Taxonomic Identification Tool"))
+        ),
       div(class = "app-brand-copy",
-        h2("Sanger Sequence Pipeline"),
-        p("Process · review · identify · document")
+        p("Sanger sequence analysis · quality review · BLAST · taxonomic interpretation")
       ),
       div(class = "app-version-badge", paste0("v", APP_VERSION))
     ),
@@ -801,7 +869,7 @@ ui <- fluidPage(
             DTOutput("taxonomy_counts_table"),
             div(class = "taxonomy-agreement-note",
               div(class = "tax-callout-icon", icon("info-circle")),
-              div("Best molecular match is chosen from comparable-coverage hits. Close alternatives are species with nearly the same Identity and coverage; database abundance is shown separately and does not decide the identification.")
+              div("Best molecular match is chosen from the near-best query-coverage band and then by Identity. Close alternatives are species with nearly the same Identity and coverage; database abundance is shown separately and does not decide the identification.")
             )
           )
         ),
@@ -982,7 +1050,7 @@ ui <- fluidPage(
                   div(class="method-num", "2"),
                   div(
                     h4("Best molecular match", span(class="evidence-badge evidence-heuristic", "App rule")),
-                    p("Partial 100% matches are not allowed to outrank near-full-length evidence merely because their aligned segment is short. If near-full hits with at least 90% query coverage exist, the leading match is selected from that tier; otherwise the app falls back to the 80% tier and then to all usable hits. Inside the comparable-coverage tier, Identity is ranked first, then query coverage, Bit score and E-value.")
+                    p("Partial 100% matches are not allowed to outrank near-full-length evidence merely because their aligned segment is short. The app first prefers the >=90% coverage tier (or >=80% if needed), then keeps hits within 2 percentage points of the best query coverage in that tier. Identity is ranked first inside that near-best-coverage band; coverage, Bit score and E-value are tie-breakers.")
                   )
                 ),
                 div(class="method-step",
@@ -1075,7 +1143,7 @@ ui <- fluidPage(
 
               div(class="about-callout",
                 strong("Important distinction: "),
-                "the comparable-coverage rule and the close-match windows (0.5 Identity percentage points and 2 coverage points) are application-specific review heuristics, not published species-delimitation thresholds. Published sources guide the biological context, while these rules should be calibrated against known isolates."
+                "the near-best coverage band and the close-match windows (0.5 Identity percentage points and 2 coverage points) are application-specific review heuristics, not published species-delimitation thresholds. Published sources guide the biological context, while these rules should be calibrated against known isolates."
               )
             ),
 
@@ -1444,6 +1512,7 @@ server <- function(input, output, session) {
     rv$rename <- data.frame(Original_name=rv$summary$sample_id, New_name=rv$summary$sample_id, stringsAsFactors=FALSE)
     choices <- names(rv$results)
     updateSelectInput(session,"inspect_sample",choices=choices,selected=if(length(choices)) choices[1] else character())
+    session$sendCustomMessage("showLoader", list(text = "Loading QC workspace…"))
     updateTabsetPanel(session,"pipeline_step",selected="qc")
   })
 
@@ -3016,7 +3085,7 @@ server <- function(input, output, session) {
         div(class = "tax-metric-icon", icon("dna")),
         div(class = "tax-metric-label", "Best-match Identity"),
         div(class = "tax-metric-value metric-colored", pct(ident, 2)),
-        div(class = "tax-metric-sub", "Highest Identity within the comparable-coverage tier")
+        div(class = "tax-metric-sub", "Best Identity within the near-best coverage band")
       ),
       div(class = "tax-metric metric-blue",
         div(class = "tax-metric-icon", icon("arrows-alt-h")),
@@ -3310,11 +3379,16 @@ server <- function(input, output, session) {
     clog <- all_curation_log()
     for (i in seq_len(nrow(out))) {
       nm <- out$Original_sample[i]
-      if (nrow(clog)) out$Manual_curation_actions[i] <- sum(clog$Sample == nm & !clog$Action %in% c("UNDO","REDO"), na.rm=TRUE)
       r <- rv$results[[nm]]
       if (!is.null(r)) {
         r <- ensure_curation_state(r)
-        out$Manual_base_edits[i] <- nrow(r$curation$base_edits)
+        base_edit_count <- if (is.data.frame(r$curation$base_edits)) nrow(r$curation$base_edits) else 0L
+        trim_left_changed <- is.finite(as.numeric(r$curation$trim_start)) && is.finite(as.numeric(r$curation$auto_trim_start)) &&
+          as.integer(r$curation$trim_start) != as.integer(r$curation$auto_trim_start)
+        trim_right_changed <- is.finite(as.numeric(r$curation$trim_end)) && is.finite(as.numeric(r$curation$auto_trim_end)) &&
+          as.integer(r$curation$trim_end) != as.integer(r$curation$auto_trim_end)
+        out$Manual_curation_actions[i] <- as.integer(base_edit_count + trim_left_changed + trim_right_changed)
+        out$Manual_base_edits[i] <- base_edit_count
         out$Curation_revision[i] <- as.integer(r$curation$revision)
       }
     }
@@ -3377,7 +3451,9 @@ server <- function(input, output, session) {
     defs <- list()
     if (length(comment_idx)) defs[[length(defs)+1]] <- list(targets=comment_idx, width="420px", className="dt-comment")
     if (length(taxon_idx)) defs[[length(defs)+1]] <- list(targets=taxon_idx, width="145px", className="dt-taxon-compact")
-    datatable(df[,show,drop=FALSE], rownames=FALSE, filter="top", class="compact stripe",
+    team_view <- df[,show,drop=FALSE]
+    if ("Manual_curation_actions" %in% names(team_view)) names(team_view)[names(team_view) == "Manual_curation_actions"] <- "Active_curation_changes"
+    datatable(team_view, rownames=FALSE, filter="top", class="compact stripe",
               options=list(pageLength=25, scrollX=TRUE, autoWidth=FALSE, columnDefs=defs))
   })
 

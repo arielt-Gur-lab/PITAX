@@ -2,6 +2,19 @@
 
 This file records changes that affect the way the pipeline behaves, presents results, or stores project data. Small internal refactors are omitted unless they change something visible or scientifically relevant.
 
+## 2.14.2
+**PITAX branding and deployment preparation**
+- Added the PITAX logo to the application header. The source image remains `logo.png` in the project root and is served without exposing the source directory.
+- Changed the browser title and main application branding to PITAX.
+- Added `prepare_connect_cloud.R` and `DEPLOYMENT.md` for GitHub-based deployment to Posit Connect Cloud.
+- No trimming, QC, BLAST or taxonomic decision logic changed in this release.
+
+## 2.14.1
+**Loading feedback and match-selection cleanup**
+- Added a visible loading overlay when changing workflow steps, with a thin activity bar while Shiny is processing. The QC workspace now shows a loading state after AB1 processing instead of appearing temporarily blank.
+- Team summary now reports active sequence curation changes rather than counting every audit-log event. Marking a flag as reviewed without changing the sequence no longer appears as a manual sequence edit.
+- Tightened best-molecular-match selection: hits are first restricted to a near-best coverage band (within 2 percentage points of the highest query coverage), then ranked by Identity. This prevents a noticeably shorter hit from being highlighted only because its Identity is marginally higher.
+
 ## 2.14.0
 **Evidence-first taxonomic interpretation**
 - Replaced the primary-score-cluster decision rule with a simpler evidence-first tree: best molecular match first, then close alternatives, then the most conservative supported taxonomic level.

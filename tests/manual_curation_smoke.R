@@ -85,4 +85,4 @@ trimmed <- curation_commit(redo$result, trim_snap, trim_row, settings, "Test tri
 stopifnot(trimmed$seq == "ACTT")
 stopifnot(trimmed$summary$trim_end == 4L)
 
-cat("v2.14.0 manual curation smoke tests passed.\n")
+cat("v2.14.2 manual curation smoke tests passed.\n")

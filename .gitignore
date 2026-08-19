@@ -29,6 +29,9 @@ Thumbs.db
 *_taxonomic_summary.csv
 *_taxonomy_enriched_hits.csv
 
+# Local rsconnect deployment metadata (manifest.json is intentionally tracked)
+rsconnect/
+
 # Temporary / cache files
 *.tmp
 *.temp

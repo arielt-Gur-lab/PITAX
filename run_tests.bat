@@ -30,7 +30,7 @@ echo [3/3] Manual curation / undo-redo smoke tests
 if errorlevel 1 goto :failed
 
 echo.
-echo All v2.14.0 smoke tests passed.
+echo All v2.14.2 smoke tests passed.
 pause
 exit /b 0
 

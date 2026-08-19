@@ -335,13 +335,14 @@ sequence_evidence_from_hit <- function(hit, target = "", rank = c("species", "ge
 
 # Molecular matching is intentionally simple and conservative:
 # 1) Partial high-identity alignments should not outrank near-full-length hits.
-#    If any resolved hit covers >=90% of the query, only that coverage tier is
-#    considered for the leading molecular match. Otherwise >=80% is preferred;
-#    if neither tier exists, all usable hits remain eligible.
-# 2) Inside the comparable-coverage tier, Identity is ranked first, then query
-#    coverage, then Bit score and E-value as tie-breakers.
+#    First prefer the >=90% coverage tier (or >=80% if no such hit exists).
+# 2) Within that tier, retain only hits within 2 percentage points of the best
+#    query coverage. This prevents a noticeably shorter alignment from winning
+#    solely because Identity is a few hundredths of a percent higher.
+# 3) Inside that near-best-coverage band, rank by Identity first, then coverage,
+#    Bit score and E-value as tie-breakers.
 # This is an application decision rule, not a universal taxonomic threshold.
-select_best_molecular_hit <- function(hits) {
+select_best_molecular_hit <- function(hits, coverage_band_pp = 2.0) {
   if (is.null(hits) || !nrow(hits)) return(NULL)
   h <- hits
   cov <- as_num_safe(h$query_coverage_percent)
@@ -351,6 +352,13 @@ select_best_molecular_hit <- function(hits) {
     h <- h[is.finite(cov) & cov >= 80, , drop = FALSE]
   }
   if (!nrow(h)) return(NULL)
+
+  cov <- as_num_safe(h$query_coverage_percent)
+  if (any(is.finite(cov))) {
+    best_cov <- max(cov[is.finite(cov)], na.rm = TRUE)
+    keep_cov <- is.finite(cov) & cov >= (best_cov - coverage_band_pp)
+    if (any(keep_cov)) h <- h[keep_cov, , drop = FALSE]
+  }
 
   id <- as_num_safe(h$identity_percent)
   cov <- as_num_safe(h$query_coverage_percent)
@@ -406,7 +414,19 @@ build_rank_evidence_profile <- function(hits, rank = c("species", "genus"),
 
   cov <- as_num_safe(out$best_query_coverage_percent)
   tier <- ifelse(is.finite(cov) & cov >= 90, 2L, ifelse(is.finite(cov) & cov >= 80, 1L, 0L))
-  if (any(tier == 2L)) eligible <- tier == 2L else if (any(tier == 1L)) eligible <- tier >= 1L else eligible <- rep(TRUE, nrow(out))
+  if (any(tier == 2L)) {
+    base_eligible <- tier == 2L
+  } else if (any(tier == 1L)) {
+    base_eligible <- tier >= 1L
+  } else {
+    base_eligible <- rep(TRUE, nrow(out))
+  }
+  eligible <- base_eligible
+  finite_cov <- base_eligible & is.finite(cov)
+  if (any(finite_cov)) {
+    max_cov <- max(cov[finite_cov], na.rm = TRUE)
+    eligible <- base_eligible & is.finite(cov) & cov >= (max_cov - 2.0)
+  }
 
   id <- as_num_safe(out$best_identity_percent)
   bits <- as_num_safe(out$best_bit_score)
@@ -699,7 +719,7 @@ build_taxonomic_consensus <- function(enriched_hits, target = "", top_n = 25L) {
   }
 
   summary <- data.frame(
-    algorithm_version = "evidence-first-v2.14.0",
+    algorithm_version = "evidence-first-v2.14.1",
     recommended_identification = recommendation,
     recommended_level = rec_rank,
     confidence = confidence,
@@ -783,7 +803,7 @@ make_taxonomy_checkpoint_zip <- function(file, tax_summary, tax_hits, tax_counts
     paste0("Application version: ", app_version),
     paste0("Exported at: ", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
     "v2.14 uses evidence-first accession-level BLAST interpretation.",
-    "Best molecular match is selected from comparable-coverage hits by Identity first, then query coverage; Bit score and E-value are tie-breakers.",
+    "Best molecular match is selected from the near-best query-coverage band (within 2 percentage points of the best coverage), then by Identity; coverage, Bit score and E-value break ties.",
     "Near-full-length hits (>=90% query coverage) are preferred over partial high-identity matches when available; >=80% is the next coverage tier.",
     "A different species is treated as a close alternative when it is within 0.5 identity percentage points and no more than 2 coverage points below the best molecular match.",
     "Close alternatives reduce the taxonomic level/confidence. If close species remain within one genus, genus identification can remain strong while species is unresolved.",

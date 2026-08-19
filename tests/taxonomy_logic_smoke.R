@@ -113,4 +113,13 @@ h7 <- make_hits(c("Fusarium shortmatch","Fusarium fullmatch"), rep("Fusarium",2)
 r7 <- build_taxonomic_consensus(h7, target="ITS", top_n=2)$summary
 stopifnot(r7$best_match_species == "Fusarium fullmatch")
 
-cat("v2.14.0 taxonomy smoke tests passed.\n")
+
+# 8. Within the same species, a marginal Identity advantage must not select a
+# noticeably shorter representative when a near-full hit is available.
+h8 <- make_hits(rep("Pleurotus pulmonarius",2), rep("Pleurotus",2),
+                c(1138,1193), c(99.84,99.80), c(94.9,100.0), "PCM")
+r8 <- build_taxonomic_consensus(h8, target="ITS", top_n=2)$summary
+stopifnot(r8$best_match_accession == "PCM2.1")
+stopifnot(r8$best_match_query_coverage_percent == 100)
+
+cat("v2.14.2 taxonomy smoke tests passed.\n")
