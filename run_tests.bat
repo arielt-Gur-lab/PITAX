@@ -15,42 +15,57 @@ echo Using R from:
 echo %RDIR%
 echo.
 
-echo [1/7] Taxonomy logic smoke tests
+echo [1/10] Taxonomy logic smoke tests
 "%RDIR%\bin\Rscript.exe" "tests\taxonomy_logic_smoke.R"
 if errorlevel 1 goto :failed
 
 echo.
-echo [2/7] QC ambiguous-peak smoke tests
+echo [2/10] QC ambiguous-peak smoke tests
 "%RDIR%\bin\Rscript.exe" "tests\qc_peak_flags_smoke.R"
 if errorlevel 1 goto :failed
 
 echo.
-echo [3/7] Manual curation / undo-redo smoke tests
+echo [3/10] Manual curation / undo-redo smoke tests
 "%RDIR%\bin\Rscript.exe" "tests\manual_curation_smoke.R"
 if errorlevel 1 goto :failed
 
 echo.
-echo [4/7] Stage 1 AB1 evidence helper tests
+echo [4/10] Stage 1 AB1 evidence helper tests
 "%RDIR%\bin\Rscript.exe" "tests\ab1_evidence_smoke.R"
 if errorlevel 1 goto :failed
 
 echo.
-echo [5/7] Workflow order and QC naming smoke tests
+echo [5/10] Workflow order and QC naming smoke tests
 "%RDIR%\bin\Rscript.exe" "tests\workflow_order_smoke.R"
 if errorlevel 1 goto :failed
 
 echo.
-echo [6/7] Stage 2 architecture and migration tests
+echo [6/10] Stage 2 architecture and migration tests
 "%RDIR%\bin\Rscript.exe" "tests\stage2_architecture_smoke.R"
 if errorlevel 1 goto :failed
 
 echo.
-echo [7/7] Stage 2 Shiny integration contract tests
+echo [7/10] Stage 2 closed-gate Shiny integration tests
 "%RDIR%\bin\Rscript.exe" "tests\stage2_app_contract_smoke.R"
 if errorlevel 1 goto :failed
 
 echo.
-echo All PITAX v3.0.0-alpha.6 tests passed.
+echo [8/10] Stage 3 consensus algorithm tests
+"%RDIR%\bin\Rscript.exe" "tests\stage3_consensus_smoke.R"
+if errorlevel 1 goto :failed
+
+echo.
+echo [9/10] Stage 3 controlled AB1 pair tests
+"%RDIR%\bin\Rscript.exe" "tests\stage3_ab1_fixture_smoke.R"
+if errorlevel 1 goto :failed
+
+echo.
+echo [10/10] Stage 3 Shiny integration and startup tests
+"%RDIR%\bin\Rscript.exe" "tests\stage3_app_contract_smoke.R"
+if errorlevel 1 goto :failed
+
+echo.
+echo All PITAX v3.0.0-alpha.8.2 tests passed.
 pause
 exit /b 0
 

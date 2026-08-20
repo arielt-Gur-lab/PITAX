@@ -1,4 +1,4 @@
-# PITAX v3.0.0-alpha.6 - Stage 2 Shiny integration contract tests.
+# PITAX v3.0.0-alpha.7.1 - Stage 2 closed-gate regression contracts.
 
 read_text <- function(path) paste(readLines(path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
 app_text <- read_text("app.R")
@@ -14,12 +14,18 @@ must_not_contain <- function(text, marker) {
 }
 
 must_contain(app_text, 'source(file.path("R", "stage2_architecture.R"), local = TRUE)')
-must_contain(app_text, "PROJECT_SCHEMA_VERSION <- 3L")
+must_contain(app_text, "PROJECT_SCHEMA_VERSION <- 4L")
 must_contain(app_text, 'actionButton("to_rename", "Continue to Rename"')
 must_contain(app_text, 'actionButton("run_trimming", "Start trimming"')
-must_contain(app_text, 'DTOutput("assignment_upload_table")')
-must_contain(app_text, 'DTOutput("assignment_review_table")')
+must_contain(app_text, 'uiOutput("assignment_editor")')
+must_contain(app_text, 'actionButton("save_assignment_edits"')
 must_contain(app_text, 'actionButton("apply_assignment_batch"')
+must_contain(app_text, 'tags$option(value = "Forward"')
+must_contain(app_text, 'tags$option(value = "Reverse"')
+must_contain(app_text, 'collect_assignment_editor <- function()')
+must_contain(app_text, 'radioButtons(')
+must_contain(app_text, '"Simple reads — no Forward/Reverse matching" = "simple"')
+must_contain(app_text, '"Paired reads — build Forward/Reverse consensus" = "paired_consensus"')
 must_contain(app_text, 'Assignment key must contain old_id, isolate, locus (or gene), and direction columns.')
 must_contain(app_text, 'name_error <- stage2_identity_error(rv$read_assignments)')
 must_contain(app_text, 'sync_assignment_state()')
@@ -61,7 +67,7 @@ to_rename_contract <- substr(app_text, to_rename_pos, run_trimming_pos - 1L)
 must_not_contain(to_rename_contract, 'trim_one_ab1(')
 must_contain(substr(app_text, run_trimming_pos, nchar(app_text)), 'trim_one_ab1(')
 
-final_names_pos <- regexpr('card_title("Final read / FASTA names"', app_text, fixed = TRUE)[1]
+final_names_pos <- regexpr('card_title("Final read / FASTA names and biological identity"', app_text, fixed = TRUE)[1]
 architecture_pos <- regexpr('card_title("Stage 2 · Architecture preview"', app_text, fixed = TRUE)[1]
 if (final_names_pos < 1L || architecture_pos < 1L || final_names_pos >= architecture_pos) {
   stop("Generated final names must appear before the architecture preview.", call. = FALSE)
@@ -71,11 +77,13 @@ must_not_contain(architecture_text, "stage2_parse_structured_read_name")
 must_not_contain(architecture_text, "stage2_detect_direction_suffix")
 must_not_contain(architecture_text, "stage2_known_locus")
 must_not_contain(app_text, 'DTOutput("read_assignment_table")')
+must_not_contain(app_text, 'DTOutput("assignment_upload_table")')
+must_not_contain(app_text, 'DTOutput("assignment_review_table")')
 must_not_contain(app_text, 'actionButton("to_qc"')
 must_not_contain(app_text, 'Loading Rename workspace')
 
-# Stage 2 stores pairing metadata only. Consensus remains gated to Stage 3.
+# Stage 2 never performs a hidden merge. Stage 3 is a separate, explicit layer.
 must_not_contain(app_text, "build_forward_reverse_consensus")
 must_not_contain(app_text, "auto_merge_forward_reverse")
 
-cat("v3.0.0-alpha.6 Stage 2 app integration tests passed.\n")
+cat("v3.0.0-alpha.7.1 Stage 2 closed-gate integration tests passed.\n")

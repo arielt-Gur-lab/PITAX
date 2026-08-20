@@ -1,70 +1,70 @@
-PITAX v3.0.0-alpha.6 — Stage 2 explicit identity build
-=====================================================
+PITAX v3.0.0-alpha.8.2 — Stage 3 consensus review
+==================================================
 
 Purpose
 -------
-Corrected Stage 2 alpha. It introduces Project -> Isolate -> Locus -> Read as a
-backward-compatible metadata architecture while keeping the upload barcode as
-the immutable source identifier. Biological identity is entered explicitly and
-is never inferred by parsing the uploaded filename.
+Stage 2 is closed. Stage 3 creates the auditable sequence used by Export and
+BLAST without overwriting either source AB1 read or its curated QC sequence.
 
-What changed
-------------
-- Project schema is now version 3.
-- The visible order is Upload -> Assay -> Rename review -> Trim & QC.
-- Upload includes manual row editing, expanded batch assignment and XLSX/CSV
-  assignment-key import.
-- The assignment source of truth is three separate fields: Isolate, Gene/Locus
-  and Direction.
-- PITAX generates the final read/FASTA name as <Isolate>_<Locus>_<F/R>; the name
-  is an output, not a field from which identity is reconstructed.
-- Assay opens Rename review immediately; trimming starts only with Start
-  trimming.
-- A single read is valid. A pair is counted only when the same isolate/locus has
-  two distinct source reads assigned Forward and Reverse.
-- Paired reads remain separate and auditable; no consensus is created in Stage 2.
-- Schema-1 and schema-2 projects migrate in memory without rewriting QC,
-  curation, BLAST or taxonomy evidence. Save to persist schema 3.
-- Project files and checkpoint ZIPs retain source IDs, explicit assignments,
-  generated names and isolate/locus/read architecture tables.
+Alpha.8–alpha.8.2 changes
+------------------------
+- Alpha.8.2 fixes Shiny startup/upload navigation by isolating the one-time
+  reactive project-mode read and passing mode explicitly to the UI helper.
+- Alpha.8.1 fixes application startup by namespace-qualifying the two new
+  Plotly consensus chromatogram outputs.
+- Simple projects no longer show a redundant Consensus screen. After QC,
+  PITAX automatically orients each independent read and continues to Export.
+- Paired projects retain Stage 3 and now include Consensus Review & Curation.
+- A selected conflict shows focused Forward and Reverse chromatograms at the
+  original called-base positions.
+- The reviewer may accept the Forward call, Reverse call, or intentionally
+  retain the automatic IUPAC ambiguity call.
+- Every decision creates a monotonic consensus revision and audit row. Undo and
+  Redo are also new audited revisions; they never erase history.
+- BLAST jobs retain the exact consensus revision used for each RID.
+- Consensus curation audit CSVs are included in checkpoint/result packages.
+- Analysis sequence summary widths are fixed and no longer change on sorting.
 
-Assignment key
---------------
-Use XLSX or CSV columns:
+Project read models
+-------------------
+- Simple independent reads: one oriented analysis sequence per uploaded read;
+  no Forward/Reverse matching and no user-facing consensus step.
+- Paired Forward/Reverse: reads pair only from explicit Isolate, Gene/Locus and
+  Direction fields. A lone read remains a valid single-read representative.
 
-  old_id, isolate, locus, direction
+Scientific contract
+-------------------
+- One upload/run contains exactly one Gene/Locus. Stage 4 will combine loci.
+- Reverse-complementing occurs only in a derived analysis view.
+- Weak overlaps are blocked rather than concatenated.
+- A mismatch is resolved automatically only with a sufficient quality
+  advantage. Otherwise an IUPAC call is retained and Export remains blocked
+  until a reviewer records a decision.
+- Source sequences, source curation revisions, alignment columns, quality,
+  chromatogram positions, automatic calls and manual decisions remain linked.
 
-`gene` may be used instead of `locus`. old_id matches the upload barcode/source
-name, with unique prefix matching supported.
+Controlled test data
+--------------------
+- `TEST/Stage3_synthetic_pair`: clean trace-aware mirror pair for orientation,
+  pairing and overlap mechanics.
+- `TEST/Stage3_conflict_pair`: the same controlled material with one
+  trace-consistent C/A conflict at Forward-oriented position 400 (IUPAC M).
 
-See `assignment_key_template.csv` for a ready-to-edit example.
+These fixtures are reproducible software-validation material. They are not an
+independently sequenced biological Forward/Reverse pair and do not by themselves
+close biological acceptance of Stage 3.
 
 Testing
 -------
-Run `run_tests.bat`.
+Run `run_tests.bat` on Windows with R installed.
 
 Expected final line:
 
-  All PITAX v3.0.0-alpha.6 tests passed.
+  All PITAX v3.0.0-alpha.8.2 tests passed.
 
-Then follow `V3_STAGE2.md` for the focused manual checks.
-
-Important boundary
-------------------
-Stage 2 stores identity and pairing metadata only. Reverse-complement alignment,
-overlap calculation, conflict resolution and Forward/Reverse consensus belong to
-Stage 3 and are intentionally absent from this build.
-
-Branching
----------
-Keep this alpha on the v3 development branch. Stable 2.14.2 remains the
-production baseline until the gated 3.0 process is complete.
-
-Online deployment
------------------
-If you intentionally deploy this branch separately, regenerate `manifest.json`
-locally with:
-
-  source("prepare_connect_cloud.R")
-
-See DEPLOYMENT.md for the stable deployment workflow.
+Roadmap
+-------
+- Stage 3: complete biological acceptance with a real paired-AB1 truth set.
+- Stage 4: multi-locus isolate profile with separate evidence per locus.
+- PITAX 4 preparation: stored alignment, ITS region annotation, then
+  phylogenetic trees based on the reviewed alignment.

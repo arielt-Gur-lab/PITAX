@@ -2,6 +2,64 @@
 
 This file records changes that affect the way the pipeline behaves, presents results, or stores project data. Small internal refactors are omitted unless they change something visible or scientifically relevant.
 
+## 3.0.0-alpha.8.2
+**Shiny reactive-context startup hotfix**
+- Removed the hidden `rv$project_mode` read from the navigation helper and now pass project mode explicitly from reactive observers.
+- Wrapped the one-time post-flush project-mode read in `isolate()`, preventing Shiny from rejecting reactive-value access outside a reactive consumer.
+- Normalized loaded Simple projects away from the hidden Consensus tab.
+- Added a regression contract for the post-flush callback and audited every alpha.8 helper that reads `input` or `rv` for its call context.
+
+## 3.0.0-alpha.8.1
+**Plotly namespace startup hotfix**
+- Qualified both new consensus chromatogram UI outputs with `plotly::`, preventing application startup failure when Plotly is installed but not attached with `library(plotly)`.
+- Added a Stage 3 integration contract that requires the namespace-qualified UI and server bindings.
+
+## 3.0.0-alpha.8
+**Consensus review, Simple-mode bypass and stable analysis table**
+- Simple projects now materialize correctly oriented independent analysis sequences automatically after QC and continue directly to Export; the user-facing consensus tab is omitted.
+- Stabilized the Analysis sequence summary with a compact fixed-width column contract so sorting no longer changes the layout.
+- Added a dedicated Consensus Review & Curation workspace for paired projects with Forward, Reverse and intentional IUPAC decisions.
+- Linked each selected conflict to focused Forward and Reverse chromatograms at the original called-base positions.
+- Added monotonic consensus revisions, persistent audit history and auditable Undo/Redo actions while retaining immutable source-read revision bindings.
+- Bound every submitted BLAST RID to the exact consensus revision used as its query.
+- Exported consensus curation audit CSVs beside per-column evidence.
+- Added a deterministic one-conflict AB1 pair under `TEST/Stage3_conflict_pair` and regression coverage for Forward/IUPAC acceptance, gate opening and Undo/Redo.
+- The controlled mirror-derived fixtures validate software mechanics but do not replace an independently sequenced biological Forward/Reverse acceptance set.
+
+## 3.0.0-alpha.7.2
+**Wider project-mode choices and controlled Stage 3 AB1 fixture**
+- Expanded the Project read model radio group to the full available horizontal width without increasing card height.
+- Added a reproducible synthetic Forward/Reverse AB1 pair, assignment key and expected sequence under `TEST/Stage3_synthetic_pair`.
+- The Reverse fixture is a trace-aware reverse complement of a permissively licensed public AB1 test trace: calls, quality values, peak positions and A/C/G/T channels are transformed consistently.
+- Documented the fixture boundary: it validates mechanics but cannot replace a real independently sequenced Forward/Reverse pair for closing the Stage 3 gate.
+
+## 3.0.0-alpha.7.1
+**Rename workspace, project read modes and BLAST depth clarification**
+- Removed biological identity editing from Upload and concentrated assignment-key import, batch editing, manual editing and generated-name review in Rename before Trim/QC.
+- Replaced the reactive DT identity editor with a stable form table and explicit **Apply table changes** action, preventing full-table redraw after each edit.
+- Made Direction a native Forward/Reverse selector in every row.
+- Added a saved project read model: Simple independent reads or explicit Forward/Reverse pairing.
+- Simple mode keeps each read independent, retains its `<Isolate>_<Locus>_<F/R>` name and orients Reverse reads without attempting a merge.
+- Relabeled BLAST hit count as retrieval depth and added audit fields separating retrieved, competitive and noncompetitive tail hits.
+- Removed accession-count boosts from confidence; database representation remains audit context and no longer acts as a vote in either direction.
+- Added regression coverage proving that many weak tail hits do not lower the recommendation or confidence; a genuinely close late hit may still do so.
+- Limited curation invalidation notices to cases where downstream BLAST/taxonomy evidence really existed and included the curation action plus sequence revision transition.
+
+## 3.0.0-alpha.7
+**Stage 3 Forward / Reverse consensus foundation**
+- Closed the accepted Stage 2 gate and advanced the project schema to version 4.
+- Enforced one Gene/Locus per uploaded sequencing run; Stage 4 will combine separately processed locus profiles.
+- Added a derived Reverse-complement view and deterministic semi-global overlap alignment without modifying either curated source read.
+- Added one isolate-level sequence record per Isolate/Locus, while labeling one-read cases as single-read representatives rather than consensus.
+- Added conservative quality-aware mismatch resolution; unresolved contradictions retain an IUPAC ambiguity call and require review.
+- Blocked weak/unreliable overlaps instead of concatenating reads.
+- Added per-column provenance with Forward/Reverse calls, basecaller quality, raw chromatogram positions, decision and review state.
+- Routed downstream FASTA and BLAST through the isolate-level sequence after the Stage 3 gate is green.
+- Added consensus staleness and invalidation when a curated source sequence or rebuilt isolate-level sequence changes.
+- Added consensus FASTA, summary, alignment and per-column evidence checkpoint exports.
+- Added schema-3 → schema-4 migration that preserves established read, QC, curation, BLAST and taxonomy evidence.
+- Added Stage 3 algorithm and Shiny integration regressions; manual conflict editing and paired-AB1 truth-set validation remain open.
+
 ## 3.0.0-alpha.6
 **Stage 2 workflow and identity correction**
 - Separated the user-facing stages into Upload → Assay → Rename & Assign → Trim & QC.
@@ -14,6 +72,7 @@ This file records changes that affect the way the pipeline behaves, presents res
 - Added regressions proving one read remains a single read and only distinct Forward plus Reverse reads form a pair.
 - Prioritized duplicate source/read-key validation so unsafe duplicate AB1 basenames are reported even while biological assignments are still incomplete.
 - Guarded empty pre-trim and all-failed-run selector states so QC/BLAST choice synchronization never calls `setNames()` on `NULL`.
+- Replaced free-text Direction cell editing with per-read Forward/Reverse dropdowns in both Upload assignment and Rename review.
 - Did not add Forward/Reverse consensus; that remains gated to Stage 3.
 
 ## 3.0.0-alpha.5

@@ -1,6 +1,6 @@
 # ============================================================
-# PITAX v3.0.0-alpha.6
-# Stage 2: isolate / locus / read architecture
+# PITAX v3.0.0-alpha.8.2
+# Stage 3: Forward / Reverse consensus review and curation
 # ============================================================
 
 required_cran <- c("shiny", "DT", "zip", "readxl", "httr2", "plotly", "xml2", "rentrez", "taxize", "openxlsx")
@@ -26,14 +26,15 @@ if (PITAX_LOGO_AVAILABLE) {
 
 source(file.path("R", "ab1_evidence.R"), local = TRUE)
 source(file.path("R", "stage2_architecture.R"), local = TRUE)
+source(file.path("R", "stage3_consensus.R"), local = TRUE)
 source(file.path("R", "core_sanger.R"), local = TRUE)
 source(file.path("R", "sequence_tools.R"), local = TRUE)
 source(file.path("R", "export_tools.R"), local = TRUE)
 source(file.path("R", "taxonomy_tools.R"), local = TRUE)
 
-APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.0.0-alpha.6")
-APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "3.0.0-alpha.6", APP_VERSION)
-PROJECT_SCHEMA_VERSION <- 3L
+APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.0.0-alpha.8.2")
+APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "3.0.0-alpha.8.2", APP_VERSION)
+PROJECT_SCHEMA_VERSION <- 4L
 
 # ============================================================
 # UI helpers
@@ -86,6 +87,7 @@ pipeline_stage_footer <- function(current_step) {
     "Assay settings",
     "Rename & assign",
     "Trim & QC",
+    "Analysis sequence",
     "Export",
     "NCBI BLAST",
     "Taxonomic summary"
@@ -373,6 +375,28 @@ ui <- fluidPage(
       .upload-drop-card .input-group { width:100%; }
       .upload-drop-card .btn-file { background:#eef5ff; border-color:#bdd2f5; color:#1d4ed8; font-weight:700; }
       .stage-table-card { min-width:0; overflow:hidden; }
+      .project-mode-options .shiny-options-group { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+      .project-mode-options .shiny-input-container { width:100%; max-width:none; }
+      .project-mode-options .radio { margin:0; padding:12px 14px; border:1px solid #dbe4ef; border-radius:10px; background:#fbfcfe; }
+      .assignment-editor-wrap { overflow:auto; max-height:560px; border:1px solid #dbe4ef; border-radius:10px; }
+      .assignment-editor { width:100%; min-width:940px; border-collapse:separate; border-spacing:0; }
+      .assignment-editor th { position:sticky; top:0; z-index:2; padding:9px 8px; background:#f8fafc; color:#475569; font-size:11.5px; border-bottom:1px solid #dbe4ef; white-space:nowrap; }
+      .assignment-editor td { padding:7px 8px; border-bottom:1px solid #e8edf4; vertical-align:middle; }
+      .assignment-editor tr:last-child td { border-bottom:none; }
+      .assignment-editor .assignment-source { font-family:Consolas,'Courier New',monospace; font-size:11.5px; color:#52647a; white-space:nowrap; }
+      .assignment-editor .assignment-final { font-family:Consolas,'Courier New',monospace; font-size:11.5px; color:#1746a2; white-space:nowrap; }
+      .assignment-editor .form-control { min-width:150px; height:32px; padding:5px 8px; font-size:12px; }
+      .assignment-editor .assignment-direction { min-width:125px; }
+      .assignment-editor-actions { display:flex; align-items:center; flex-wrap:wrap; gap:9px; margin:12px 0 4px; }
+      .assignment-editor-actions .compact-hint { margin:0; }
+      #consensus_summary_table .dataTables_scrollHead table,
+      #consensus_summary_table .dataTables_scrollBody table { table-layout:fixed !important; width:100% !important; }
+      #consensus_summary_table table.dataTable th,
+      #consensus_summary_table table.dataTable td { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .consensus-review-grid { display:grid; grid-template-columns:minmax(250px,.8fr) minmax(0,2.2fr); gap:16px; align-items:start; }
+      .consensus-review-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+      .consensus-trace-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+      @media (max-width:1050px) { .consensus-review-grid,.consensus-trace-grid { grid-template-columns:1fr; } }
       .form-grid-2, .form-grid-3 { display:grid; gap:10px 14px; align-items:end; }
       .form-grid-2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .form-grid-3 { grid-template-columns:repeat(3,minmax(0,1fr)); }
@@ -436,6 +460,7 @@ ui <- fluidPage(
         .export-tile-grid { grid-template-columns:1fr; }
         .checkpoint-modern { align-items:flex-start; flex-direction:column; }
         .project-session-card .shiny-input-container { width:100%; }
+        .project-mode-options .shiny-options-group { grid-template-columns:1fr; }
       }
 
       /* Taxonomy dashboard ------------------------------------------------- */
@@ -568,7 +593,7 @@ ui <- fluidPage(
       # 1. Upload
       # --------------------------------------------------------
       tabPanel("1 · Upload", value = "upload",
-        stage_heading("upload", "Upload and identify chromatograms", "Keep the sequencer barcode as the immutable source, then assign isolate, gene and direction before processing.", "Step 1 of 7"),
+        stage_heading("upload", "Upload chromatograms", "Keep the sequencer barcode and source filename unchanged. Biological identity is assigned later in Rename.", "Step 1 of 8"),
         stage_topbar(
           div(class = "stage-topbar-spacer"),
           actionButton("to_settings", "Continue to Assay", icon = icon("arrow-right"), class = "btn-primary")
@@ -585,37 +610,19 @@ ui <- fluidPage(
             DTOutput("uploaded_files_table")
           )
         ),
-        div(class = "stage-grid stage-grid-rename",
-          div(class = "panel-box",
-            card_title("Assignment key", "Import XLSX/CSV with old_id, isolate, locus (or gene), and direction columns. old_id matches the uploaded barcode; prefix matching is supported.", "key"),
-            fileInput("rename_key_file", NULL, multiple = FALSE, accept = c(".xlsx", ".csv"), buttonLabel = "Choose assignment key", placeholder = "XLSX or CSV"),
-            actionButton("apply_rename_key", "Apply assignment key", icon = icon("check"), class = "btn-primary"),
-            downloadButton("download_assignment_key_template", "Download key template"),
-            uiOutput("rename_key_status")
+        div(class = "panel-box",
+            card_title("Project read model", "Choose whether every chromatogram is an independent sequence or whether explicit Forward/Reverse reads should be paired into one isolate-level consensus.", "sitemap"),
+          div(class = "project-mode-options",
+            radioButtons(
+              "project_mode", NULL,
+              choices = c(
+                "Simple reads — no Forward/Reverse matching" = "simple",
+                "Paired reads — build Forward/Reverse consensus" = "paired_consensus"
+              ),
+              selected = "simple", inline = FALSE
+            )
           ),
-          div(class = "panel-box",
-            card_title("Batch assignment", "Apply isolate edits, gene and direction to selected rows. If no rows are selected, the action applies to all uploaded reads.", "edit"),
-            div(class = "form-grid-2",
-              textInput("batch_isolate_prefix", "Isolate prefix", ""),
-              textInput("batch_isolate_suffix", "Isolate suffix", "")
-            ),
-            div(class = "form-grid-2",
-              textInput("batch_isolate_find", "Find in isolate", ""),
-              textInput("batch_isolate_replace", "Replace with", "")
-            ),
-            div(class = "form-grid-2",
-              textInput("batch_locus", "Set gene / locus", ""),
-              selectInput("batch_direction", "Set direction", c("No change" = "", "Forward" = "Forward", "Reverse" = "Reverse"), selected = "")
-            ),
-            actionButton("apply_assignment_batch", "Apply to selected / all", class = "btn-primary"),
-            actionButton("reset_assignments", "Clear assignments")
-          )
-        ),
-        div(class = "panel-box stage-table-card",
-          card_title("Read identity and generated FASTA names", "Edit Isolate, Gene / locus and Direction directly. PITAX generates the final name; it never extracts biological identity from the upload barcode.", "list-alt"),
-          DTOutput("assignment_upload_table"),
-          uiOutput("upload_assignment_validation"),
-          uiOutput("upload_architecture_summary")
+          div(class = "compact-hint", icon("info-circle"), span("Direction is still required in both modes so Reverse reads can be oriented correctly. The mode can be changed before Stage 3 is built."))
         ),
         pipeline_stage_footer(1)
       ),
@@ -623,7 +630,7 @@ ui <- fluidPage(
       # 2. Assay and trimming settings
       # --------------------------------------------------------
       tabPanel("2 · Assay", value = "settings",
-        stage_heading("sliders", "Assay setup", "Define run-level locus/primer defaults and the automatic trimming rules. Trimming starts only after Rename.", "Step 2 of 7"),
+        stage_heading("sliders", "Assay setup", "Define run-level locus/primer defaults and the automatic trimming rules. Trimming starts only after Rename.", "Step 2 of 8"),
         stage_topbar(
           actionButton("back_upload", "Back", icon = icon("arrow-left")),
           div(class = "stage-topbar-spacer"),
@@ -675,11 +682,11 @@ ui <- fluidPage(
       # 4. QC, chromatogram & sequence preview
       # --------------------------------------------------------
       tabPanel("4 · Trim & QC", value = "qc",
-        stage_heading("bar-chart", "Trimming results, QC & curation", "Review the completed trim, inspect renamed chromatograms, and document manual sequence curation.", "Step 4 of 7"),
+        stage_heading("bar-chart", "Trimming results, QC & curation", "Review the completed trim, inspect renamed chromatograms, and document manual sequence curation.", "Step 4 of 8"),
         stage_topbar(
           actionButton("back_rename_from_qc", "Back to Rename", icon = icon("arrow-left")),
           div(class = "stage-topbar-spacer"),
-          actionButton("to_export", "Continue to Export", icon = icon("arrow-right"), class = "btn-primary")
+          actionButton("to_consensus", "Continue to Consensus", icon = icon("arrow-right"), class = "btn-primary")
         ),
         uiOutput("qc_summary_cards"),
         div(class = "panel-box stage-table-card",
@@ -717,7 +724,7 @@ ui <- fluidPage(
             tags$summary(class = "stage1-audit-toggle", "Open evidence audit"),
             div(class = "status-note",
                 tags$strong("Validation mode only. "),
-                "The active v2.14.2 trimming/QC path is still the decision path. alpha.6 keeps the same-length PCON-only comparison observational; it does not apply that proposal to the processed sequence, FASTA or BLAST output."),
+                "The active v2.14.2 trimming/QC path is still the decision path. The current build keeps the same-length PCON-only comparison observational; it does not apply that proposal to the processed sequence, FASTA or BLAST output."),
             div(class = "subsection-title", "Run-level audit"),
             DTOutput("ab1_evidence_run_table"),
             div(class = "blast-action-row",
@@ -781,19 +788,49 @@ ui <- fluidPage(
       # 3. Rename
       # --------------------------------------------------------
       tabPanel("3 · Rename & Assign", value = "rename",
-        stage_heading("tags", "Review read identity before trimming", "Confirm the explicit isolate, gene and direction fields entered at Upload. The final FASTA name is generated from those fields.", "Step 3 of 7"),
+        stage_heading("tags", "Rename and assign read identity", "Assign isolate, gene and Forward/Reverse direction here, after Upload and Assay and before trimming. The upload barcode remains unchanged.", "Step 3 of 8"),
         stage_topbar(
           actionButton("back_settings_from_rename", "Back to Assay", icon = icon("arrow-left")),
           div(class = "stage-topbar-spacer"),
           actionButton("run_trimming", "Start trimming", icon = icon("play"), class = "btn-primary")
         ),
+        div(class = "stage-grid stage-grid-rename",
+          div(class = "panel-box",
+            card_title("Assignment key", "Import XLSX/CSV with old_id, isolate, locus (or gene), and direction columns. old_id matches the uploaded barcode; prefix matching is supported.", "key"),
+            fileInput("rename_key_file", NULL, multiple = FALSE, accept = c(".xlsx", ".csv"), buttonLabel = "Choose assignment key", placeholder = "XLSX or CSV"),
+            actionButton("apply_rename_key", "Apply assignment key", icon = icon("check"), class = "btn-primary"),
+            downloadButton("download_assignment_key_template", "Download key template"),
+            uiOutput("rename_key_status")
+          ),
+          div(class = "panel-box",
+            card_title("Batch assignment", "Apply isolate edits, gene and direction to checked rows. If no rows are checked, the action applies to all uploaded reads.", "edit"),
+            div(class = "form-grid-2",
+              textInput("batch_isolate_prefix", "Isolate prefix", ""),
+              textInput("batch_isolate_suffix", "Isolate suffix", "")
+            ),
+            div(class = "form-grid-2",
+              textInput("batch_isolate_find", "Find in isolate", ""),
+              textInput("batch_isolate_replace", "Replace with", "")
+            ),
+            div(class = "form-grid-2",
+              textInput("batch_locus", "Set gene / locus", ""),
+              selectInput("batch_direction", "Set direction", c("No change" = "", "Forward" = "Forward", "Reverse" = "Reverse"), selected = "")
+            ),
+            actionButton("apply_assignment_batch", "Apply to checked / all", class = "btn-primary"),
+            actionButton("reset_assignments", "Clear checked / all")
+          )
+        ),
         div(class = "panel-box stage-table-card",
-          card_title("Final read / FASTA names", "The source barcode stays unchanged. Edit the three identity fields; PITAX generates <Isolate>_<Locus>_<F/R>.", "list-alt"),
-          DTOutput("assignment_review_table"),
+          card_title("Final read / FASTA names and biological identity", "The generated name is shown beside the immutable barcode. Edit Isolate and Gene, then choose Forward or Reverse from the list. Changes are committed together, without refreshing the table after every cell.", "list-alt"),
+          uiOutput("assignment_editor"),
+          div(class = "assignment-editor-actions",
+            actionButton("save_assignment_edits", "Apply table changes", icon = icon("check"), class = "btn-primary"),
+            div(class = "compact-hint", icon("info-circle"), span("The table stays stable while you edit; generated names update after Apply."))
+          ),
           uiOutput("rename_validation")
         ),
         div(class = "panel-box stage2-assignment-card",
-          card_title("Stage 2 · Architecture preview", "Built directly from the explicit identity fields. A pair requires two distinct source reads assigned to the same isolate/locus, one Forward and one Reverse.", "sitemap"),
+          card_title("Stage 2 · Architecture preview", "Built directly from the explicit identity fields. Project mode determines whether matching Forward/Reverse reads will later be merged or remain independent.", "sitemap"),
           uiOutput("architecture_summary")
         ),
         div(class = "panel-box checkpoint checkpoint-modern",
@@ -803,12 +840,93 @@ ui <- fluidPage(
         pipeline_stage_footer(3)
       ),
       # --------------------------------------------------------
-      # 5. Export
+      # 5. Forward / Reverse consensus
       # --------------------------------------------------------
-      tabPanel("5 · Export", value = "export",
-        stage_heading("download", "Export processed sequences", "Create working FASTA files or an auditable package of the complete processing run.", "Step 5 of 7"),
+      tabPanel("5 · Analysis Sequence", value = "consensus",
+        stage_heading("random", "Stage 3 · Analysis sequence", "Create the sequence used for export and BLAST according to the project read model selected at Upload.", "Step 5 of 8"),
         stage_topbar(
-          actionButton("back_qc_from_export", "Back to QC", icon = icon("arrow-left")),
+          actionButton("back_qc_from_consensus", "Back to QC", icon = icon("arrow-left")),
+          div(class = "stage-topbar-spacer"),
+          actionButton("build_consensus", "Build / rebuild", icon = icon("cogs"), class = "btn-success"),
+          actionButton("to_export", "Continue to Export", icon = icon("arrow-right"), class = "btn-primary")
+        ),
+        uiOutput("consensus_mode_note"),
+        div(class = "stage-grid stage-grid-2",
+          div(class = "panel-box settings-card",
+            card_title("Conservative overlap rules", "These are run-level review thresholds, not universal biological constants. A weak overlap is blocked rather than joined.", "sliders"),
+            div(class = "form-grid-2",
+              numericInput("consensus_min_overlap", "Minimum overlap (bp)", 40, min = 10, step = 5),
+              numericInput("consensus_min_identity", "Minimum overlap identity (%)", 85, min = 0, max = 100, step = 1),
+              numericInput("consensus_quality_delta", "Minimum quality advantage", 10, min = 0, step = 1),
+              numericInput("consensus_strong_quality", "Strong base quality", 20, min = 0, step = 1)
+            ),
+            div(class = "compact-hint", "A mismatch is resolved automatically only when one base has sufficiently stronger basecaller quality. Otherwise PITAX retains an IUPAC ambiguity call and requires review.")
+          ),
+          div(class = "panel-box",
+            card_title("Consensus gate", "Single reads remain valid representatives. Paired reads must have a reliable overlap and no unresolved review positions before downstream analysis.", "check-circle"),
+            uiOutput("consensus_gate_status"),
+            div(class = "button-row",
+              downloadButton("download_consensus_fasta", "Analysis FASTA"),
+              downloadButton("download_consensus_checkpoint", "Consensus checkpoint ZIP")
+            )
+          )
+        ),
+        div(class = "panel-box stage-table-card",
+          card_title("Analysis sequence summary", "Simple mode keeps one oriented sequence per read. Paired mode creates one row per Isolate–Locus and labels unpaired reads as single-read representatives.", "table"),
+          DTOutput("consensus_summary_table")
+        ),
+        div(class = "panel-box consensus-review-card",
+          card_title("Consensus Review & Curation", "Resolve only evidence conflicts that need a biological decision. Forward, Reverse and the automatic IUPAC call remain linked to their raw chromatograms and every action creates an auditable revision.", "edit"),
+          div(class = "consensus-review-grid",
+            div(
+              selectInput("consensus_review_position", "Review position", choices = NULL),
+              uiOutput("consensus_review_call_ui"),
+              textInput("consensus_review_note", "Review note", placeholder = "Optional rationale"),
+              div(class = "consensus-review-actions",
+                actionButton("apply_consensus_review", "Apply decision", icon = icon("check"), class = "btn-primary"),
+                actionButton("consensus_review_undo", "Undo", icon = icon("undo")),
+                actionButton("consensus_review_redo", "Redo", icon = icon("repeat")),
+                actionButton("consensus_review_history", "History", icon = icon("history"))
+              ),
+              uiOutput("consensus_review_state")
+            ),
+            div(class = "consensus-trace-grid",
+              plotly::plotlyOutput("consensus_forward_conflict_plot", height = "315px"),
+              plotly::plotlyOutput("consensus_reverse_conflict_plot", height = "315px")
+            )
+          )
+        ),
+        div(class = "qc-inspection-grid",
+          div(class = "panel-box qc-sidebar-card",
+            card_title("Consensus inspection", "Select an isolate/locus to inspect the oriented overlap and every automatic or unresolved base decision.", "search"),
+            selectInput("consensus_sample", "Isolate / locus", choices = NULL),
+            uiOutput("consensus_selected_status"),
+            DTOutput("consensus_selected_metrics")
+          ),
+          div(class = "qc-main-stack",
+            div(class = "panel-box sequence-preview-card",
+              card_title("Oriented overlap", "The Reverse read is shown after reverse-complementing. Gaps are alignment characters only and do not modify either curated source read.", "exchange"),
+              verbatimTextOutput("consensus_alignment_text")
+            ),
+            div(class = "panel-box sequence-preview-card",
+              card_title("Analysis sequence", "This is the oriented independent read or paired consensus that proceeds to FASTA, BLAST and later Stage 4 locus profiles after the gate is green.", "file-text"),
+              verbatimTextOutput("consensus_sequence_text")
+            )
+          )
+        ),
+        div(class = "panel-box stage-table-card",
+          card_title("Per-column provenance", "Every consensus position records the Forward and Reverse calls, available basecaller quality, raw chromatogram positions, decision rule and review state.", "list-alt"),
+          DTOutput("consensus_evidence_table")
+        ),
+        pipeline_stage_footer(5)
+      ),
+      # --------------------------------------------------------
+      # 6. Export
+      # --------------------------------------------------------
+      tabPanel("6 · Export", value = "export",
+        stage_heading("download", "Export analysis sequences", "Create working FASTA files or an auditable package containing the analysis sequence and original read evidence.", "Step 6 of 8"),
+        stage_topbar(
+          actionButton("back_consensus_from_export", "Back to Consensus", icon = icon("arrow-left")),
           div(class = "stage-topbar-spacer"),
           actionButton("to_blast", "Continue to NCBI BLAST", icon = icon("arrow-right"), class = "btn-primary")
         ),
@@ -822,13 +940,13 @@ ui <- fluidPage(
           div(class = "export-tile", div(class = "export-tile-icon", icon("table")), h4("Summary CSV"), p("Compact processing and QC summary for downstream review."), downloadButton("download_summary_csv", "Download CSV")),
           div(class = "export-tile export-tile-primary", div(class = "export-tile-icon", icon("archive")), h4("Complete results package"), p("Sequences, QC evidence, settings and curation records in one ZIP."), downloadButton("download_all_zip", "Download results ZIP"))
         ),
-        pipeline_stage_footer(5)
+        pipeline_stage_footer(6)
       ),
       # --------------------------------------------------------
-      # 6. NCBI BLAST
+      # 7. NCBI BLAST
       # --------------------------------------------------------
-      tabPanel("6 · NCBI BLAST", value = "blast",
-        stage_heading("search", "NCBI BLAST workspace", "Submit curated sequences, retrieve accession-level hits, and keep each RID linked to its sequence revision.", "Step 6 of 7"),
+      tabPanel("7 · NCBI BLAST", value = "blast",
+        stage_heading("search", "NCBI BLAST workspace", "Submit analysis sequences, retrieve accession-level hits, and keep each RID linked to the active sequence revision.", "Step 7 of 8"),
         stage_topbar(
           actionButton("back_export", "Back to Export", icon = icon("arrow-left")),
           div(class = "stage-topbar-spacer"),
@@ -842,8 +960,9 @@ ui <- fluidPage(
               selectInput("blast_sample", "Sequence", choices = NULL),
               div(class = "form-grid-2",
                 selectInput("blast_database", "NCBI database", choices = c("core_nt", "nt"), selected = "core_nt"),
-                numericInput("blast_hitlist", tagList("Maximum hits", info_tip("Controls how many BLAST hits NCBI returns. Taxonomic interpretation uses accession-level competitive evidence rather than flat Top-N voting.")), 25, min = 1, max = 100)
+                numericInput("blast_hitlist", tagList("Results to retrieve", info_tip("Controls BLAST retrieval depth, not a voting threshold. All returned accessions are audited; only molecularly close alternatives can reduce the supported taxonomic rank.")), 25, min = 1, max = 100)
               ),
+              div(class = "compact-hint", icon("info-circle"), span("More weak tail hits do not lower confidence. A close competing taxon can lower it even if it appears late in the returned list.")),
               div(class = "button-row",
                 actionButton("copy_blast_sequence", "Copy sequence", icon = icon("copy")),
                 actionButton("open_ncbi_blast", "Open NCBI BLAST", icon = icon("external-link")),
@@ -881,19 +1000,19 @@ ui <- fluidPage(
           )
         ),
         div(class = "panel-box checkpoint checkpoint-modern",
-          div(class = "checkpoint-copy", card_title("Checkpoint C · BLAST workspace", "Export BLAST job metadata and accession-level hits.", "save")),
+          div(class = "checkpoint-copy", card_title("Checkpoint D · BLAST workspace", "Export BLAST job metadata and accession-level hits.", "save")),
           div(class = "button-row",
             downloadButton("download_blast_jobs", "Job/results CSV"),
             downloadButton("download_blast_hits", "All BLAST hits CSV")
           )
         ),
-        pipeline_stage_footer(6)
+        pipeline_stage_footer(7)
       ),
       # --------------------------------------------------------
-      # 7. Taxonomic interpretation
+      # 8. Taxonomic interpretation
       # --------------------------------------------------------
-      tabPanel("7 · Taxonomic summary", value = "taxonomy",
-        stage_heading("sitemap", "Taxonomic interpretation", "Identify the best molecular match, inspect close alternatives and report the most conservative supported taxonomic level.", "Step 7 of 7"),
+      tabPanel("8 · Taxonomic summary", value = "taxonomy",
+        stage_heading("sitemap", "Taxonomic interpretation", "Identify the best molecular match, inspect close alternatives and report the most conservative supported taxonomic level.", "Step 8 of 8"),
         stage_topbar(
           actionButton("back_blast", "Back to NCBI BLAST", icon = icon("arrow-left")),
           div(class = "stage-topbar-spacer"),
@@ -948,14 +1067,14 @@ ui <- fluidPage(
           )
         ),
         div(class = "panel-box checkpoint checkpoint-modern",
-          div(class = "checkpoint-copy", card_title("Checkpoint D · Taxonomic interpretation", "Save the final taxonomic evidence and interpretation package.", "save")),
+          div(class = "checkpoint-copy", card_title("Checkpoint E · Taxonomic interpretation", "Save the final taxonomic evidence and interpretation package.", "save")),
           div(class = "button-row",
             downloadButton("download_taxonomy_summary", "Summary CSV"),
             downloadButton("download_taxonomy_hits", "Enriched hits CSV"),
             downloadButton("download_taxonomy_checkpoint", "Checkpoint ZIP")
           )
         ),
-        pipeline_stage_footer(7)
+        pipeline_stage_footer(8)
       ),
       # --------------------------------------------------------
       # Help / About (documentation, not a pipeline stage)
@@ -966,7 +1085,7 @@ ui <- fluidPage(
           p(class="about-lead",
             "Documentation for the laboratory workflow, the BLAST/taxonomy interpretation logic, and the scientific sources used to guide the application. Published evidence and application-specific heuristics are labeled separately."),
           div(class="help-flow",
-              "AB1 upload  →  Assay settings  →  Rename & read assignment  →  Start trimming  →  QC  →  Export  →  NCBI BLAST  →  Taxonomic interpretation")
+              "AB1 upload + project mode  →  Assay settings  →  Rename & read assignment  →  Trim & QC  →  Analysis sequence  →  Export  →  NCBI BLAST  →  Taxonomic interpretation")
         ),
 
         div(class="about-section",
@@ -987,13 +1106,14 @@ ui <- fluidPage(
                 column(6,
                   div(class="help-card",
                     h3("Workflow"),
-                    p(strong("1. Upload"), " — raw AB1 chromatograms plus explicit isolate, gene and direction assignment; source barcodes remain unchanged."),
+                    p(strong("1. Upload"), " — raw AB1 chromatograms and the project read model; source barcodes remain unchanged."),
                     p(strong("2. Assay"), " — run-level primer defaults and trimming parameters; no trimming starts yet."),
-                    p(strong("3. Rename & Assign"), " — review the explicit identity fields and PITAX-generated <Isolate>_<Locus>_<F/R> names."),
+                    p(strong("3. Rename & Assign"), " — import a key, batch-edit or manually assign explicit identity fields and PITAX-generated <Isolate>_<Locus>_<F/R> names."),
                     p(strong("4. Trim & QC"), " — start trimming explicitly, then review Quality Control plots, chromatograms and processed sequences."),
-                    p(strong("5. Export"), " — processed FASTA, CSV/Excel summaries and checkpoints."),
-                    p(strong("6. NCBI BLAST"), " — submit processed sequences and retrieve accession-level hits."),
-                    p(strong("7. Taxonomic summary"), " — compare competitive hits and report identification plus confidence.")
+                    p(strong("5. Analysis Sequence"), " — keep independent reads in Simple mode or create an auditable F/R consensus in Paired mode; Reverse reads are oriented without changing the source."),
+                    p(strong("6. Export"), " — isolate-level FASTA plus source-read QC and consensus evidence checkpoints."),
+                    p(strong("7. NCBI BLAST"), " — submit isolate-level sequences and retrieve accession-level hits."),
+                    p(strong("8. Taxonomic summary"), " — compare competitive hits and report identification plus confidence.")
                   )
                 ),
                 column(6,
@@ -1011,8 +1131,14 @@ ui <- fluidPage(
                 p("The upload barcode is an immutable technical source ID and is never parsed as biological identity. Isolate, Gene/Locus and Direction are edited as separate fields on Upload and reviewed before trimming; PITAX generates the final <Isolate>_<Locus>_<F/R> label from those fields. Duplicate AB1 basenames are blocked because they cannot be represented safely by the established source-read key."),
                 div(class="about-callout",
                   strong("Stage boundary: "),
-                  "alpha.6 records pairing metadata but does not align or merge Forward/Reverse reads. Consensus construction remains Stage 3."
+                  "Stage 2 stores identity and pairing only. Stage 3 builds a separate isolate-level sequence with overlap evidence and never rewrites the source reads."
                 )
+              ),
+              div(class="help-card",
+                h3("Stage 3 isolate-level sequence"),
+                p("A sequencing run must contain one Gene/Locus. PITAX reverse-complements Reverse reads in a derived view, aligns each explicit pair and records every call with source positions and available basecaller quality."),
+                p("Single reads remain valid representatives. Weak pair overlaps and unresolved contradictions block downstream analysis; they are not hidden by concatenation or majority voting."),
+                div(class="about-callout", strong("Current alpha boundary: "), "alpha.8 adds linked chromatogram conflict decisions, consensus revisions and undo/redo. The controlled fixtures validate mechanics; an independently sequenced paired-AB1 acceptance set is still required for biological closure.")
               )
             ),
 
@@ -1230,10 +1356,13 @@ server <- function(input, output, session) {
   rv <- reactiveValues(
     results = list(), summary = NULL, rename = NULL, settings = NULL,
     read_assignments = stage2_empty_assignments(), architecture = NULL,
+    consensus_set = stage3_empty_consensus_set(),
+    project_mode = "simple",
+    assignment_signature = "",
     project_migration_log = "",
     blast_jobs = data.frame(
       final_name=character(), original_name=character(), rid=character(), rtoe=character(),
-      database=character(), hitlist_size=integer(), status=character(), submitted_at=character(), last_checked_at=character(), stringsAsFactors=FALSE
+      database=character(), hitlist_size=integer(), consensus_revision=integer(), status=character(), submitted_at=character(), last_checked_at=character(), stringsAsFactors=FALSE
     ),
     ncbi_last_contact = as.POSIXct(NA),
     blast_batch_status_text = "No batch operation has been run yet.",
@@ -1251,7 +1380,7 @@ server <- function(input, output, session) {
   ensure_blast_jobs_schema <- function(df) {
     template <- data.frame(
       final_name=character(), original_name=character(), rid=character(), rtoe=character(),
-      database=character(), hitlist_size=integer(), status=character(), submitted_at=character(),
+      database=character(), hitlist_size=integer(), consensus_revision=integer(), status=character(), submitted_at=character(),
       last_checked_at=character(), stringsAsFactors=FALSE
     )
     if (!is.data.frame(df) || !nrow(df)) return(template)
@@ -1261,6 +1390,7 @@ server <- function(input, output, session) {
     df <- df[, names(template), drop=FALSE]
     df$database <- as.character(df$database)
     df$hitlist_size <- suppressWarnings(as.integer(df$hitlist_size))
+    df$consensus_revision <- suppressWarnings(as.integer(df$consensus_revision))
     df
   }
 
@@ -1315,6 +1445,7 @@ server <- function(input, output, session) {
       active_tab = if (!is.null(input$pipeline_step)) input$pipeline_step else "upload",
       ui_state = list(
         inspect_sample = input$inspect_sample,
+        consensus_sample = input$consensus_sample,
         blast_sample = input$blast_sample,
         tax_sample = input$tax_sample,
         blast_database = input$blast_database,
@@ -1325,8 +1456,10 @@ server <- function(input, output, session) {
         summary = rv$summary,
         rename = rv$rename,
         settings = rv$settings,
+        project_mode = rv$project_mode,
         read_assignments = rv$read_assignments,
         architecture = rv$architecture,
+        consensus_set = rv$consensus_set,
         migration_log = rv$project_migration_log,
         blast_jobs = rv$blast_jobs,
         blast_raw = rv$blast_raw,
@@ -1381,34 +1514,53 @@ server <- function(input, output, session) {
   invalidate_downstream_for_sample <- function(original_name, reason = "Curated sequence changed") {
     if (is.null(original_name) || !nzchar(original_name)) return(invisible(NULL))
     stale_rids <- character()
+    had_blast <- FALSE
+    had_taxonomy <- FALSE
     if (is.data.frame(rv$blast_jobs) && nrow(rv$blast_jobs) && "original_name" %in% names(rv$blast_jobs)) {
       idx <- which(rv$blast_jobs$original_name == original_name)
       if (length(idx)) {
+        had_blast <- TRUE
         stale_rids <- unique(as.character(rv$blast_jobs$rid[idx]))
         rv$blast_jobs$status[idx] <- "STALE"
       }
     }
     if (is.data.frame(rv$blast_hits) && nrow(rv$blast_hits)) {
       if ("original_name" %in% names(rv$blast_hits)) {
-        stale_rids <- unique(c(stale_rids, as.character(rv$blast_hits$rid[rv$blast_hits$original_name == original_name])))
+        hit_idx <- rv$blast_hits$original_name == original_name
+        had_blast <- had_blast || any(hit_idx)
+        stale_rids <- unique(c(stale_rids, as.character(rv$blast_hits$rid[hit_idx])))
         rv$blast_hits <- rv$blast_hits[rv$blast_hits$original_name != original_name, , drop = FALSE]
       } else if (length(stale_rids) && "rid" %in% names(rv$blast_hits)) {
+        had_blast <- had_blast || any(rv$blast_hits$rid %in% stale_rids)
         rv$blast_hits <- rv$blast_hits[!rv$blast_hits$rid %in% stale_rids, , drop = FALSE]
       }
     }
     rebuild_blast_ids()
     filter_stale_tax <- function(df) {
       if (!is.data.frame(df) || !nrow(df)) return(df)
-      if ("original_name" %in% names(df)) return(df[df$original_name != original_name, , drop = FALSE])
-      if (length(stale_rids) && "rid" %in% names(df)) return(df[!df$rid %in% stale_rids, , drop = FALSE])
+      if ("original_name" %in% names(df)) {
+        idx <- df$original_name == original_name
+        had_taxonomy <<- had_taxonomy || any(idx)
+        return(df[!idx, , drop = FALSE])
+      }
+      if (length(stale_rids) && "rid" %in% names(df)) {
+        idx <- df$rid %in% stale_rids
+        had_taxonomy <<- had_taxonomy || any(idx)
+        return(df[!idx, , drop = FALSE])
+      }
       df
     }
     rv$taxonomy_summary <- filter_stale_tax(rv$taxonomy_summary)
     rv$taxonomy_hits <- filter_stale_tax(rv$taxonomy_hits)
     rv$taxonomy_counts <- filter_stale_tax(rv$taxonomy_counts)
-    rv$blast_batch_status_text <- paste0("Sequence ", original_name, " changed after curation; previous BLAST results for this sample are stale and must be rerun.")
-    rv$taxonomy_status_text <- paste0("Sequence ", original_name, " changed after curation; taxonomic interpretation was invalidated.")
-    invisible(NULL)
+    cause <- stage2_scalar_text(reason, "Curated sequence changed")
+    if (had_blast) {
+      rv$blast_batch_status_text <- paste0("BLAST evidence for ", original_name, " was marked stale because the active sequence changed (", cause, "). Re-run BLAST on the current sequence.")
+    }
+    if (had_taxonomy) {
+      rv$taxonomy_status_text <- paste0("The previous taxonomic interpretation for ", original_name, " was removed because the active sequence changed (", cause, "). Re-run BLAST, then Taxonomy.")
+    }
+    invisible(list(blast = had_blast, taxonomy = had_taxonomy))
   }
 
   commit_curated_result <- function(sample_name, new_result, label = "Manual curation") {
@@ -1421,7 +1573,19 @@ server <- function(input, output, session) {
       updateTextAreaInput(session, "trimmed_sequence_preview", value = new_seq)
     }
     if (!identical(old_seq, new_seq)) {
-      invalidate_downstream_for_sample(sample_name, label)
+      old_revision <- if (is.list(old_result$curation)) suppressWarnings(as.integer(old_result$curation$revision[1])) else NA_integer_
+      new_revision <- if (is.list(new_result$curation)) suppressWarnings(as.integer(new_result$curation$revision[1])) else NA_integer_
+      revision_note <- if (is.finite(old_revision) && is.finite(new_revision)) paste0(label, "; revision ", old_revision, " → ", new_revision) else label
+      affected_consensus <- character()
+      if (is.list(rv$consensus_set) && length(rv$consensus_set$records)) {
+        affected_consensus <- names(Filter(
+          function(x) sample_name %in% as.character(x$source_read_ids),
+          rv$consensus_set$records
+        ))
+      }
+      rv$consensus_set <- stage3_empty_consensus_set()
+      for (consensus_id in affected_consensus) invalidate_downstream_for_sample(consensus_id, revision_note)
+      invalidate_downstream_for_sample(sample_name, revision_note)
     }
     rv$project_status_text <- paste0("Unsaved curation change: ", sample_name, " · ", label, ".")
     invisible(!identical(old_seq, new_seq))
@@ -1470,6 +1634,7 @@ server <- function(input, output, session) {
     st <- obj$state
     if (source_schema < 2L) st <- stage2_migrate_v1_state(st)
     if (source_schema == 2L) st <- stage2_migrate_v2_state(st)
+    if (source_schema <= 3L) st <- stage3_migrate_v3_state(st)
     loaded_assignments <- stage2_coerce_assignments(st$read_assignments)
     assignment_error <- stage2_validate_assignments(loaded_assignments)
     if (length(st$results) && !is.null(assignment_error)) {
@@ -1498,8 +1663,11 @@ server <- function(input, output, session) {
     rv$summary <- st$summary
     rv$rename <- st$rename
     rv$settings <- st$settings
+    rv$project_mode <- if (!is.null(st$project_mode) && st$project_mode %in% c("simple", "paired_consensus")) st$project_mode else "paired_consensus"
     rv$read_assignments <- loaded_assignments
+    rv$assignment_signature <- assignment_state_signature(loaded_assignments)
     rv$architecture <- loaded_architecture
+    rv$consensus_set <- stage3_ensure_consensus_set(if (is.list(st$consensus_set)) st$consensus_set else stage3_empty_consensus_set())
     rv$project_migration_log <- stage2_scalar_text(st$migration_log)
     rv$blast_jobs <- ensure_blast_jobs_schema(if (is.data.frame(st$blast_jobs)) st$blast_jobs else NULL)
     rv$blast_raw <- if (is.list(st$blast_raw)) st$blast_raw else list()
@@ -1515,11 +1683,24 @@ server <- function(input, output, session) {
     rebuild_blast_ids()
 
     restore_settings_inputs(rv$settings)
+    updateRadioButtons(session, "project_mode", selected = rv$project_mode)
+    sync_project_mode_navigation(rv$project_mode)
+    if (is.list(rv$consensus_set$settings)) {
+      cs <- rv$consensus_set$settings
+      if (!is.null(cs$min_overlap)) updateNumericInput(session, "consensus_min_overlap", value = cs$min_overlap)
+      if (!is.null(cs$min_identity)) updateNumericInput(session, "consensus_min_identity", value = cs$min_identity)
+      if (!is.null(cs$quality_delta)) updateNumericInput(session, "consensus_quality_delta", value = cs$quality_delta)
+      if (!is.null(cs$strong_quality)) updateNumericInput(session, "consensus_strong_quality", value = cs$strong_quality)
+    }
 
     result_names <- names(rv$results)
     saved_ui <- obj$ui_state
     inspect_selected <- if (!is.null(saved_ui$inspect_sample) && saved_ui$inspect_sample %in% result_names) saved_ui$inspect_sample else if (length(result_names)) result_names[1] else character()
     sync_qc_sample_choices(inspect_selected)
+    consensus_ids <- names(rv$consensus_set$records)
+    consensus_labels <- if (length(consensus_ids)) setNames(consensus_ids, vapply(rv$consensus_set$records, function(x) stage3_scalar_text(x$final_name), character(1))) else character()
+    consensus_selected <- if (!is.null(saved_ui$consensus_sample) && saved_ui$consensus_sample %in% consensus_ids) saved_ui$consensus_sample else if (length(consensus_ids)) consensus_ids[1] else character()
+    updateSelectInput(session, "consensus_sample", choices = consensus_labels, selected = consensus_selected)
 
     final_names <- character()
     if (length(result_names)) {
@@ -1547,7 +1728,8 @@ server <- function(input, output, session) {
       updateSelectInput(session, "tax_sample", choices = character())
     }
 
-    active <- if (!is.null(obj$active_tab) && obj$active_tab %in% c("upload","settings","qc","rename","export","blast","taxonomy","help")) obj$active_tab else if (nrow(rv$taxonomy_summary)) "taxonomy" else if (nrow(rv$blast_hits)) "blast" else if (length(rv$results)) "qc" else "upload"
+    active <- if (!is.null(obj$active_tab) && obj$active_tab %in% c("upload","settings","qc","rename","consensus","export","blast","taxonomy","help")) obj$active_tab else if (nrow(rv$taxonomy_summary)) "taxonomy" else if (nrow(rv$blast_hits)) "blast" else if (length(rv$consensus_set$records)) "consensus" else if (length(rv$results)) "qc" else "upload"
+    if (identical(rv$project_mode, "simple") && identical(active, "consensus")) active <- if (length(rv$consensus_set$records)) "export" else "qc"
     updateTabsetPanel(session, "pipeline_step", selected = active)
 
     rv$project_loaded_name <- input$load_project$name
@@ -1565,6 +1747,13 @@ server <- function(input, output, session) {
   })
 
   # ---------------- Upload ----------------
+  assignment_state_signature <- function(assignments) {
+    assignments <- stage2_coerce_assignments(assignments)
+    if (!nrow(assignments)) return("")
+    cols <- c("Source_ID", "Isolate", "Locus", "Direction", "Final_Name")
+    paste(apply(assignments[, cols, drop = FALSE], 1, paste, collapse = "\r"), collapse = "\n")
+  }
+
   output$uploaded_files_table <- renderDT({
     req(input$ab1_files)
     datatable(data.frame(File=input$ab1_files$name, Size_KB=round(input$ab1_files$size/1024,1)),
@@ -1586,10 +1775,40 @@ server <- function(input, output, session) {
     rv$project_migration_log <- ""
   })
 
+  sync_project_mode_navigation <- function(mode) {
+    simple <- identical(as.character(mode)[1], "simple")
+    updateActionButton(session, "to_consensus", label = if (simple) "Continue to Export" else "Continue to Consensus")
+    updateActionButton(session, "back_consensus_from_export", label = if (simple) "Back to QC" else "Back to Consensus")
+    if (simple) {
+      hideTab(inputId = "pipeline_step", target = "consensus", session = session)
+    } else {
+      showTab(inputId = "pipeline_step", target = "consensus", session = session)
+    }
+    invisible(NULL)
+  }
+
+  session$onFlushed(function() sync_project_mode_navigation(isolate(rv$project_mode)), once = TRUE)
+
+  observeEvent(input$project_mode, {
+    mode <- as.character(input$project_mode)[1]
+    if (!mode %in% c("simple", "paired_consensus") || identical(mode, rv$project_mode)) return()
+    rv$project_mode <- mode
+    if (is.list(rv$consensus_set) && length(rv$consensus_set$records)) {
+      old_ids <- names(rv$consensus_set$records)
+      rv$consensus_set <- stage3_empty_consensus_set()
+      for (consensus_id in old_ids) invalidate_downstream_for_sample(consensus_id, "Project read model changed")
+    }
+    rv$project_status_text <- paste0("Unsaved project read model: ", if (mode == "simple") "simple independent reads" else "Forward/Reverse pairing", ".")
+    sync_project_mode_navigation(mode)
+  }, ignoreInit = TRUE)
+
   sync_assignment_state <- function() {
     if (!nrow(rv$read_assignments)) {
+      identity_changed <- nzchar(rv$assignment_signature)
       rv$rename <- stage2_default_rename_map(rv$read_assignments)
       rv$architecture <- NULL
+      rv$assignment_signature <- ""
+      if (identity_changed && is.list(rv$consensus_set) && length(rv$consensus_set$records)) rv$consensus_set <- stage3_empty_consensus_set()
       return(invisible(NULL))
     }
     rv$read_assignments <- stage2_sync_generated_names(
@@ -1597,6 +1816,14 @@ server <- function(input, output, session) {
       forward_primer = input$forward_primer,
       reverse_primer = input$reverse_primer
     )
+    new_signature <- assignment_state_signature(rv$read_assignments)
+    identity_changed <- nzchar(rv$assignment_signature) && !identical(new_signature, rv$assignment_signature)
+    if (identity_changed && is.list(rv$consensus_set) && length(rv$consensus_set$records)) {
+      stale_consensus_ids <- names(rv$consensus_set$records)
+      rv$consensus_set <- stage3_empty_consensus_set()
+      for (consensus_id in stale_consensus_ids) invalidate_downstream_for_sample(consensus_id, "Read identity changed")
+    }
+    rv$assignment_signature <- new_signature
     rv$rename <- stage2_default_rename_map(rv$read_assignments)
     assignment_error <- stage2_identity_error(rv$read_assignments)
     rv$architecture <- if (is.null(assignment_error)) stage2_build_architecture(rv$read_assignments) else NULL
@@ -1630,12 +1857,11 @@ server <- function(input, output, session) {
       class = "compact-hint",
       paste0(
         "Architecture preview: ", sm$Isolates, " isolate(s) · ", sm$Loci, " locus/loci · ", sm$Reads, " read(s) · ",
-        sm$Paired_loci, " Forward/Reverse pair(s) · ", sm$Single_read_loci, " single-read locus/loci."
+        if (identical(rv$project_mode, "simple")) paste0(sm$Reads, " independent analysis sequence(s).") else paste0(sm$Paired_loci, " Forward/Reverse pair(s) · ", sm$Single_read_loci, " single-read locus/loci.")
       )
     )
   }
   output$architecture_summary <- renderUI(architecture_summary_ui())
-  output$upload_architecture_summary <- renderUI(architecture_summary_ui())
 
   observeEvent(input$to_settings, {
     if (is.null(input$ab1_files) || nrow(input$ab1_files)==0) {
@@ -1646,7 +1872,8 @@ server <- function(input, output, session) {
   observeEvent(input$back_upload, updateTabsetPanel(session,"pipeline_step",selected="upload"))
   observeEvent(input$back_settings_from_rename, updateTabsetPanel(session,"pipeline_step",selected="settings"))
   observeEvent(input$back_rename_from_qc, updateTabsetPanel(session,"pipeline_step",selected="rename"))
-  observeEvent(input$back_qc_from_export, updateTabsetPanel(session,"pipeline_step",selected="qc"))
+  observeEvent(input$back_qc_from_consensus, updateTabsetPanel(session,"pipeline_step",selected="qc"))
+  observeEvent(input$back_consensus_from_export, updateTabsetPanel(session,"pipeline_step",selected=if (identical(rv$project_mode, "simple")) "qc" else "consensus"))
   observeEvent(input$back_export, updateTabsetPanel(session,"pipeline_step",selected="export"))
   observeEvent(input$back_blast, updateTabsetPanel(session,"pipeline_step",selected="blast"))
 
@@ -1694,6 +1921,7 @@ server <- function(input, output, session) {
   # ---------------- Trimming ----------------
   observeEvent(input$run_trimming, {
     req(input$ab1_files)
+    rv$read_assignments <- collect_assignment_editor()
     name_error <- stage2_identity_error(rv$read_assignments)
     if (!is.null(name_error)) {
       showNotification(paste("Rename error:", name_error), type = "error", duration = 10)
@@ -1703,6 +1931,11 @@ server <- function(input, output, session) {
     assignment_error <- stage2_validate_assignments(rv$read_assignments, current_upload_source_ids())
     if (!is.null(assignment_error)) {
       showNotification(paste("Read assignment error:", assignment_error), type = "error", duration = 10)
+      return()
+    }
+    locus_error <- stage3_run_locus_error(rv$read_assignments)
+    if (!is.null(locus_error)) {
+      showNotification(locus_error, type = "error", duration = 10)
       return()
     }
     rv$read_assignments <- stage2_coerce_assignments(rv$read_assignments)
@@ -1715,6 +1948,7 @@ server <- function(input, output, session) {
     )
     if (is.null(rv$architecture)) return()
     settings <- current_settings_from_inputs()
+    settings$target <- unique(trimws(as.character(rv$read_assignments$Locus)))[1]
     rv$settings <- settings
     all_results <- list(); summaries <- list(); files <- input$ab1_files
 
@@ -1748,6 +1982,7 @@ server <- function(input, output, session) {
 
     rv$results <- all_results
     rv$summary <- Reduce(rbind_fill, summaries); rownames(rv$summary) <- NULL
+    rv$consensus_set <- stage3_empty_consensus_set()
     sync_qc_sample_choices()
     session$sendCustomMessage("showLoader", list(text = "Opening Trim & QC workspace…"))
     updateTabsetPanel(session,"pipeline_step",selected="qc")
@@ -1873,7 +2108,7 @@ server <- function(input, output, session) {
     if (is.null(ev)) {
       return(div(class = "status-note",
                  tags$strong(paste0("Selected sample: ", sample_label, ". ")),
-                 "This sample has no Stage 1 evidence object. Reprocess the original AB1 with alpha.6 to create the audit."))
+                 "This sample has no Stage 1 evidence object. Reprocess the original AB1 with the current build to create the audit."))
     }
     if (!is.null(ev$error) && nzchar(as.character(ev$error)[1])) {
       return(div(class = "status-error", tags$strong(paste0("Selected sample: ", sample_label, ". ")),
@@ -1889,7 +2124,7 @@ server <- function(input, output, session) {
           div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Q20_auto_trim_percent[1]), paste0(sm$Q20_auto_trim_percent[1], "%"), "NA")), " Q≥20 in auto trim"),
           div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Primary_position_difference_percent[1]), paste0(sm$Primary_position_difference_percent[1], "%"), "NA")), " PLOC vs legacy positions differ")),
       div(class = "compact-hint",
-          "alpha.6 retains the active legacy auto trim and a same-length PCON-only comparison. The comparison is observational and does not change the processed sequence.")
+          "The current build retains the active legacy auto trim and a same-length PCON-only comparison. The comparison is observational and does not change the processed sequence.")
     )
   })
 
@@ -2453,6 +2688,7 @@ server <- function(input, output, session) {
 
   observeEvent(input$apply_rename_key, {
     req(nrow(rv$read_assignments))
+    rv$read_assignments <- collect_assignment_editor()
     key <- tryCatch(rename_key_data(), error=function(e){showNotification(conditionMessage(e),type="error");NULL})
     if (is.null(key)) return()
     matched <- 0L
@@ -2471,15 +2707,75 @@ server <- function(input, output, session) {
     showNotification(paste(matched,"of",nrow(rv$read_assignments),"reads matched; identity fields and generated names were updated."),type="message")
   })
 
+  assignment_input_id <- function(prefix, read_id) paste0(prefix, "_", gsub("[^A-Za-z0-9_]", "_", read_id))
+
+  collect_assignment_editor <- function() {
+    edited <- stage2_coerce_assignments(rv$read_assignments)
+    if (!nrow(edited)) return(edited)
+    for (i in seq_len(nrow(edited))) {
+      read_id <- edited$Read_ID[i]
+      isolate_value <- input[[assignment_input_id("assign_isolate", read_id)]]
+      locus_value <- input[[assignment_input_id("assign_locus", read_id)]]
+      direction_value <- input[[assignment_input_id("assign_direction", read_id)]]
+      if (!is.null(isolate_value)) edited$Isolate[i] <- trimws(as.character(isolate_value)[1])
+      if (!is.null(locus_value)) edited$Locus[i] <- trimws(as.character(locus_value)[1])
+      if (!is.null(direction_value)) edited$Direction[i] <- stage2_normalize_direction(direction_value)
+    }
+    edited
+  }
+
   selected_assignment_rows <- function() {
-    rows <- unique(c(input$assignment_upload_table_rows_selected, input$assignment_review_table_rows_selected))
-    rows <- rows[!is.na(rows) & rows >= 1L & rows <= nrow(rv$read_assignments)]
+    if (!nrow(rv$read_assignments)) return(integer())
+    selected <- vapply(seq_len(nrow(rv$read_assignments)), function(i) {
+      read_id <- rv$read_assignments$Read_ID[i]
+      isTRUE(input[[assignment_input_id("assign_select", read_id)]])
+    }, logical(1))
+    rows <- which(selected)
     if (length(rows)) rows else seq_len(nrow(rv$read_assignments))
   }
+
+  output$assignment_editor <- renderUI({
+    assignments <- stage2_coerce_assignments(rv$read_assignments)
+    if (!nrow(assignments)) return(div(class = "status-note", "Upload AB1 files to create the Rename table."))
+    header <- tags$thead(tags$tr(
+      tags$th("Use"), tags$th("Upload barcode / source"), tags$th("Final read / FASTA name"),
+      tags$th("Isolate"), tags$th("Gene / locus"), tags$th("Direction")
+    ))
+    body_rows <- lapply(seq_len(nrow(assignments)), function(i) {
+      read_id <- assignments$Read_ID[i]
+      direction <- stage2_normalize_direction(assignments$Direction[i])
+      tags$tr(
+        tags$td(tags$input(id = assignment_input_id("assign_select", read_id), type = "checkbox", class = "shiny-input-checkbox")),
+        tags$td(class = "assignment-source", assignments$Source_ID[i]),
+        tags$td(class = "assignment-final", if (nzchar(assignments$Final_Name[i])) assignments$Final_Name[i] else "— generated after Apply —"),
+        tags$td(tags$input(id = assignment_input_id("assign_isolate", read_id), type = "text", class = "form-control", value = assignments$Isolate[i], autocomplete = "off")),
+        tags$td(tags$input(id = assignment_input_id("assign_locus", read_id), type = "text", class = "form-control", value = assignments$Locus[i], autocomplete = "off")),
+        tags$td(tags$select(
+          id = assignment_input_id("assign_direction", read_id), class = "form-control assignment-direction",
+          tags$option(value = "", disabled = NA, selected = if (!direction %in% c("Forward", "Reverse")) NA, "Select…"),
+          tags$option(value = "Forward", selected = if (direction == "Forward") NA, "Forward"),
+          tags$option(value = "Reverse", selected = if (direction == "Reverse") NA, "Reverse")
+        ))
+      )
+    })
+    div(class = "assignment-editor-wrap", tags$table(class = "assignment-editor", header, tags$tbody(body_rows)))
+  })
+
+  observeEvent(input$save_assignment_edits, {
+    req(nrow(rv$read_assignments))
+    rv$read_assignments <- collect_assignment_editor()
+    error <- sync_assignment_state()
+    if (is.null(error)) {
+      showNotification("Read identity and generated FASTA names were updated.", type = "message")
+    } else {
+      showNotification(paste("Saved draft assignments:", error), type = "warning", duration = 8)
+    }
+  })
 
   observeEvent(input$apply_assignment_batch, {
     req(nrow(rv$read_assignments))
     rows <- selected_assignment_rows()
+    rv$read_assignments <- collect_assignment_editor()
     isolate_values <- as.character(rv$read_assignments$Isolate[rows])
     if (nzchar(input$batch_isolate_find)) isolate_values <- gsub(input$batch_isolate_find, input$batch_isolate_replace, isolate_values, fixed = TRUE)
     if (nzchar(input$batch_isolate_prefix)) isolate_values <- paste0(input$batch_isolate_prefix, isolate_values)
@@ -2494,34 +2790,13 @@ server <- function(input, output, session) {
   observeEvent(input$reset_assignments, {
     req(nrow(rv$read_assignments))
     rows <- selected_assignment_rows()
+    rv$read_assignments <- collect_assignment_editor()
     rv$read_assignments$Isolate[rows] <- ""
     rv$read_assignments$Locus[rows] <- ""
     rv$read_assignments$Direction[rows] <- "Unknown"
     rv$read_assignments$Primer[rows] <- ""
     sync_assignment_state()
   })
-
-  assignment_table_widget <- function() {
-    req(nrow(rv$read_assignments))
-    df <- rv$read_assignments[, c("Source_ID", "Isolate", "Locus", "Direction", "Final_Name"), drop = FALSE]
-    names(df) <- c("Upload barcode / source", "Isolate", "Gene / locus", "Direction", "Final read / FASTA name")
-    datatable(df, rownames = FALSE, selection = "multiple",
-              editable = list(target = "cell", disable = list(columns = c(0, 4))),
-              options = list(pageLength = 20, scrollX = TRUE, dom = "tip"))
-  }
-  output$assignment_upload_table <- renderDT(assignment_table_widget())
-  output$assignment_review_table <- renderDT(assignment_table_widget())
-
-  apply_assignment_cell_edit <- function(info) {
-    if (is.null(info) || !info$col %in% 1:3) return(invisible(NULL))
-    field <- c("Isolate", "Locus", "Direction")[[info$col]]
-    value <- as.character(info$value)
-    if (field == "Direction") value <- stage2_normalize_direction(value)
-    rv$read_assignments[info$row, field] <- value
-    sync_assignment_state()
-  }
-  observeEvent(input$assignment_upload_table_cell_edit, apply_assignment_cell_edit(input$assignment_upload_table_cell_edit))
-  observeEvent(input$assignment_review_table_cell_edit, apply_assignment_cell_edit(input$assignment_review_table_cell_edit))
 
   rename_error <- reactive({
     stage2_identity_error(rv$read_assignments)
@@ -2531,10 +2806,337 @@ server <- function(input, output, session) {
     if(is.null(e)) div(class="status-ok","✓ Explicit identity fields are complete; final read names were generated by PITAX.") else div(class="status-error",paste0("⚠ ",e))
   }
   output$rename_validation <- renderUI(assignment_validation_ui())
-  output$upload_assignment_validation <- renderUI(assignment_validation_ui())
+
+  # ---------------- Stage 3 consensus ----------------
+  output$consensus_mode_note <- renderUI({
+    if (identical(rv$project_mode, "simple")) {
+      div(class = "status-note", strong("Project mode: Simple reads. "), "Each read remains an independent analysis sequence. Reverse reads are reverse-complemented, but PITAX does not search for or merge a matching Forward read.")
+    } else {
+      div(class = "status-note", strong("Project mode: Paired Forward/Reverse. "), "Reads sharing the same isolate and gene are paired only when one is Forward and one is Reverse. A lone read remains a valid single-read representative.")
+    }
+  })
+
+  sync_consensus_choices <- function(preferred = NULL) {
+    ids <- if (is.list(rv$consensus_set) && is.list(rv$consensus_set$records)) names(rv$consensus_set$records) else character()
+    if (!length(ids)) {
+      updateSelectInput(session, "consensus_sample", choices = character(), selected = character())
+      return(invisible(NULL))
+    }
+    labels <- vapply(rv$consensus_set$records, function(x) stage3_scalar_text(x$final_name), character(1))
+    choices <- setNames(ids, labels)
+    selected <- if (!is.null(preferred) && preferred %in% ids) preferred else if (!is.null(input$consensus_sample) && input$consensus_sample %in% ids) input$consensus_sample else ids[1]
+    updateSelectInput(session, "consensus_sample", choices = choices, selected = selected)
+    invisible(selected)
+  }
+
+  build_analysis_sequences <- function(notify = TRUE) {
+    if (!length(rv$results)) {
+      if (notify) showNotification("No processed reads are available.", type = "error")
+      return(FALSE)
+    }
+    locus_error <- stage3_run_locus_error(rv$read_assignments)
+    if (!is.null(locus_error)) {
+      if (notify) showNotification(locus_error, type = "error", duration = 10)
+      return(FALSE)
+    }
+    built <- tryCatch(
+      stage3_build_consensus_set(
+        rv$read_assignments, rv$results,
+        min_overlap = input$consensus_min_overlap,
+        min_identity = input$consensus_min_identity,
+        quality_delta = input$consensus_quality_delta,
+        strong_quality = input$consensus_strong_quality,
+        project_mode = rv$project_mode
+      ),
+      error = function(e) structure(list(error = conditionMessage(e)), class = "consensus_build_error")
+    )
+    if (inherits(built, "consensus_build_error")) {
+      if (notify) showNotification(paste("Consensus build failed:", built$error), type = "error", duration = 12)
+      return(FALSE)
+    }
+    old_records <- tryCatch(stage3_analysis_records(rv$consensus_set), error = function(e) list())
+    new_records <- stage3_analysis_records(built)
+    old_signature <- if (length(old_records)) vapply(old_records, function(x) paste0(x$final_name, "\r", x$seq), character(1)) else character()
+    new_signature <- if (length(new_records)) vapply(new_records, function(x) paste0(x$final_name, "\r", x$seq), character(1)) else character()
+    if (!identical(old_signature, new_signature) && (nrow(rv$blast_jobs) || nrow(rv$blast_hits) || nrow(rv$taxonomy_summary))) {
+      if (nrow(rv$blast_jobs)) rv$blast_jobs$status <- "STALE"
+      rv$blast_raw <- list(); rv$blast_hits <- data.frame(); rv$blast_ids <- data.frame()
+      rv$taxonomy_summary <- data.frame(); rv$taxonomy_hits <- data.frame(); rv$taxonomy_counts <- data.frame()
+      rv$blast_batch_status_text <- "Stage 3 analysis sequences changed; previous BLAST evidence is stale and must be rerun."
+      rv$taxonomy_status_text <- "Stage 3 analysis sequences changed; previous taxonomic interpretation was removed. Re-run BLAST, then Taxonomy."
+    }
+    rv$consensus_set <- built
+    sync_consensus_choices()
+    rv$project_status_text <- paste0("Unsaved Stage 3 build: ", nrow(built$summary), " analysis sequence(s).")
+    gate_error <- stage3_consensus_gate_error(rv$consensus_set, rv$results)
+    if (notify) {
+      showNotification(
+        if (is.null(gate_error)) "Stage 3 sequence gate is green." else gate_error,
+        type = if (is.null(gate_error)) "message" else "warning", duration = 10
+      )
+    }
+    is.null(gate_error)
+  }
+
+  observeEvent(input$to_consensus, {
+    if (!length(rv$results)) {
+      showNotification("Run trimming and review QC before building analysis sequences.", type = "error")
+      return()
+    }
+    if (identical(rv$project_mode, "simple")) {
+      if (isTRUE(build_analysis_sequences(notify = TRUE))) {
+        updateTabsetPanel(session, "pipeline_step", selected = "export")
+      }
+      return()
+    }
+    locus_error <- stage3_run_locus_error(rv$read_assignments)
+    if (!is.null(locus_error)) {
+      showNotification(locus_error, type = "error", duration = 10)
+      return()
+    }
+    updateTabsetPanel(session, "pipeline_step", selected = "consensus")
+  })
+
+  observeEvent(input$build_consensus, {
+    build_analysis_sequences(notify = TRUE)
+  })
+
+  output$consensus_gate_status <- renderUI({
+    error <- stage3_consensus_gate_error(rv$consensus_set, rv$results)
+    if (is.null(error)) {
+      div(class = "status-ok", "✓ Every expected analysis sequence is current and review-complete.")
+    } else {
+      div(class = "status-warning", paste0("⚠ ", error))
+    }
+  })
+
+  output$consensus_summary_table <- renderDT({
+    df <- if (is.list(rv$consensus_set) && is.data.frame(rv$consensus_set$summary)) rv$consensus_set$summary else stage3_empty_summary()
+    if (!nrow(df)) return(datatable(data.frame(Message = "Build analysis sequences to populate this table."), rownames = FALSE, options = list(dom = "t")))
+    visible <- c("Final_Name", "Isolate", "Locus", "Status", "Source_Reads", "Length", "Overlap", "Identity_percent", "Review_positions", "Revision")
+    df <- df[, intersect(visible, names(df)), drop = FALSE]
+    datatable(
+      df, rownames = FALSE, selection = "single", class = "compact stripe hover consensus-summary-stable",
+      options = list(
+        pageLength = 20, scrollX = TRUE, autoWidth = FALSE, deferRender = TRUE, dom = "tip",
+        columnDefs = list(
+          list(targets = 0, width = "190px"), list(targets = 1, width = "115px"),
+          list(targets = 2, width = "85px"), list(targets = 3, width = "150px"),
+          list(targets = 4:9, width = "82px", className = "dt-center")
+        )
+      )
+    )
+  })
+
+  observeEvent(input$consensus_summary_table_rows_selected, {
+    row <- input$consensus_summary_table_rows_selected
+    if (length(row) == 1L && row >= 1L && row <= nrow(rv$consensus_set$summary)) {
+      updateSelectInput(session, "consensus_sample", selected = rv$consensus_set$summary$Consensus_ID[row])
+    }
+  })
+
+  selected_consensus <- reactive({
+    req(is.list(rv$consensus_set), length(rv$consensus_set$records), input$consensus_sample)
+    record <- rv$consensus_set$records[[as.character(input$consensus_sample)]]
+    req(is.list(record))
+    record
+  })
+
+  sync_consensus_review_choices <- function(preferred = NULL) {
+    id <- stage3_scalar_text(input$consensus_sample)
+    record <- if (nzchar(id) && is.list(rv$consensus_set$records[[id]])) rv$consensus_set$records[[id]] else NULL
+    review <- if (is.list(record)) stage3_reviewable_evidence(record) else data.frame()
+    if (!nrow(review)) {
+      updateSelectInput(session, "consensus_review_position", choices = character(), selected = character())
+      return(invisible(NULL))
+    }
+    values <- as.character(review$Alignment_Column)
+    labels <- paste0(
+      "Position ", review$Consensus_Position, " · F:", review$Forward_Base,
+      " / R:", review$Reverse_Base, ifelse(review$Needs_Review, " · unresolved", " · reviewed")
+    )
+    selected <- if (!is.null(preferred) && as.character(preferred) %in% values) as.character(preferred) else values[1]
+    updateSelectInput(session, "consensus_review_position", choices = setNames(values, labels), selected = selected)
+    invisible(selected)
+  }
+
+  observeEvent(input$consensus_sample, sync_consensus_review_choices(), ignoreInit = FALSE)
+
+  selected_consensus_review_row <- reactive({
+    record <- selected_consensus()
+    column <- suppressWarnings(as.integer(input$consensus_review_position))
+    req(is.finite(column), is.data.frame(record$evidence), nrow(record$evidence))
+    idx <- match(column, record$evidence$Alignment_Column)
+    req(!is.na(idx))
+    record$evidence[idx, , drop = FALSE]
+  })
+
+  output$consensus_review_call_ui <- renderUI({
+    row <- selected_consensus_review_row()
+    candidate_values <- c(as.character(row$Forward_Base), as.character(row$Reverse_Base), as.character(row$Automatic_Call))
+    candidate_labels <- c(paste0("Forward · ", row$Forward_Base), paste0("Reverse · ", row$Reverse_Base), paste0("IUPAC / automatic · ", row$Automatic_Call))
+    candidates <- setNames(candidate_values, candidate_labels)
+    candidates <- candidates[candidates != "-" & nzchar(candidates)]
+    candidates <- candidates[!duplicated(unname(candidates))]
+    radioButtons("consensus_review_call", "Accepted consensus call", choices = candidates,
+                 selected = as.character(row$Consensus_Call), inline = FALSE)
+  })
+
+  output$consensus_review_state <- renderUI({
+    record <- selected_consensus()
+    record <- stage3_ensure_record_curation(record)
+    reviewable <- stage3_reviewable_evidence(record)
+    unresolved <- if (nrow(record$evidence)) sum(record$evidence$Needs_Review, na.rm = TRUE) else 0L
+    div(class = if (unresolved) "status-warning" else "status-ok",
+        paste0("Revision ", record$curation$revision, " · ", unresolved, " unresolved · ", nrow(reviewable), " reviewable position(s)."))
+  })
+
+  consensus_review_plot <- function(direction) {
+    record <- selected_consensus()
+    row <- selected_consensus_review_row()
+    source_id <- if (identical(direction, "Forward")) stage3_scalar_text(record$forward_read) else stage3_scalar_text(record$reverse_read)
+    raw_position <- if (identical(direction, "Forward")) row$Forward_Raw_Position else row$Reverse_Raw_Position
+    result <- if (nzchar(source_id)) rv$results[[source_id]] else NULL
+    title <- paste0(direction, " evidence", if (nzchar(source_id)) paste0(" · ", source_id) else "")
+    make_chromatogram_focus_plot(result, settings_for_result(result), raw_position, title)
+  }
+
+  output$consensus_forward_conflict_plot <- plotly::renderPlotly(consensus_review_plot("Forward"))
+  output$consensus_reverse_conflict_plot <- plotly::renderPlotly(consensus_review_plot("Reverse"))
+
+  commit_consensus_record <- function(id, record, previous_sequence, action_label) {
+    rv$consensus_set$records[[id]] <- record
+    rv$consensus_set <- stage3_refresh_consensus_summary(rv$consensus_set)
+    sequence_changed <- !identical(previous_sequence, stage3_scalar_text(record$sequence))
+    invalidate_downstream_for_sample(
+      id,
+      paste0("Consensus ", action_label, if (sequence_changed) " changed the sequence" else " changed the review state", "; revision ", record$curation$revision)
+    )
+    rv$project_status_text <- paste0("Unsaved consensus ", action_label, ": ", record$final_name, " · revision ", record$curation$revision, ".")
+    sync_consensus_review_choices(input$consensus_review_position)
+  }
+
+  observeEvent(input$apply_consensus_review, {
+    id <- stage3_scalar_text(input$consensus_sample)
+    req(nzchar(id), input$consensus_review_position, input$consensus_review_call)
+    old <- rv$consensus_set$records[[id]]
+    previous_sequence <- stage3_scalar_text(old$sequence)
+    updated <- tryCatch(
+      stage3_apply_consensus_call(old, input$consensus_review_position, input$consensus_review_call,
+                                  method = "Forward / Reverse / IUPAC decision", note = input$consensus_review_note),
+      error = function(e) e
+    )
+    if (inherits(updated, "error")) {
+      showNotification(conditionMessage(updated), type = "error", duration = 10)
+      return()
+    }
+    commit_consensus_record(id, updated, previous_sequence, "review")
+    updateTextInput(session, "consensus_review_note", value = "")
+    showNotification("Consensus decision saved with a new revision.", type = "message")
+  })
+
+  observeEvent(input$consensus_review_undo, {
+    id <- stage3_scalar_text(input$consensus_sample); req(nzchar(id))
+    old <- rv$consensus_set$records[[id]]; previous_sequence <- stage3_scalar_text(old$sequence)
+    updated <- tryCatch(stage3_consensus_undo(old), error = function(e) e)
+    if (inherits(updated, "error")) { showNotification(conditionMessage(updated), type = "warning"); return() }
+    commit_consensus_record(id, updated, previous_sequence, "undo")
+  })
+
+  observeEvent(input$consensus_review_redo, {
+    id <- stage3_scalar_text(input$consensus_sample); req(nzchar(id))
+    old <- rv$consensus_set$records[[id]]; previous_sequence <- stage3_scalar_text(old$sequence)
+    updated <- tryCatch(stage3_consensus_redo(old), error = function(e) e)
+    if (inherits(updated, "error")) { showNotification(conditionMessage(updated), type = "warning"); return() }
+    commit_consensus_record(id, updated, previous_sequence, "redo")
+  })
+
+  observeEvent(input$consensus_review_history, {
+    record <- stage3_ensure_record_curation(selected_consensus())
+    output$consensus_review_history_table <- renderDT({
+      datatable(record$curation$audit_log, rownames = FALSE, options = list(pageLength = 12, scrollX = TRUE, order = list(list(0, "desc"))))
+    })
+    showModal(modalDialog(title = paste0("Consensus revision history · ", record$final_name),
+                          DTOutput("consensus_review_history_table"), size = "l", easyClose = TRUE, footer = modalButton("Close")))
+  })
+
+  output$consensus_selected_status <- renderUI({
+    record <- selected_consensus()
+    class_name <- if (record$status %in% c("READY", "SINGLE_READ", "INDEPENDENT_READ")) "status-ok" else if (record$status == "REVIEW_REQUIRED") "status-warning" else "status-error"
+    label <- switch(record$status,
+      READY = "Ready · Forward and Reverse overlap passed",
+      SINGLE_READ = "Valid single-read representative · not a two-read consensus",
+      INDEPENDENT_READ = "Ready · independent read, oriented without Forward/Reverse matching",
+      REVIEW_REQUIRED = "Review required · unresolved conflicts are retained as IUPAC calls",
+      NO_RELIABLE_OVERLAP = "Blocked · no reliable Forward/Reverse overlap",
+      SOURCE_MISSING = "Blocked · a processed source read is missing",
+      record$status
+    )
+    div(class = class_name, label)
+  })
+
+  output$consensus_selected_metrics <- renderDT({
+    record <- selected_consensus()
+    df <- data.frame(
+      Metric = c("Isolate", "Locus", "Forward read", "Reverse read", "Sequence length", "Overlap", "Overlap identity", "Mismatches", "Indels", "Review positions"),
+      Value = c(record$isolate, record$locus, stage3_scalar_text(record$forward_read, "—"), stage3_scalar_text(record$reverse_read, "—"),
+                nchar(stage3_scalar_text(record$sequence)), record$metrics$overlap,
+                if (is.finite(record$metrics$identity_percent)) paste0(record$metrics$identity_percent, "%") else "—",
+                record$metrics$mismatches, record$metrics$indels, record$metrics$review_positions),
+      stringsAsFactors = FALSE
+    )
+    datatable(df, rownames = FALSE, options = list(dom = "t", ordering = FALSE))
+  })
+
+  output$consensus_alignment_text <- renderText({
+    record <- selected_consensus()
+    if (is.null(record$alignment)) return("Single read: no pairwise overlap alignment is required.")
+    f <- record$alignment$forward_aligned
+    r <- record$alignment$reverse_aligned
+    n <- nchar(f)
+    starts <- seq.int(1L, max(1L, n), by = 80L)
+    blocks <- vapply(starts, function(st) {
+      en <- min(n, st + 79L)
+      fs <- substr(f, st, en); rs <- substr(r, st, en)
+      fc <- strsplit(fs, "", fixed = TRUE)[[1]]; rc <- strsplit(rs, "", fixed = TRUE)[[1]]
+      middle <- paste0(ifelse(fc == rc & fc != "-", "|", ifelse(fc == "-" | rc == "-", " ", ".")), collapse = "")
+      paste0("F  ", fs, "\n   ", middle, "\nR  ", rs, "\n")
+    }, character(1))
+    paste(blocks, collapse = "\n")
+  })
+
+  output$consensus_sequence_text <- renderText({
+    record <- selected_consensus()
+    sequence <- stage3_scalar_text(record$sequence)
+    if (!nzchar(sequence)) return("No downstream sequence is emitted while this record is blocked.")
+    wrap_sequence(sequence, 80)
+  })
+
+  output$consensus_evidence_table <- renderDT({
+    record <- selected_consensus()
+    evidence <- record$evidence
+    if (!is.data.frame(evidence) || !nrow(evidence)) return(datatable(data.frame(Message = "No per-column evidence is available."), rownames = FALSE, options = list(dom = "t")))
+    datatable(evidence, rownames = FALSE, filter = "top", options = list(pageLength = 25, scrollX = TRUE))
+  })
+
+  output$download_consensus_fasta <- downloadHandler(
+    filename = function() paste0(project_export_stem(), "_isolate_level.fasta"),
+    content = function(file) {
+      req(is.null(stage3_consensus_gate_error(rv$consensus_set, rv$results)))
+      writeLines(make_fasta(stage3_analysis_records(rv$consensus_set), FALSE), file)
+    }
+  )
+
+  output$download_consensus_checkpoint <- downloadHandler(
+    filename = function() paste0(project_export_stem(), "_checkpoint_C_consensus.zip"),
+    content = function(file) {
+      req(is.list(rv$consensus_set), length(rv$consensus_set$records))
+      write_consensus_checkpoint_zip(file, rv$consensus_set, rv$read_assignments, rv$settings)
+    }
+  )
 
   # ---------------- Export records ----------------
-  export_records <- reactive({
+  read_export_records <- reactive({
     req(rv$results,rv$rename)
     records <- list()
     for(original_name in names(rv$results)) {
@@ -2545,35 +3147,50 @@ server <- function(input, output, session) {
     }
     records
   })
-  export_summary_df <- reactive({
+  read_export_summary_df <- reactive({
     req(rv$summary,rv$rename)
     df <- rv$summary
     df$final_name <- rv$rename$New_name[match(df$sample_id,rv$rename$Original_name)]
     df
   })
+  export_records <- reactive({
+    req(is.null(stage3_consensus_gate_error(rv$consensus_set, rv$results)))
+    stage3_analysis_records(rv$consensus_set)
+  })
+  export_summary_df <- reactive({
+    req(is.null(stage3_consensus_gate_error(rv$consensus_set, rv$results)))
+    stage3_analysis_summary(rv$consensus_set)
+  })
 
   observeEvent(input$to_export, {
-    e <- rename_error(); if(!is.null(e)){showNotification(e,type="error");return()}
+    e <- stage3_consensus_gate_error(rv$consensus_set, rv$results)
+    if(!is.null(e)){showNotification(e,type="error",duration=10);return()}
     updateTabsetPanel(session,"pipeline_step",selected="export")
   })
 
   project_export_stem <- function() {
-    if (is.list(rv$architecture) && is.data.frame(rv$architecture$loci) && nrow(rv$architecture$loci) > 1L) return("PITAX_multi_locus")
+    if (is.list(rv$architecture) && is.data.frame(rv$architecture$loci) && "Locus" %in% names(rv$architecture$loci)) {
+      locus_names <- unique(trimws(as.character(rv$architecture$loci$Locus)))
+      locus_names <- locus_names[nzchar(locus_names)]
+      if (length(locus_names) > 1L) return("PITAX_multi_locus")
+      if (length(locus_names) == 1L) return(clean_fasta_name(locus_names))
+    }
     if (!is.null(rv$settings)) return(clean_fasta_name(stage2_scalar_text(rv$settings$target, "PITAX_project")))
     "PITAX_project"
   }
 
   output$export_summary <- renderUI({
-    req(rv$summary,rv$settings)
-    loci <- unique(as.character(rv$summary$target))
+    req(rv$summary,rv$settings, is.null(stage3_consensus_gate_error(rv$consensus_set, rv$results)))
+    consensus_summary <- rv$consensus_set$summary
+    loci <- unique(as.character(consensus_summary$Locus))
     architecture_summary <- stage2_architecture_summary(rv$architecture)
     tagList(
-      p(strong("Locus/loci: "), paste(loci, collapse = ", ")),
-      p(strong("Architecture: "), paste0(architecture_summary$Isolates, " isolate(s), ", architecture_summary$Loci, " locus/loci, ", architecture_summary$Reads, " read(s)")),
+      p(strong("Gene / locus: "), paste(loci, collapse = ", ")),
+      p(strong("Source architecture: "), paste0(architecture_summary$Isolates, " isolate(s), ", architecture_summary$Reads, " read(s)")),
       p(strong("Forward primer: "),ifelse(rv$settings$forward_primer=="","Not specified",rv$settings$forward_primer)),
       p(strong("Reverse primer: "),ifelse(rv$settings$reverse_primer=="","Not specified",rv$settings$reverse_primer)),
-      p(strong("Samples processed: "),nrow(rv$summary)),
-      p(strong("Sequences available for export: "),sum(rv$summary$trimmed_length>0,na.rm=TRUE))
+      p(strong("Source reads processed: "),nrow(rv$summary)),
+      p(strong("Isolate-level sequences for export: "),sum(consensus_summary$Length > 0, na.rm = TRUE))
     )
   })
 
@@ -2581,7 +3198,7 @@ server <- function(input, output, session) {
   output$download_trim_checkpoint <- downloadHandler(
     filename=function() paste0(project_export_stem(),"_checkpoint_B_qc.zip"),
     content=function(file){
-      write_checkpoint_zip(file,"qc",export_records(),export_summary_df(),rv$settings,rv$rename,results=rv$results,
+      write_checkpoint_zip(file,"qc",read_export_records(),read_export_summary_df(),rv$settings,rv$rename,results=rv$results,
                            read_assignments=rv$read_assignments,architecture=rv$architecture)
     })
   output$download_rename_checkpoint <- downloadHandler(
@@ -2595,15 +3212,15 @@ server <- function(input, output, session) {
     filename=function() paste0(project_export_stem(),"_BLAST.fasta"),
     content=function(file) writeLines(make_fasta(export_records(),FALSE),file))
   output$download_full_fasta <- downloadHandler(
-    filename=function() paste0(project_export_stem(),"_trimmed_sequences.fasta"),
+    filename=function() paste0(project_export_stem(),"_isolate_level_sequences.fasta"),
     content=function(file) writeLines(make_fasta(export_records(),TRUE,export_summary_df()),file))
   output$download_summary_csv <- downloadHandler(
-    filename=function() paste0(project_export_stem(),"_trim_summary.csv"),
+    filename=function() paste0(project_export_stem(),"_isolate_level_summary.csv"),
     content=function(file) write.csv(export_summary_df(),file,row.names=FALSE,fileEncoding="UTF-8"))
   output$download_all_zip <- downloadHandler(
     filename=function() paste0(project_export_stem(),"_Sanger_pipeline_results.zip"),
     content=function(file) write_checkpoint_zip(file,"final",export_records(),export_summary_df(),rv$settings,rv$rename,results=rv$results,
-                                                read_assignments=rv$read_assignments,architecture=rv$architecture))
+                                                read_assignments=rv$read_assignments,architecture=rv$architecture,consensus_set=rv$consensus_set))
 
   # ---------------- BLAST workspace ----------------
   resolve_blast_original_name <- function(value, records = export_records()) {
@@ -2638,6 +3255,11 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$to_blast, {
+    gate_error <- stage3_consensus_gate_error(rv$consensus_set, rv$results)
+    if (!is.null(gate_error)) {
+      showNotification(gate_error, type = "error", duration = 10)
+      return()
+    }
     updateTabsetPanel(session, "pipeline_step", selected="blast")
   })
 
@@ -2697,14 +3319,15 @@ server <- function(input, output, session) {
     tail(idx, 1)
   }
 
-  matching_active_blast_job_index <- function(original_name, database, hitlist_size) {
+  matching_active_blast_job_index <- function(original_name, database, hitlist_size, consensus_revision) {
     if (!is.data.frame(rv$blast_jobs) || !nrow(rv$blast_jobs)) return(NA_integer_)
     idx <- which(
       rv$blast_jobs$original_name == original_name &
       rv$blast_jobs$status %in% c("SUBMITTED", "WAITING", "READY") &
       nzchar(as.character(rv$blast_jobs$database)) &
       as.character(rv$blast_jobs$database) == as.character(database) &
-      suppressWarnings(as.integer(rv$blast_jobs$hitlist_size)) == as.integer(hitlist_size)
+      suppressWarnings(as.integer(rv$blast_jobs$hitlist_size)) == as.integer(hitlist_size) &
+      suppressWarnings(as.integer(rv$blast_jobs$consensus_revision)) == as.integer(consensus_revision)
     )
     if (!length(idx)) return(NA_integer_)
     tail(idx, 1)
@@ -2751,6 +3374,7 @@ server <- function(input, output, session) {
       rtoe=parsed$rtoe,
       database=as.character(input$blast_database),
       hitlist_size=hitlist,
+      consensus_revision=if (is.list(r$consensus$curation)) as.integer(r$consensus$curation$revision) else 0L,
       status="SUBMITTED",
       submitted_at=format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
       last_checked_at="",
@@ -2765,7 +3389,8 @@ server <- function(input, output, session) {
     original_name <- resolve_blast_original_name(input$blast_sample, rec)
     req(!is.null(original_name))
     requested_hitlist <- min(100L, max(1L, as.integer(input$blast_hitlist)))
-    existing_idx <- matching_active_blast_job_index(original_name, input$blast_database, requested_hitlist)
+    current_revision <- if (is.list(rec[[original_name]]$consensus$curation)) as.integer(rec[[original_name]]$consensus$curation$revision) else 0L
+    existing_idx <- matching_active_blast_job_index(original_name, input$blast_database, requested_hitlist, current_revision)
     if (!is.na(existing_idx)) {
       existing <- rv$blast_jobs[existing_idx, , drop=FALSE]
       showNotification(
@@ -2802,7 +3427,8 @@ server <- function(input, output, session) {
       for (i in seq_along(sample_names)) {
         nm <- sample_names[i]
         requested_hitlist <- min(100L, max(1L, as.integer(input$blast_hitlist)))
-        idx <- matching_active_blast_job_index(nm, input$blast_database, requested_hitlist)
+        current_revision <- if (is.list(records[[nm]]$consensus$curation)) as.integer(records[[nm]]$consensus$curation$revision) else 0L
+        idx <- matching_active_blast_job_index(nm, input$blast_database, requested_hitlist, current_revision)
         if (!is.na(idx)) {
           skipped <- skipped + 1L
           incProgress(
@@ -3129,11 +3755,11 @@ server <- function(input, output, session) {
   output$blast_jobs_table <- renderDT({
     df <- rv$blast_jobs
     if (!nrow(df)) return(datatable(data.frame(Message="No BLAST jobs submitted yet."), rownames=FALSE, options=list(dom="t")))
-    keep <- c("final_name","original_name","rid","database","hitlist_size","rtoe","status","submitted_at","last_checked_at")
+    keep <- c("final_name","original_name","rid","database","hitlist_size","consensus_revision","rtoe","status","submitted_at","last_checked_at")
     df <- df[, intersect(keep, names(df)), drop=FALSE]
     friendly <- c(
       final_name="Sample", original_name="Original sample", rid="RID", database="Database", hitlist_size="Hits requested",
-      rtoe="Estimated wait (s)", status="Status", submitted_at="Submitted at", last_checked_at="Last checked at"
+      consensus_revision="Consensus revision", rtoe="Estimated wait (s)", status="Status", submitted_at="Submitted at", last_checked_at="Last checked at"
     )
     names(df) <- unname(friendly[names(df)])
     datatable(df, rownames=FALSE, selection=list(mode="multiple", target="row"), options=list(pageLength=25, scrollX=TRUE))
@@ -3850,7 +4476,9 @@ server <- function(input, output, session) {
     qcf <- all_qc_peak_flags()
     if (nrow(qcf)) {
       for (i in seq_len(nrow(out))) {
-        sf <- qcf[qcf$Sample == out$Original_sample[i], , drop = FALSE]
+        consensus_record <- rv$consensus_set$records[[out$Original_sample[i]]]
+        source_ids <- if (is.list(consensus_record)) as.character(consensus_record$source_read_ids) else out$Original_sample[i]
+        sf <- qcf[qcf$Sample %in% source_ids, , drop = FALSE]
         if ("Review_status" %in% names(sf)) sf <- sf[sf$Review_status == "Active", , drop = FALSE]
         out$Ambiguous_peak_flags[i] <- nrow(sf)
         out$Strong_peak_flags[i] <- if (nrow(sf)) sum(sf$Severity == "Strong", na.rm = TRUE) else 0L
@@ -3859,17 +4487,25 @@ server <- function(input, output, session) {
     clog <- all_curation_log()
     for (i in seq_len(nrow(out))) {
       nm <- out$Original_sample[i]
-      r <- rv$results[[nm]]
-      if (!is.null(r)) {
+      consensus_record <- rv$consensus_set$records[[nm]]
+      source_ids <- if (is.list(consensus_record)) as.character(consensus_record$source_read_ids) else nm
+      source_results <- rv$results[intersect(source_ids, names(rv$results))]
+      if (length(source_results)) {
+        active_changes <- base_edits <- revisions <- integer()
+        for (r in source_results) {
         r <- ensure_curation_state(r)
         base_edit_count <- if (is.data.frame(r$curation$base_edits)) nrow(r$curation$base_edits) else 0L
         trim_left_changed <- is.finite(as.numeric(r$curation$trim_start)) && is.finite(as.numeric(r$curation$auto_trim_start)) &&
           as.integer(r$curation$trim_start) != as.integer(r$curation$auto_trim_start)
         trim_right_changed <- is.finite(as.numeric(r$curation$trim_end)) && is.finite(as.numeric(r$curation$auto_trim_end)) &&
           as.integer(r$curation$trim_end) != as.integer(r$curation$auto_trim_end)
-        out$Manual_curation_actions[i] <- as.integer(base_edit_count + trim_left_changed + trim_right_changed)
-        out$Manual_base_edits[i] <- base_edit_count
-        out$Curation_revision[i] <- as.integer(r$curation$revision)
+          active_changes <- c(active_changes, as.integer(base_edit_count + trim_left_changed + trim_right_changed))
+          base_edits <- c(base_edits, base_edit_count)
+          revisions <- c(revisions, as.integer(r$curation$revision))
+        }
+        out$Manual_curation_actions[i] <- sum(active_changes)
+        out$Manual_base_edits[i] <- sum(base_edits)
+        out$Curation_revision[i] <- if (length(revisions)) max(revisions) else 0L
       }
     }
 
@@ -3965,7 +4601,8 @@ server <- function(input, output, session) {
       add_sheet("BLAST Hits", rv$blast_hits)
       add_sheet("Taxonomy Details", rv$taxonomy_summary)
       add_sheet("Species Evidence", rv$taxonomy_counts)
-      add_sheet("QC", export_summary_df())
+      add_sheet("Consensus Summary", rv$consensus_set$summary)
+      add_sheet("Source Read QC", read_export_summary_df())
       add_sheet("QC Flags", all_qc_peak_flags())
       add_sheet("Manual Curation", all_curation_log())
       if (!is.null(rv$rename)) add_sheet("Rename Map", rv$rename)
@@ -4002,7 +4639,7 @@ server <- function(input, output, session) {
   )
 
   output$download_taxonomy_checkpoint <- downloadHandler(
-    filename=function() paste0(clean_fasta_name(ifelse(is.null(input$tax_sample), "sample", input$tax_sample)), "_checkpoint_D_taxonomy.zip"),
+    filename=function() paste0(clean_fasta_name(ifelse(is.null(input$tax_sample), "sample", input$tax_sample)), "_checkpoint_E_taxonomy.zip"),
     content=function(file) {
       req(nrow(selected_tax_summary()))
       source_hits <- blast_hits_for_sample(input$tax_sample)
@@ -4013,7 +4650,7 @@ server <- function(input, output, session) {
   # ---------------- Reset ----------------
   reset_pipeline_state <- function() {
     rv$results <- list(); rv$summary <- NULL; rv$rename <- NULL; rv$settings <- NULL
-    rv$read_assignments <- stage2_empty_assignments(); rv$architecture <- NULL; rv$project_migration_log <- ""
+    rv$read_assignments <- stage2_empty_assignments(); rv$architecture <- NULL; rv$consensus_set <- stage3_empty_consensus_set(); rv$project_migration_log <- ""
     rv$blast_jobs <- rv$blast_jobs[0,]; rv$blast_raw <- list(); rv$blast_ids <- data.frame(); rv$blast_hits <- data.frame()
     rv$ncbi_last_contact <- as.POSIXct(NA); rv$blast_batch_status_text <- "No batch operation has been run yet."
     rv$taxonomy_summary <- data.frame(); rv$taxonomy_hits <- data.frame(); rv$taxonomy_counts <- data.frame()

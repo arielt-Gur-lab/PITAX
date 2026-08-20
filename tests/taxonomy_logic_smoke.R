@@ -122,4 +122,24 @@ r8 <- build_taxonomic_consensus(h8, target="ITS", top_n=2)$summary
 stopifnot(r8$best_match_accession == "PCM2.1")
 stopifnot(r8$best_match_query_coverage_percent == 100)
 
+# 9. Retrieval depth is not a vote: appending many weak tail hits must not
+# lower the recommendation or confidence. A genuinely close late alternative
+# remains allowed to change the conclusion.
+weak_tail <- make_hits(
+  paste0("Weakgenus species", seq_len(90)), paste0("Weakgenus", seq_len(90)),
+  seq(500, 411), rep(82, 90), rep(70, 90), "WEAK"
+)
+h9 <- rbind(h2, weak_tail)
+r9 <- build_taxonomic_consensus(h9, target="ITS", top_n=nrow(h9))$summary
+stopifnot(r9$recommended_identification == r2$recommended_identification)
+stopifnot(r9$recommended_level == r2$recommended_level)
+stopifnot(r9$confidence == r2$confidence)
+stopifnot(r9$hits_retrieved == 100)
+stopifnot(r9$noncompetitive_tail_hits >= 90)
+
+# 10. Database representation is audit context, not a confidence vote.
+r10one <- build_taxonomic_consensus(h2[1, , drop = FALSE], target="ITS", top_n=1)$summary
+r10many <- build_taxonomic_consensus(h2, target="ITS", top_n=nrow(h2))$summary
+stopifnot(r10one$confidence == r10many$confidence)
+
 cat("v2.14.2 taxonomy smoke tests passed.\n")

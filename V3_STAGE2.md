@@ -1,4 +1,4 @@
-# PITAX 3.0 — Stage 2 gate candidate
+# PITAX 3.0 — Stage 2 closed gate
 
 Version: `3.0.0-alpha.6`
 
@@ -36,7 +36,8 @@ The generated name is an output and display label. The separate fields remain th
 
 The Upload screen supports:
 
-- direct cell editing for Isolate, Gene/Locus and Direction;
+- direct cell editing for Isolate and Gene/Locus;
+- a closed Forward/Reverse dropdown for Direction, with a non-valid `Select…` placeholder until assignment;
 - multi-row selection;
 - batch isolate prefix, suffix, find and replace;
 - batch Gene/Locus and Direction assignment;
@@ -121,4 +122,4 @@ Seven groups cover the accepted taxonomy, QC, curation, Stage 1 evidence, workfl
 
 ## Gate boundary
 
-alpha.6 is a Stage 2 gate candidate when automated and focused manual checks pass. Reverse-complement alignment, overlap conflict resolution and Forward/Reverse consensus are intentionally absent and belong to Stage 3.
+Stage 2 was accepted and closed after the alpha.6 automated and focused manual checks. Reverse-complement alignment, overlap conflict resolution and Forward/Reverse consensus remain outside this layer and are implemented only by the explicit Stage 3 sequence object.

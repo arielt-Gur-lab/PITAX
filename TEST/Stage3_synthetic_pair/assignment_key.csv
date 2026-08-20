@@ -1,0 +1,3 @@
+old_id,isolate,locus,direction
+TESTPAIR001_forward,TESTPAIR001,TEST_LOCUS,Forward
+TESTPAIR001_reverse,TESTPAIR001,TEST_LOCUS,Reverse

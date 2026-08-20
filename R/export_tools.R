@@ -60,8 +60,77 @@ write_assignment_checkpoint_zip <- function(file, rename_df, read_assignments, a
   zip::zipr(file, files, root = temp_dir)
 }
 
+write_consensus_artifacts <- function(root_dir, consensus_set) {
+  if (!is.list(consensus_set) || !length(consensus_set$records)) return(invisible(NULL))
+  consensus_dir <- file.path(root_dir, "consensus")
+  evidence_dir <- file.path(consensus_dir, "per_sequence_evidence")
+  audit_dir <- file.path(consensus_dir, "curation_audit")
+  alignment_dir <- file.path(consensus_dir, "pairwise_alignments")
+  dir.create(evidence_dir, recursive = TRUE, showWarnings = FALSE)
+  dir.create(audit_dir, recursive = TRUE, showWarnings = FALSE)
+  dir.create(alignment_dir, recursive = TRUE, showWarnings = FALSE)
+
+  if (is.data.frame(consensus_set$summary)) {
+    write.csv(consensus_set$summary, file.path(consensus_dir, "consensus_summary.csv"), row.names = FALSE, fileEncoding = "UTF-8")
+  }
+  records <- tryCatch(stage3_analysis_records(consensus_set), error = function(e) list())
+  writeLines(make_fasta(records, FALSE), file.path(consensus_dir, "isolate_level_sequences.fasta"))
+
+  for (id in names(consensus_set$records)) {
+    record <- consensus_set$records[[id]]
+    stem <- clean_fasta_name(if (nzchar(stage3_scalar_text(record$final_name))) record$final_name else id)
+    if (is.data.frame(record$evidence) && nrow(record$evidence)) {
+      write.csv(record$evidence, file.path(evidence_dir, paste0(stem, "_column_evidence.csv")), row.names = FALSE, fileEncoding = "UTF-8")
+    }
+    if (is.list(record$curation) && is.data.frame(record$curation$audit_log) && nrow(record$curation$audit_log)) {
+      write.csv(record$curation$audit_log, file.path(audit_dir, paste0(stem, "_consensus_curation_audit.csv")), row.names = FALSE, fileEncoding = "UTF-8")
+    }
+    if (is.list(record$alignment)) {
+      lines <- c(
+        paste0("consensus_id: ", id),
+        paste0("final_name: ", stage3_scalar_text(record$final_name)),
+        paste0("status: ", stage3_scalar_text(record$status)),
+        paste0("algorithm: ", stage3_scalar_text(record$algorithm)),
+        paste0("forward_read: ", stage3_scalar_text(record$forward_read)),
+        paste0("reverse_read: ", stage3_scalar_text(record$reverse_read)),
+        paste0("overlap: ", record$metrics$overlap),
+        paste0("identity_percent: ", record$metrics$identity_percent),
+        "",
+        paste0("Forward: ", record$alignment$forward_aligned),
+        paste0("Reverse: ", record$alignment$reverse_aligned),
+        paste0("Consensus: ", stage3_scalar_text(record$sequence))
+      )
+      writeLines(lines, file.path(alignment_dir, paste0(stem, "_alignment.txt")))
+    }
+  }
+  invisible(NULL)
+}
+
+write_consensus_checkpoint_zip <- function(file, consensus_set, read_assignments, settings) {
+  temp_dir <- tempfile("pitax_consensus_")
+  dir.create(temp_dir, recursive = TRUE)
+  on.exit(unlink(temp_dir, recursive = TRUE, force = TRUE), add = TRUE)
+  write_consensus_artifacts(temp_dir, consensus_set)
+  if (is.data.frame(read_assignments)) {
+    write.csv(read_assignments, file.path(temp_dir, "read_assignments.csv"), row.names = FALSE, fileEncoding = "UTF-8")
+  }
+  app_version <- tryCatch(get("APP_VERSION", inherits = TRUE), error = function(e) "unknown")
+  consensus_settings <- if (is.list(consensus_set$settings)) consensus_set$settings else list()
+  settings_lines <- c(
+    paste0("application_version: ", app_version),
+    paste0("exported_at: ", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
+    "checkpoint_stage: forward_reverse_consensus",
+    paste0("consensus_algorithm: ", stage3_scalar_text(consensus_set$algorithm)),
+    unlist(lapply(names(consensus_settings), function(nm) paste0("consensus_", nm, ": ", consensus_settings[[nm]]))),
+    unlist(lapply(names(settings), function(nm) paste0(nm, ": ", settings[[nm]])))
+  )
+  writeLines(settings_lines, file.path(temp_dir, "run_settings.txt"))
+  files <- list.files(temp_dir, recursive = TRUE, full.names = TRUE)
+  zip::zipr(file, files, root = temp_dir)
+}
+
 write_checkpoint_zip <- function(file, stage, records, summary_df, settings, rename_df = NULL, results = NULL,
-                                 read_assignments = NULL, architecture = NULL) {
+                                 read_assignments = NULL, architecture = NULL, consensus_set = NULL) {
   temp_dir <- tempfile(paste0("sanger_", stage, "_"))
   dir.create(temp_dir, recursive = TRUE)
   on.exit(unlink(temp_dir, recursive = TRUE, force = TRUE), add = TRUE)
@@ -82,6 +151,9 @@ write_checkpoint_zip <- function(file, stage, records, summary_df, settings, ren
     if (is.data.frame(architecture$isolates)) write.csv(architecture$isolates, file.path(architecture_dir, "isolates.csv"), row.names = FALSE, fileEncoding = "UTF-8")
     if (is.data.frame(architecture$loci)) write.csv(architecture$loci, file.path(architecture_dir, "loci.csv"), row.names = FALSE, fileEncoding = "UTF-8")
     if (is.data.frame(architecture$reads)) write.csv(architecture$reads, file.path(architecture_dir, "reads.csv"), row.names = FALSE, fileEncoding = "UTF-8")
+  }
+  if (is.list(consensus_set) && length(consensus_set$records)) {
+    write_consensus_artifacts(temp_dir, consensus_set)
   }
   app_version <- tryCatch(get("APP_VERSION", inherits = TRUE), error = function(e) "unknown")
   settings_lines <- c(

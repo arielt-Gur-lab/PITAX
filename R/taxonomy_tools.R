@@ -585,7 +585,7 @@ build_taxonomic_consensus <- function(enriched_hits, target = "", top_n = 25L) {
     taxonomic_support <- "High"
     sequence_evidence <- species_seq$level
     selected_ref <- species_ref
-    confidence <- if (best_species_count >= 2 || reference_quality_rank(species_ref) >= 2) "High" else "Moderate"
+    confidence <- if (reference_quality_rank(species_ref) >= 2) "High" else "Moderate"
   } else if (genus_supported) {
     recommendation <- best_genus
     rec_rank <- "genus"
@@ -593,7 +593,7 @@ build_taxonomic_consensus <- function(enriched_hits, target = "", top_n = 25L) {
     sequence_evidence <- genus_seq$level
     selected_ref <- genus_ref
     if (genus_seq$level == "High" && reference_quality_rank(genus_ref) >= 1) {
-      confidence <- if (best_genus_count >= 2) "High" else "Moderate"
+      confidence <- if (reference_quality_rank(genus_ref) >= 2) "High" else "Moderate"
     } else if (genus_seq$level == "Moderate") {
       confidence <- "Moderate"
     } else {
@@ -652,6 +652,8 @@ build_taxonomic_consensus <- function(enriched_hits, target = "", top_n = 25L) {
   hits$molecular_evidence_status <- ifelse(hits$is_best_molecular_match, "Best molecular match",
                                            ifelse(hits$is_close_species_alternative | hits$is_close_genus_alternative,
                                                   "Close alternative", "Other database match"))
+  hits$is_competitive_evidence <- hits$is_best_molecular_match |
+    hits$is_close_species_alternative | hits$is_close_genus_alternative
 
   best_id <- if (!is.null(best_species_row)) as_num_safe(best_species_row$best_identity_percent[1]) else if (!is.null(best_genus_row)) as_num_safe(best_genus_row$best_identity_percent[1]) else NA_real_
   best_cov <- if (!is.null(best_species_row)) as_num_safe(best_species_row$best_query_coverage_percent[1]) else if (!is.null(best_genus_row)) as_num_safe(best_genus_row$best_query_coverage_percent[1]) else NA_real_
@@ -719,7 +721,7 @@ build_taxonomic_consensus <- function(enriched_hits, target = "", top_n = 25L) {
   }
 
   summary <- data.frame(
-    algorithm_version = "evidence-first-v2.14.1",
+    algorithm_version = "evidence-first-v2.14.2",
     recommended_identification = recommendation,
     recommended_level = rec_rank,
     confidence = confidence,
@@ -728,6 +730,10 @@ build_taxonomic_consensus <- function(enriched_hits, target = "", top_n = 25L) {
     reference_support = selected_ref,
     decision_reason = decision_reason,
     hits_used = nrow(hits),
+    hits_retrieved = nrow(hits),
+    competitive_hits = sum(hits$is_competitive_evidence, na.rm = TRUE),
+    noncompetitive_tail_hits = sum(!hits$is_competitive_evidence, na.rm = TRUE),
+    retrieval_depth_note = "Retrieval depth is not a vote. Weak tail hits do not reduce confidence; a molecularly close alternative can reduce the supported rank regardless of its returned position.",
     best_molecular_match = best_match_name,
     best_match_species = best_species,
     best_match_genus = best_genus,

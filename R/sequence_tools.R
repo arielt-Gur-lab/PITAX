@@ -1022,6 +1022,27 @@ make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags 
   )
 }
 
+make_chromatogram_focus_plot <- function(result, settings, raw_position, title, window = 12L) {
+  position <- suppressWarnings(as.integer(raw_position[1]))
+  if (!is.list(result) || !length(position) || !is.finite(position[1])) {
+    return(plotly::plot_ly() |> plotly::layout(title = list(text = paste0(title, " · no linked raw position"), x = 0)))
+  }
+  focused <- result
+  focused$display_name <- title
+  p <- make_chromatogram_plotly(focused, settings, flags = NULL, show_flags = FALSE)
+  left <- max(1L, position - as.integer(window))
+  right <- position + as.integer(window)
+  plotly::layout(
+    p,
+    xaxis = list(title = "Raw called-base position", range = c(left, right), rangeslider = list(visible = FALSE)),
+    shapes = c(
+      p$x$layout$shapes,
+      list(list(type = "line", x0 = position, x1 = position, y0 = 0, y1 = 1, yref = "paper",
+                line = list(color = "#dc2626", width = 2, dash = "dot")))
+    )
+  )
+}
+
 
 # ============================================================
 # QC plots used both on-screen and in exported checkpoints

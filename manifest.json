@@ -3897,13 +3897,13 @@
   },
   "files": {
     "app.R": {
-      "checksum": "e92fba31ee0de676ea6d20bd1dfff66d"
+      "checksum": "f99cd10f9dc394b167c40ccea916b894"
     },
     "assignment_key_template.csv": {
       "checksum": "c0c2c530384487551c0c137d7e354549"
     },
     "CHANGELOG.md": {
-      "checksum": "2d6f09be6c6d549c1972b20ea566cf11"
+      "checksum": "b9fe2a14e1295df111292b57e2a4c422"
     },
     "DEPLOYMENT.md": {
       "checksum": "b1d95c7b85a425daec686ba3cbaba436"
@@ -3915,7 +3915,7 @@
       "checksum": "6a06337ea09989e5a3b280ace3f6673b"
     },
     "logo.png": {
-      "checksum": "f1e67ad4a15d181f7998cf93f81025ed"
+      "checksum": "a14851bfff729b420f2b47743ec0f938"
     },
     "prepare_connect_cloud.R": {
       "checksum": "51cdca309fc3903a1375bbe95f7e907c"
@@ -3927,28 +3927,67 @@
       "checksum": "0bd2f692de81f5f13e2d53642ecda900"
     },
     "R/export_tools.R": {
-      "checksum": "505191f4b9858646e4e46383119cd500"
+      "checksum": "d568337691ed79e178d0c50ae8b6fc19"
     },
     "R/sequence_tools.R": {
-      "checksum": "43bf50d3a4fae57324b864cd1217e288"
+      "checksum": "3759be3c74b297f2172c47c1b6bce4dc"
     },
     "R/stage2_architecture.R": {
       "checksum": "6a9dee6a38df753299674129717b0fa9"
     },
+    "R/stage3_consensus.R": {
+      "checksum": "5d3a0de7f92e86295ef20c381e14d78f"
+    },
     "R/taxonomy_tools.R": {
-      "checksum": "7acc5a3befc0f17f7eeca489ce28440a"
+      "checksum": "6aa0b9f331e5eaf8c319833b9bf49bc0"
     },
     "README.txt": {
-      "checksum": "74f1446da409666f2b59f72664e76e2c"
+      "checksum": "1d5b3b9f95d4fab7732f8ed5f8d2dcb3"
     },
     "run_app.bat": {
       "checksum": "e747f1c11fc42fde571e1ec7e14cd626"
     },
     "run_tests.bat": {
-      "checksum": "198e606e5e0255b045511686dac6aed4"
+      "checksum": "232b3e3f89d08859d7d4884602e7da5c"
+    },
+    "TEST/Stage3_conflict_pair/assignment_key.csv": {
+      "checksum": "7e9f078cc40c681922cf043da58e7154"
+    },
+    "TEST/Stage3_conflict_pair/README.txt": {
+      "checksum": "789228657eb58d1159de2e3f6c4d4c9a"
+    },
+    "TEST/Stage3_conflict_pair/TESTCONFLICT001_forward.ab1": {
+      "checksum": "7524afd17cc8415170e35bb1be3eca91"
+    },
+    "TEST/Stage3_conflict_pair/TESTCONFLICT001_reverse.ab1": {
+      "checksum": "a9d449473e239aaab3177f82f641a453"
+    },
+    "TEST/Stage3_synthetic_pair/assignment_key.csv": {
+      "checksum": "b722d1df0e1c105e88dbff278ce72622"
+    },
+    "TEST/Stage3_synthetic_pair/BIOPYTHON_LICENSE.rst": {
+      "checksum": "c52c51048a819935fe8b93eb2bbda611"
+    },
+    "TEST/Stage3_synthetic_pair/expected_forward_calls.fasta": {
+      "checksum": "3cffe6a1b6fb5698c263754deff1d87d"
+    },
+    "TEST/Stage3_synthetic_pair/README.txt": {
+      "checksum": "af62bd79d262fb51f6e7c59f8c44fe64"
+    },
+    "TEST/Stage3_synthetic_pair/TESTPAIR001_forward.ab1": {
+      "checksum": "7524afd17cc8415170e35bb1be3eca91"
+    },
+    "TEST/Stage3_synthetic_pair/TESTPAIR001_reverse.ab1": {
+      "checksum": "80b8bf468b4b03dd3c3b722baeb069d9"
+    },
+    "tests/__pycache__/generate_stage3_ab1_fixture.cpython-312.pyc": {
+      "checksum": "510eef7f96544e0236c41b6cac8e7b49"
     },
     "tests/ab1_evidence_smoke.R": {
       "checksum": "c76798581d12e80d86707cff65ac9a4b"
+    },
+    "tests/generate_stage3_ab1_fixture.py": {
+      "checksum": "52c677cd1006e183731a4d3c8b9d8d4f"
     },
     "tests/manual_curation_smoke.R": {
       "checksum": "2385057d4f1ecbfa2243a5ee46f81307"
@@ -3957,28 +3996,40 @@
       "checksum": "713a9e81778de7cb3a327327f51449cf"
     },
     "tests/stage2_app_contract_smoke.R": {
-      "checksum": "e95e8f8d7f3c783bb9f32a3d2a61a7a1"
+      "checksum": "a5f06cb09851eb7b8b28d8bbb4dd003b"
     },
     "tests/stage2_architecture_smoke.R": {
       "checksum": "2156e476302923cd9bb5f8f809cf8b5c"
     },
+    "tests/stage3_ab1_fixture_smoke.R": {
+      "checksum": "60c406b93003f48a95726ff51be71ba7"
+    },
+    "tests/stage3_app_contract_smoke.R": {
+      "checksum": "09f46705c704887342c174eb1fddb22c"
+    },
+    "tests/stage3_consensus_smoke.R": {
+      "checksum": "a8d18d83672dc7d71db5525f90f37901"
+    },
     "tests/taxonomy_logic_smoke.R": {
-      "checksum": "b70df61aa963b37bffb0e00c990ff2a3"
+      "checksum": "d31f5a597f2c6b6009303a9f1dc97521"
     },
     "tests/workflow_order_smoke.R": {
-      "checksum": "f754a56543162d73b7671b5e837c220d"
+      "checksum": "d3fd5f1b4d8be01cf36d451aebb3fd7d"
     },
     "V3_ROADMAP.md": {
-      "checksum": "c37edc7df1965091123ce4d66db6ba39"
+      "checksum": "1266a6104aa8d0e555e8f71da67a010c"
     },
     "V3_STAGE1.md": {
       "checksum": "4f3046ca732302de7f5e16b59d6ec432"
     },
     "V3_STAGE2.md": {
-      "checksum": "9a95d3292af97b0ab0e5280ea213153b"
+      "checksum": "425ebc9cb5ef9a9583ef0f54d1b381a8"
+    },
+    "V3_STAGE3.md": {
+      "checksum": "fecab61284c8d45fba5f95c88b8f9742"
     },
     "VERSION.txt": {
-      "checksum": "c48b7f2f1568f8b8659d9ac866d3e27d"
+      "checksum": "e83adb4c02a6ef90b5f720736b968c41"
     }
   },
   "users": null

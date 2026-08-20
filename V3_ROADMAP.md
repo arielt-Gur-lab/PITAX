@@ -24,7 +24,7 @@ Goal: make the isolate the primary biological object while preserving single-rea
 
 Gate: old projects load; new projects can represent single and paired reads without losing any v2 evidence or audit trail.
 
-Status: **Gate candidate in v3.0.0-alpha.6**. Upload now supports explicit manual, batch and key-based assignment; PITAX generates `<Isolate>_<Locus>_<F/R>` without parsing the barcode, and single/pair counting has a regression test. Consensus remains reserved for Stage 3.
+Status: **Closed in v3.0.0-alpha.6** after automated and focused manual acceptance. Upload supports explicit manual, batch and key-based assignment; PITAX generates `<Isolate>_<Locus>_<F/R>` without parsing the barcode, and single/pair counting has a regression test. Consensus remains a separate Stage 3 object.
 
 ## Stage 3 — Forward / Reverse consensus
 Goal: build an auditable, quality-aware consensus rather than a majority vote.
@@ -37,8 +37,10 @@ Goal: build an auditable, quality-aware consensus rather than a majority vote.
 
 Gate: curated truth-set comparisons and F/R edge-case tests pass.
 
-## Stage 4 — Multi-locus fungal identification
-Goal: interpret each locus separately, then integrate evidence at isolate level.
+Status: **Functional review workflow in v3.0.0-alpha.8**. Stage 3 now includes the one-locus run gate, orientation normalization, deterministic overlap alignment, conservative quality-aware calls, single-read representatives, linked chromatogram conflict decisions, monotonic revisions, Undo/Redo, per-column provenance, staleness and downstream gating. A real independently sequenced paired-AB1 truth set and edge-case acceptance remain open for biological closure.
+
+## Stage 4 — Multi-locus isolate profile
+Goal: combine separately processed loci at isolate level while keeping every locus-specific sequence, identification and limitation visible.
 
 - Per-locus BLAST/taxonomy remains evidence-first.
 - Marker profiles for major fungal groups.
@@ -58,3 +60,10 @@ Goal: harden the online multi-user system and validate the scientific workflow.
 - Real-lab truth-set validation and release documentation.
 
 Gate: local and Posit Connect Cloud acceptance suite passes; PITAX 3.0 is released as stable.
+
+## PITAX 4 preparation
+
+These features are deliberately prepared by the Stage 3/4 data model but are not part of the PITAX 3.0 gate:
+
+1. **Alignment and gene annotation** — initially ITS only. Store the reviewed multiple-sequence alignment and annotate SSU/ITS1/5.8S/ITS2/LSU boundaries only with a validated, provenance-bearing method; alignment alone is not treated as biological annotation.
+2. **Phylogenetic trees** — build trees from the saved reviewed alignment, with explicit reference sequences, analysis settings and warnings when the uploaded taxa are too divergent for a defensible common ITS alignment.
