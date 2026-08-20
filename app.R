@@ -1,6 +1,6 @@
 # ============================================================
-# PITAX v3.0.0-alpha.4
-# Stage 1: evidence foundation / compatibility audit
+# PITAX v3.0.0-alpha.6
+# Stage 2: isolate / locus / read architecture
 # ============================================================
 
 required_cran <- c("shiny", "DT", "zip", "readxl", "httr2", "plotly", "xml2", "rentrez", "taxize", "openxlsx")
@@ -25,14 +25,15 @@ if (PITAX_LOGO_AVAILABLE) {
 }
 
 source(file.path("R", "ab1_evidence.R"), local = TRUE)
+source(file.path("R", "stage2_architecture.R"), local = TRUE)
 source(file.path("R", "core_sanger.R"), local = TRUE)
 source(file.path("R", "sequence_tools.R"), local = TRUE)
 source(file.path("R", "export_tools.R"), local = TRUE)
 source(file.path("R", "taxonomy_tools.R"), local = TRUE)
 
-APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.0.0-alpha.4")
-APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "3.0.0-alpha.4", APP_VERSION)
-PROJECT_SCHEMA_VERSION <- 1L
+APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.0.0-alpha.6")
+APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "3.0.0-alpha.6", APP_VERSION)
+PROJECT_SCHEMA_VERSION <- 3L
 
 # ============================================================
 # UI helpers
@@ -82,9 +83,9 @@ stage_topbar <- function(...) {
 pipeline_stage_footer <- function(current_step) {
   labels <- c(
     "Upload",
-    "Assay & Trim",
-    "Rename",
-    "QC",
+    "Assay settings",
+    "Rename & assign",
+    "Trim & QC",
     "Export",
     "NCBI BLAST",
     "Taxonomic summary"
@@ -567,10 +568,10 @@ ui <- fluidPage(
       # 1. Upload
       # --------------------------------------------------------
       tabPanel("1 · Upload", value = "upload",
-        stage_heading("upload", "Upload chromatograms", "Start with the raw AB1 files for this sequencing run.", "Step 1 of 7"),
+        stage_heading("upload", "Upload and identify chromatograms", "Keep the sequencer barcode as the immutable source, then assign isolate, gene and direction before processing.", "Step 1 of 7"),
         stage_topbar(
           div(class = "stage-topbar-spacer"),
-          actionButton("to_settings", "Continue to Assay & Trim", icon = icon("arrow-right"), class = "btn-primary")
+          actionButton("to_settings", "Continue to Assay", icon = icon("arrow-right"), class = "btn-primary")
         ),
         div(class = "stage-grid stage-grid-upload",
           div(class = "panel-box upload-drop-card",
@@ -584,17 +585,49 @@ ui <- fluidPage(
             DTOutput("uploaded_files_table")
           )
         ),
+        div(class = "stage-grid stage-grid-rename",
+          div(class = "panel-box",
+            card_title("Assignment key", "Import XLSX/CSV with old_id, isolate, locus (or gene), and direction columns. old_id matches the uploaded barcode; prefix matching is supported.", "key"),
+            fileInput("rename_key_file", NULL, multiple = FALSE, accept = c(".xlsx", ".csv"), buttonLabel = "Choose assignment key", placeholder = "XLSX or CSV"),
+            actionButton("apply_rename_key", "Apply assignment key", icon = icon("check"), class = "btn-primary"),
+            downloadButton("download_assignment_key_template", "Download key template"),
+            uiOutput("rename_key_status")
+          ),
+          div(class = "panel-box",
+            card_title("Batch assignment", "Apply isolate edits, gene and direction to selected rows. If no rows are selected, the action applies to all uploaded reads.", "edit"),
+            div(class = "form-grid-2",
+              textInput("batch_isolate_prefix", "Isolate prefix", ""),
+              textInput("batch_isolate_suffix", "Isolate suffix", "")
+            ),
+            div(class = "form-grid-2",
+              textInput("batch_isolate_find", "Find in isolate", ""),
+              textInput("batch_isolate_replace", "Replace with", "")
+            ),
+            div(class = "form-grid-2",
+              textInput("batch_locus", "Set gene / locus", ""),
+              selectInput("batch_direction", "Set direction", c("No change" = "", "Forward" = "Forward", "Reverse" = "Reverse"), selected = "")
+            ),
+            actionButton("apply_assignment_batch", "Apply to selected / all", class = "btn-primary"),
+            actionButton("reset_assignments", "Clear assignments")
+          )
+        ),
+        div(class = "panel-box stage-table-card",
+          card_title("Read identity and generated FASTA names", "Edit Isolate, Gene / locus and Direction directly. PITAX generates the final name; it never extracts biological identity from the upload barcode.", "list-alt"),
+          DTOutput("assignment_upload_table"),
+          uiOutput("upload_assignment_validation"),
+          uiOutput("upload_architecture_summary")
+        ),
         pipeline_stage_footer(1)
       ),
       # --------------------------------------------------------
-      # 2. Assay & trimming settings
+      # 2. Assay and trimming settings
       # --------------------------------------------------------
-      tabPanel("2 · Assay & Trim", value = "settings",
-        stage_heading("sliders", "Assay & trimming", "Define locus metadata and the automatic trimming rules for this run.", "Step 2 of 7"),
+      tabPanel("2 · Assay", value = "settings",
+        stage_heading("sliders", "Assay setup", "Define run-level locus/primer defaults and the automatic trimming rules. Trimming starts only after Rename.", "Step 2 of 7"),
         stage_topbar(
           actionButton("back_upload", "Back", icon = icon("arrow-left")),
           div(class = "stage-topbar-spacer"),
-          actionButton("run_trimming", "Run trimming", icon = icon("play"), class = "btn-primary")
+          actionButton("to_rename", "Continue to Rename", icon = icon("arrow-right"), class = "btn-primary")
         ),
         div(class = "stage-grid stage-grid-2",
           div(class = "panel-box settings-card",
@@ -641,8 +674,8 @@ ui <- fluidPage(
       # --------------------------------------------------------
       # 4. QC, chromatogram & sequence preview
       # --------------------------------------------------------
-      tabPanel("4 · QC & Chromatogram", value = "qc",
-        stage_heading("bar-chart", "Quality control & curation", "Review renamed samples, inspect chromatograms, and document any manual sequence curation.", "Step 4 of 7"),
+      tabPanel("4 · Trim & QC", value = "qc",
+        stage_heading("bar-chart", "Trimming results, QC & curation", "Review the completed trim, inspect renamed chromatograms, and document manual sequence curation.", "Step 4 of 7"),
         stage_topbar(
           actionButton("back_rename_from_qc", "Back to Rename", icon = icon("arrow-left")),
           div(class = "stage-topbar-spacer"),
@@ -684,7 +717,7 @@ ui <- fluidPage(
             tags$summary(class = "stage1-audit-toggle", "Open evidence audit"),
             div(class = "status-note",
                 tags$strong("Validation mode only. "),
-                "The active v2.14.2 trimming/QC path is still the decision path. alpha.4 keeps the same-length PCON-only comparison observational; it does not apply that proposal to the processed sequence, FASTA or BLAST output."),
+                "The active v2.14.2 trimming/QC path is still the decision path. alpha.6 keeps the same-length PCON-only comparison observational; it does not apply that proposal to the processed sequence, FASTA or BLAST output."),
             div(class = "subsection-title", "Run-level audit"),
             DTOutput("ab1_evidence_run_table"),
             div(class = "blast-action-row",
@@ -747,44 +780,24 @@ ui <- fluidPage(
       # --------------------------------------------------------
       # 3. Rename
       # --------------------------------------------------------
-      tabPanel("3 · Rename", value = "rename",
-        stage_heading("tags", "Resolve sample names", "Name samples before QC so every chromatogram and review table is easier to identify.", "Step 3 of 7"),
+      tabPanel("3 · Rename & Assign", value = "rename",
+        stage_heading("tags", "Review read identity before trimming", "Confirm the explicit isolate, gene and direction fields entered at Upload. The final FASTA name is generated from those fields.", "Step 3 of 7"),
         stage_topbar(
-          actionButton("back_settings_from_rename", "Back to Assay & Trim", icon = icon("arrow-left")),
+          actionButton("back_settings_from_rename", "Back to Assay", icon = icon("arrow-left")),
           div(class = "stage-topbar-spacer"),
-          actionButton("to_qc", "Continue to QC", icon = icon("arrow-right"), class = "btn-primary")
-        ),
-        div(class = "stage-grid stage-grid-rename",
-          div(class = "panel-box",
-            card_title("Rename key", "Import XLSX/CSV with old_id and new_id columns. Prefix matching is supported.", "key"),
-            fileInput("rename_key_file", NULL, multiple = FALSE, accept = c(".xlsx", ".csv"), buttonLabel = "Choose rename key", placeholder = "XLSX or CSV"),
-            actionButton("apply_rename_key", "Apply rename key", icon = icon("check"), class = "btn-primary"),
-            uiOutput("rename_key_status")
-          ),
-          div(class = "panel-box",
-            card_title("Batch rename tools", "Apply predictable edits to all current names. Changes remain visible in the validation table below.", "edit"),
-            div(class = "form-grid-3",
-              textInput("rename_remove_suffix", "Remove suffix", "_customer"),
-              textInput("rename_prefix", "Add prefix", ""),
-              textInput("rename_suffix", "Add suffix", "")
-            ),
-            actionButton("apply_batch_affixes", "Apply prefix / suffix", class = "btn-primary"),
-            div(class = "subsection-divider"),
-            div(class = "form-grid-2",
-              textInput("rename_find", "Find text", ""),
-              textInput("rename_replace", "Replace with", "")
-            ),
-            actionButton("apply_find_replace", "Find & Replace"),
-            actionButton("reset_names", "Reset names")
-          )
+          actionButton("run_trimming", "Start trimming", icon = icon("play"), class = "btn-primary")
         ),
         div(class = "panel-box stage-table-card",
-          card_title("Final sequence names", "Edit New_name directly when needed. Validation checks for empty or duplicate names.", "list-alt"),
-          DTOutput("rename_table"),
+          card_title("Final read / FASTA names", "The source barcode stays unchanged. Edit the three identity fields; PITAX generates <Isolate>_<Locus>_<F/R>.", "list-alt"),
+          DTOutput("assignment_review_table"),
           uiOutput("rename_validation")
         ),
+        div(class = "panel-box stage2-assignment-card",
+          card_title("Stage 2 · Architecture preview", "Built directly from the explicit identity fields. A pair requires two distinct source reads assigned to the same isolate/locus, one Forward and one Reverse.", "sitemap"),
+          uiOutput("architecture_summary")
+        ),
         div(class = "panel-box checkpoint checkpoint-modern",
-          div(class = "checkpoint-copy", card_title("Checkpoint A · Renamed sequences", "Save the resolved naming state before QC and curation.", "save")),
+          div(class = "checkpoint-copy", card_title("Checkpoint A · Renamed and assigned reads", "Save resolved read names and biological identity before trimming.", "save")),
           downloadButton("download_rename_checkpoint", "Download checkpoint ZIP")
         ),
         pipeline_stage_footer(3)
@@ -953,7 +966,7 @@ ui <- fluidPage(
           p(class="about-lead",
             "Documentation for the laboratory workflow, the BLAST/taxonomy interpretation logic, and the scientific sources used to guide the application. Published evidence and application-specific heuristics are labeled separately."),
           div(class="help-flow",
-              "AB1 upload  →  Assay & trimming  →  Rename  →  QC  →  Export  →  NCBI BLAST  →  Taxonomic interpretation")
+              "AB1 upload  →  Assay settings  →  Rename & read assignment  →  Start trimming  →  QC  →  Export  →  NCBI BLAST  →  Taxonomic interpretation")
         ),
 
         div(class="about-section",
@@ -974,10 +987,10 @@ ui <- fluidPage(
                 column(6,
                   div(class="help-card",
                     h3("Workflow"),
-                    p(strong("1. Upload"), " — raw AB1 chromatograms."),
-                    p(strong("2. Assay & Trim"), " — locus metadata and trimming parameters."),
-                    p(strong("3. QC"), " — Quality Control plots, chromatogram inspection and processed sequence."),
-                    p(strong("4. Rename"), " — manual or key-based sample naming."),
+                    p(strong("1. Upload"), " — raw AB1 chromatograms plus explicit isolate, gene and direction assignment; source barcodes remain unchanged."),
+                    p(strong("2. Assay"), " — run-level primer defaults and trimming parameters; no trimming starts yet."),
+                    p(strong("3. Rename & Assign"), " — review the explicit identity fields and PITAX-generated <Isolate>_<Locus>_<F/R> names."),
+                    p(strong("4. Trim & QC"), " — start trimming explicitly, then review Quality Control plots, chromatograms and processed sequences."),
                     p(strong("5. Export"), " — processed FASTA, CSV/Excel summaries and checkpoints."),
                     p(strong("6. NCBI BLAST"), " — submit processed sequences and retrieve accession-level hits."),
                     p(strong("7. Taxonomic summary"), " — compare competitive hits and report identification plus confidence.")
@@ -986,10 +999,19 @@ ui <- fluidPage(
                 column(6,
                   div(class="help-card",
                     h3("Auditability"),
-                    p("The QC plots, automatic trimming parameters, manual curation audit log, BLAST hits, taxonomy-enriched hits, decision components and application version are retained in exports."),
+                    p("Read assignments, isolate/locus/read links, QC plots, automatic trimming parameters, manual curation audit log, BLAST hits, taxonomy-enriched hits, decision components and application version are retained in exports."),
                     p(strong("Save / Load project"), " stores the workflow state in a .sangerproject file so completed processing and retrieved BLAST results do not need to be repeated."),
                     p("The final identification is decision-support. It does not replace locus-specific taxonomy, type/reference inspection, morphology or additional loci when those are required.")
                   )
+                )
+              ),
+              div(class="help-card",
+                h3("Stage 2 project architecture"),
+                p("PITAX stores Project → Isolate → Locus → Read as explicit linked objects. One isolate may have several loci, and one locus may have a single read or separate Forward and Reverse reads."),
+                p("The upload barcode is an immutable technical source ID and is never parsed as biological identity. Isolate, Gene/Locus and Direction are edited as separate fields on Upload and reviewed before trimming; PITAX generates the final <Isolate>_<Locus>_<F/R> label from those fields. Duplicate AB1 basenames are blocked because they cannot be represented safely by the established source-read key."),
+                div(class="about-callout",
+                  strong("Stage boundary: "),
+                  "alpha.6 records pairing metadata but does not align or merge Forward/Reverse reads. Consensus construction remains Stage 3."
                 )
               )
             ),
@@ -1207,6 +1229,8 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   rv <- reactiveValues(
     results = list(), summary = NULL, rename = NULL, settings = NULL,
+    read_assignments = stage2_empty_assignments(), architecture = NULL,
+    project_migration_log = "",
     blast_jobs = data.frame(
       final_name=character(), original_name=character(), rid=character(), rtoe=character(),
       database=character(), hitlist_size=integer(), status=character(), submitted_at=character(), last_checked_at=character(), stringsAsFactors=FALSE
@@ -1240,11 +1264,31 @@ server <- function(input, output, session) {
     df
   }
 
+  settings_for_result <- function(result, fallback = rv$settings) {
+    if (is.list(result) && is.list(result$processing_settings)) result$processing_settings else fallback
+  }
+
+  current_upload_source_ids <- function() {
+    if (is.null(input$ab1_files) || !nrow(input$ab1_files)) return(NULL)
+    vapply(input$ab1_files$name, stage2_read_stem, character(1))
+  }
+
+  initialize_current_read_assignments <- function() {
+    if (is.null(input$ab1_files) || !nrow(input$ab1_files)) return(stage2_empty_assignments())
+    stage2_make_read_assignments(
+      input$ab1_files$name,
+      default_locus = input$target,
+      default_direction = input$sequencing_primer,
+      forward_primer = input$forward_primer,
+      reverse_primer = input$reverse_primer
+    )
+  }
+
   sync_summary_from_results <- function() {
     if (is.null(rv$summary) || !is.data.frame(rv$summary) || !nrow(rv$summary) || is.null(rv$results) || !length(rv$results)) return(invisible(NULL))
     for (nm in names(rv$results)) {
       r <- ensure_curation_state(rv$results[[nm]])
-      r <- curation_rebuild(r, rv$settings)
+      r <- curation_rebuild(r, settings_for_result(r))
       rv$results[[nm]] <- r
       sm <- r$summary
       idx <- which(as.character(rv$summary$sample_id) == nm)
@@ -1281,6 +1325,9 @@ server <- function(input, output, session) {
         summary = rv$summary,
         rename = rv$rename,
         settings = rv$settings,
+        read_assignments = rv$read_assignments,
+        architecture = rv$architecture,
+        migration_log = rv$project_migration_log,
         blast_jobs = rv$blast_jobs,
         blast_raw = rv$blast_raw,
         blast_ids = rv$blast_ids,
@@ -1297,8 +1344,7 @@ server <- function(input, output, session) {
 
   output$save_project <- downloadHandler(
     filename = function() {
-      target <- if (!is.null(rv$settings) && !is.null(rv$settings$target) && nzchar(rv$settings$target)) rv$settings$target else "Sanger"
-      paste0(clean_fasta_name(target), "_", format(Sys.Date(), "%Y%m%d"), ".sangerproject")
+      paste0(project_export_stem(), "_", format(Sys.Date(), "%Y%m%d"), ".sangerproject")
     },
     content = function(file) {
       saveRDS(make_project_bundle(), file = file, compress = "xz")
@@ -1411,22 +1457,50 @@ server <- function(input, output, session) {
       showNotification("This file is not a valid Sanger Sequence Pipeline project.", type = "error", duration = 10)
       return()
     }
-    if (!is.null(obj$schema_version) && as.integer(obj$schema_version) > PROJECT_SCHEMA_VERSION) {
+    source_schema <- if (is.null(obj$schema_version)) 1L else suppressWarnings(as.integer(obj$schema_version))
+    if (length(source_schema) != 1L || is.na(source_schema) || source_schema < 1L) {
+      showNotification("This project has an invalid schema version.", type = "error", duration = 10)
+      return()
+    }
+    if (source_schema > PROJECT_SCHEMA_VERSION) {
       showNotification("This project was created by a newer project schema and cannot be loaded safely.", type = "error", duration = 10)
       return()
     }
 
     st <- obj$state
+    if (source_schema < 2L) st <- stage2_migrate_v1_state(st)
+    if (source_schema == 2L) st <- stage2_migrate_v2_state(st)
+    loaded_assignments <- stage2_coerce_assignments(st$read_assignments)
+    assignment_error <- stage2_validate_assignments(loaded_assignments)
+    if (length(st$results) && !is.null(assignment_error)) {
+      showNotification(paste("Project read architecture is invalid:", assignment_error), type = "error", duration = 10)
+      return()
+    }
+    loaded_architecture <- if (nrow(loaded_assignments) && is.null(assignment_error)) tryCatch(
+      stage2_build_architecture(
+        loaded_assignments,
+        project_id = if (is.list(st$architecture)) stage2_scalar_text(st$architecture$project_id, "project") else "project"
+      ),
+      error = function(e) NULL
+    ) else NULL
+    if (length(st$results) && nrow(loaded_assignments) && is.null(loaded_architecture)) {
+      showNotification("Project read architecture could not be rebuilt safely.", type = "error", duration = 10)
+      return()
+    }
     rv$results <- if (!is.null(st$results)) st$results else list()
     if (length(rv$results)) {
       for (nm in names(rv$results)) {
         rv$results[[nm]] <- ensure_curation_state(rv$results[[nm]])
-        rv$results[[nm]] <- curation_rebuild(rv$results[[nm]], st$settings)
+        loaded_settings <- if (is.list(rv$results[[nm]]$processing_settings)) rv$results[[nm]]$processing_settings else st$settings
+        rv$results[[nm]] <- curation_rebuild(rv$results[[nm]], loaded_settings)
       }
     }
     rv$summary <- st$summary
     rv$rename <- st$rename
     rv$settings <- st$settings
+    rv$read_assignments <- loaded_assignments
+    rv$architecture <- loaded_architecture
+    rv$project_migration_log <- stage2_scalar_text(st$migration_log)
     rv$blast_jobs <- ensure_blast_jobs_schema(if (is.data.frame(st$blast_jobs)) st$blast_jobs else NULL)
     rv$blast_raw <- if (is.list(st$blast_raw)) st$blast_raw else list()
     rv$blast_hits <- if (is.data.frame(st$blast_hits)) normalize_blast_hits_unique_accession(st$blast_hits) else data.frame()
@@ -1447,7 +1521,16 @@ server <- function(input, output, session) {
     inspect_selected <- if (!is.null(saved_ui$inspect_sample) && saved_ui$inspect_sample %in% result_names) saved_ui$inspect_sample else if (length(result_names)) result_names[1] else character()
     sync_qc_sample_choices(inspect_selected)
 
-    final_names <- if (!is.null(rv$rename) && nrow(rv$rename)) setNames(rv$rename$Original_name, rv$rename$New_name) else setNames(result_names, result_names)
+    final_names <- character()
+    if (length(result_names)) {
+      result_labels <- result_names
+      if (!is.null(rv$rename) && nrow(rv$rename)) {
+        rename_idx <- match(result_names, rv$rename$Original_name)
+        resolved <- !is.na(rename_idx) & nzchar(trimws(rv$rename$New_name[rename_idx]))
+        result_labels[resolved] <- rv$rename$New_name[rename_idx[resolved]]
+      }
+      final_names <- setNames(result_names, result_labels)
+    }
     blast_selected <- if (!is.null(saved_ui$blast_sample) && saved_ui$blast_sample %in% unname(final_names)) saved_ui$blast_sample else if (length(final_names)) unname(final_names)[1] else character()
     updateSelectInput(session, "blast_sample", choices = final_names, selected = blast_selected)
     if (!is.null(saved_ui$blast_database)) updateSelectInput(session, "blast_database", selected = saved_ui$blast_database)
@@ -1464,7 +1547,7 @@ server <- function(input, output, session) {
       updateSelectInput(session, "tax_sample", choices = character())
     }
 
-    active <- if (!is.null(obj$active_tab) && obj$active_tab %in% c("upload","settings","qc","rename","export","blast","taxonomy","help")) obj$active_tab else if (nrow(rv$taxonomy_summary)) "taxonomy" else if (nrow(rv$blast_hits)) "blast" else if (length(rv$results)) "rename" else "upload"
+    active <- if (!is.null(obj$active_tab) && obj$active_tab %in% c("upload","settings","qc","rename","export","blast","taxonomy","help")) obj$active_tab else if (nrow(rv$taxonomy_summary)) "taxonomy" else if (nrow(rv$blast_hits)) "blast" else if (length(rv$results)) "qc" else "upload"
     updateTabsetPanel(session, "pipeline_step", selected = active)
 
     rv$project_loaded_name <- input$load_project$name
@@ -1472,9 +1555,13 @@ server <- function(input, output, session) {
       "Loaded ", input$load_project$name,
       " · saved with app v", ifelse(is.null(obj$app_version), "unknown", obj$app_version),
       if (!is.null(obj$saved_at)) paste0(" · saved ", obj$saved_at) else "",
+      if (source_schema < PROJECT_SCHEMA_VERSION) paste0(" · migrated project schema ", source_schema, " → ", PROJECT_SCHEMA_VERSION, " in memory") else "",
       ". BLAST hits were normalized to one row per accession."
     )
-    showNotification("Project loaded successfully.", type = "message", duration = 6)
+    showNotification(
+      if (source_schema < PROJECT_SCHEMA_VERSION) paste0("Older project loaded and migrated to schema ", PROJECT_SCHEMA_VERSION, ". Save it to persist the migration.") else "Project loaded successfully.",
+      type = "message", duration = 8
+    )
   })
 
   # ---------------- Upload ----------------
@@ -1483,6 +1570,72 @@ server <- function(input, output, session) {
     datatable(data.frame(File=input$ab1_files$name, Size_KB=round(input$ab1_files$size/1024,1)),
               rownames=FALSE, options=list(pageLength=15, dom="tip"))
   })
+
+  observeEvent(input$ab1_files, {
+    fresh <- initialize_current_read_assignments()
+    previous <- stage2_coerce_assignments(rv$read_assignments)
+    if (nrow(previous) && nrow(fresh)) {
+      carry <- intersect(c("Isolate", "Locus", "Direction", "Primer", "Notes"), names(previous))
+      for (i in seq_len(nrow(fresh))) {
+        j <- match(fresh$Source_ID[i], previous$Source_ID)
+        if (!is.na(j)) fresh[i, carry] <- previous[j, carry]
+      }
+    }
+    rv$read_assignments <- fresh
+    sync_assignment_state()
+    rv$project_migration_log <- ""
+  })
+
+  sync_assignment_state <- function() {
+    if (!nrow(rv$read_assignments)) {
+      rv$rename <- stage2_default_rename_map(rv$read_assignments)
+      rv$architecture <- NULL
+      return(invisible(NULL))
+    }
+    rv$read_assignments <- stage2_sync_generated_names(
+      rv$read_assignments,
+      forward_primer = input$forward_primer,
+      reverse_primer = input$reverse_primer
+    )
+    rv$rename <- stage2_default_rename_map(rv$read_assignments)
+    assignment_error <- stage2_identity_error(rv$read_assignments)
+    rv$architecture <- if (is.null(assignment_error)) stage2_build_architecture(rv$read_assignments) else NULL
+    if (is.null(assignment_error) && length(rv$results)) {
+      for (source_id in intersect(names(rv$results), rv$read_assignments$Source_ID)) {
+        i <- match(source_id, rv$read_assignments$Source_ID)
+        rv$results[[source_id]]$read_assignment <- as.list(rv$read_assignments[i, , drop = FALSE])
+        if (is.list(rv$results[[source_id]]$processing_settings)) {
+          rv$results[[source_id]]$processing_settings$target <- rv$read_assignments$Locus[i]
+          rv$results[[source_id]]$processing_settings$sequencing_primer <- rv$read_assignments$Direction[i]
+          if (rv$read_assignments$Direction[i] == "Forward" && nzchar(rv$read_assignments$Primer[i])) rv$results[[source_id]]$processing_settings$forward_primer <- rv$read_assignments$Primer[i]
+          if (rv$read_assignments$Direction[i] == "Reverse" && nzchar(rv$read_assignments$Primer[i])) rv$results[[source_id]]$processing_settings$reverse_primer <- rv$read_assignments$Primer[i]
+        }
+      }
+    }
+    invisible(assignment_error)
+  }
+
+  observeEvent(list(input$target, input$sequencing_primer, input$forward_primer, input$reverse_primer), {
+    if (is.null(input$ab1_files) || !nrow(input$ab1_files)) return()
+    sync_assignment_state()
+  }, ignoreInit = TRUE)
+
+  architecture_summary_ui <- function() {
+    error <- stage2_identity_error(rv$read_assignments)
+    if (!is.null(error)) return(div(class = "status-warning", "Architecture preview will appear after every read has explicit Isolate, Gene / locus and Forward / Reverse fields."))
+    architecture <- tryCatch(stage2_build_architecture(rv$read_assignments), error = function(e) NULL)
+    if (is.null(architecture)) return(NULL)
+    sm <- stage2_architecture_summary(architecture)
+    div(
+      class = "compact-hint",
+      paste0(
+        "Architecture preview: ", sm$Isolates, " isolate(s) · ", sm$Loci, " locus/loci · ", sm$Reads, " read(s) · ",
+        sm$Paired_loci, " Forward/Reverse pair(s) · ", sm$Single_read_loci, " single-read locus/loci."
+      )
+    )
+  }
+  output$architecture_summary <- renderUI(architecture_summary_ui())
+  output$upload_architecture_summary <- renderUI(architecture_summary_ui())
 
   observeEvent(input$to_settings, {
     if (is.null(input$ab1_files) || nrow(input$ab1_files)==0) {
@@ -1497,10 +1650,8 @@ server <- function(input, output, session) {
   observeEvent(input$back_export, updateTabsetPanel(session,"pipeline_step",selected="export"))
   observeEvent(input$back_blast, updateTabsetPanel(session,"pipeline_step",selected="blast"))
 
-  # ---------------- Trimming ----------------
-  observeEvent(input$run_trimming, {
-    req(input$ab1_files)
-    settings <- list(
+  current_settings_from_inputs <- function() {
+    list(
       target=input$target,
       forward_primer=input$forward_primer,
       forward_primer_seq=sanitize_dna(input$forward_primer_seq),
@@ -1524,22 +1675,71 @@ server <- function(input, output, session) {
       auto_correct_max_peak_offset=2L,
       auto_correct_min_relative_signal=0.50
     )
+  }
+
+  observeEvent(input$to_rename, {
+    if (is.null(input$ab1_files) || !nrow(input$ab1_files)) {
+      showNotification("Please upload at least one AB1 file.", type = "error")
+      return()
+    }
+    source_ids <- current_upload_source_ids()
+    if (!nrow(rv$read_assignments) || !identical(sort(rv$read_assignments$Source_ID), sort(source_ids))) {
+      rv$read_assignments <- initialize_current_read_assignments()
+    }
+    rv$settings <- current_settings_from_inputs()
+    sync_assignment_state()
+    updateTabsetPanel(session, "pipeline_step", selected = "rename")
+  })
+
+  # ---------------- Trimming ----------------
+  observeEvent(input$run_trimming, {
+    req(input$ab1_files)
+    name_error <- stage2_identity_error(rv$read_assignments)
+    if (!is.null(name_error)) {
+      showNotification(paste("Rename error:", name_error), type = "error", duration = 10)
+      return()
+    }
+    sync_assignment_state()
+    assignment_error <- stage2_validate_assignments(rv$read_assignments, current_upload_source_ids())
+    if (!is.null(assignment_error)) {
+      showNotification(paste("Read assignment error:", assignment_error), type = "error", duration = 10)
+      return()
+    }
+    rv$read_assignments <- stage2_coerce_assignments(rv$read_assignments)
+    rv$architecture <- tryCatch(
+      stage2_build_architecture(rv$read_assignments),
+      error = function(e) {
+        showNotification(paste("Could not build project architecture:", conditionMessage(e)), type = "error", duration = 10)
+        NULL
+      }
+    )
+    if (is.null(rv$architecture)) return()
+    settings <- current_settings_from_inputs()
     rv$settings <- settings
     all_results <- list(); summaries <- list(); files <- input$ab1_files
 
     withProgress(message="Processing AB1 files", value=0, {
       for (i in seq_len(nrow(files))) {
         sample_id <- sub("\\.ab1$", "", files$name[i], ignore.case=TRUE)
+        assignment_idx <- match(sample_id, rv$read_assignments$Source_ID)
+        assignment <- rv$read_assignments[assignment_idx, , drop = FALSE]
+        read_settings <- settings
+        read_settings$target <- assignment$Locus[1]
+        read_settings$sequencing_primer <- assignment$Direction[1]
+        if (assignment$Direction[1] == "Forward" && nzchar(trimws(assignment$Primer[1]))) read_settings$forward_primer <- assignment$Primer[1]
+        if (assignment$Direction[1] == "Reverse" && nzchar(trimws(assignment$Primer[1]))) read_settings$reverse_primer <- assignment$Primer[1]
         incProgress(1/nrow(files), detail=paste("Processing", files$name[i]))
         result <- tryCatch(
-          trim_one_ab1(files$datapath[i], sample_id, settings),
+          trim_one_ab1(files$datapath[i], sample_id, read_settings),
           error=function(e) structure(list(error=conditionMessage(e)), class="ab1_error")
         )
         if (inherits(result,"ab1_error")) {
-          summaries[[sample_id]] <- make_failure_summary(sample_id, settings, result$error)
+          summaries[[sample_id]] <- make_failure_summary(sample_id, read_settings, result$error)
         } else {
+          result$read_assignment <- as.list(assignment[1, , drop = FALSE])
+          result$processing_settings <- read_settings
           result <- ensure_curation_state(result)
-          result <- curation_rebuild(result, settings)
+          result <- curation_rebuild(result, read_settings)
           all_results[[sample_id]] <- result
           summaries[[sample_id]] <- result$summary
         }
@@ -1548,9 +1748,9 @@ server <- function(input, output, session) {
 
     rv$results <- all_results
     rv$summary <- Reduce(rbind_fill, summaries); rownames(rv$summary) <- NULL
-    rv$rename <- data.frame(Original_name=rv$summary$sample_id, New_name=rv$summary$sample_id, stringsAsFactors=FALSE)
-    session$sendCustomMessage("showLoader", list(text = "Loading Rename workspace…"))
-    updateTabsetPanel(session,"pipeline_step",selected="rename")
+    sync_qc_sample_choices()
+    session$sendCustomMessage("showLoader", list(text = "Opening Trim & QC workspace…"))
+    updateTabsetPanel(session,"pipeline_step",selected="qc")
   })
 
   qc_display_name <- function(original_name) {
@@ -1562,6 +1762,10 @@ server <- function(input, output, session) {
 
   sync_qc_sample_choices <- function(preferred = NULL) {
     keys <- names(rv$results)
+    if (!length(keys)) {
+      updateSelectInput(session, "inspect_sample", choices = character(), selected = character())
+      return(invisible(NULL))
+    }
     labels <- vapply(keys, qc_display_name, character(1))
     choices <- stats::setNames(keys, labels)
     current <- if (!is.null(preferred) && preferred %in% keys) preferred else isolate(input$inspect_sample)
@@ -1600,6 +1804,12 @@ server <- function(input, output, session) {
     r <- rv$results[[sid]]
     req(!is.null(r))
     r
+  })
+
+  selected_processing_settings <- reactive({
+    settings <- settings_for_result(selected_result())
+    req(is.list(settings))
+    settings
   })
 
   observeEvent(input$inspect_sample, {
@@ -1663,7 +1873,7 @@ server <- function(input, output, session) {
     if (is.null(ev)) {
       return(div(class = "status-note",
                  tags$strong(paste0("Selected sample: ", sample_label, ". ")),
-                 "This sample has no Stage 1 evidence object. Reprocess the original AB1 with alpha.4 to create the audit."))
+                 "This sample has no Stage 1 evidence object. Reprocess the original AB1 with alpha.6 to create the audit."))
     }
     if (!is.null(ev$error) && nzchar(as.character(ev$error)[1])) {
       return(div(class = "status-error", tags$strong(paste0("Selected sample: ", sample_label, ". ")),
@@ -1679,7 +1889,7 @@ server <- function(input, output, session) {
           div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Q20_auto_trim_percent[1]), paste0(sm$Q20_auto_trim_percent[1], "%"), "NA")), " Q≥20 in auto trim"),
           div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Primary_position_difference_percent[1]), paste0(sm$Primary_position_difference_percent[1], "%"), "NA")), " PLOC vs legacy positions differ")),
       div(class = "compact-hint",
-          "alpha.4 compares the active legacy auto trim with a same-length PCON-only window. The comparison is observational and does not change the processed sequence.")
+          "alpha.6 retains the active legacy auto trim and a same-length PCON-only comparison. The comparison is observational and does not change the processed sequence.")
     )
   })
 
@@ -1745,26 +1955,26 @@ server <- function(input, output, session) {
   )
   output$primer_match_table <- renderDT({
     req(isTRUE(input$enable_primer_mapping))
-    datatable(primer_match_table(selected_result(), rv$settings), rownames = FALSE,
+    datatable(primer_match_table(selected_result(), selected_processing_settings()), rownames = FALSE,
               options = list(dom = "t", scrollX = TRUE))
   })
   output$primer_alignment <- renderText({
     req(isTRUE(input$enable_primer_mapping))
-    primer_alignment_text(selected_result(), rv$settings)
+    primer_alignment_text(selected_result(), selected_processing_settings())
   })
   output$amplicon_overview <- renderPlot({
-    draw_amplicon_overview(selected_result(), rv$settings)
+    draw_amplicon_overview(selected_result(), selected_processing_settings())
   })
   output$expected_amplicon_note <- renderUI({
-    req(rv$settings)
+    settings <- selected_processing_settings()
     span(class = "peak-flag-pill", title = "Assay metadata only; not a fixed coordinate on the Sanger read.",
-         paste0("Expected amplicon: ", rv$settings$expected_amplicon_len, " bp"))
+         paste0("Expected amplicon: ", settings$expected_amplicon_len, " bp · Locus: ", settings$target))
   })
 
   all_current_peak_flags <- reactive({
     req(selected_result())
     scope <- if (!is.null(input$peak_flag_scope) && input$peak_flag_scope %in% c("trimmed", "raw")) input$peak_flag_scope else "trimmed"
-    df <- ambiguous_peak_flags(selected_result(), scope = scope, params = ambiguous_peak_params_from_settings(rv$settings))
+    df <- ambiguous_peak_flags(selected_result(), scope = scope, params = ambiguous_peak_params_from_settings(selected_processing_settings()))
     if (!nrow(df)) return(df)
     r <- ensure_curation_state(selected_result())
     reviewed <- as.integer(r$curation$reviewed_positions)
@@ -1975,7 +2185,7 @@ server <- function(input, output, session) {
     row <- data.frame(Action = "Mark reviewed / keep call", Position = pos,
                       Before = as.character(rv$context_peak_flag$Call[1]), After = as.character(rv$context_peak_flag$Call[1]),
                       Method = "Manual review", Evidence = flag_evidence_text(rv$context_peak_flag), Details = "No sequence change", stringsAsFactors = FALSE)
-    r2 <- curation_commit(r, snap, row, rv$settings, paste0("Reviewed position ", pos))
+    r2 <- curation_commit(r, snap, row, selected_processing_settings(), paste0("Reviewed position ", pos))
     commit_curated_result(input$inspect_sample, r2, paste0("Reviewed position ", pos))
     removeModal()
   }, ignoreInit = TRUE)
@@ -1994,7 +2204,7 @@ server <- function(input, output, session) {
         row <- data.frame(Action = "Mark reviewed / keep call", Position = pos, Before = before_call, After = before_call,
                           Method = "Manual review", Evidence = pnd$evidence, Details = "Selected base equals current call; no sequence change", stringsAsFactors = FALSE)
         label <- paste0("Reviewed position ", pos)
-        r2 <- curation_commit(r, snap, row, rv$settings, label)
+        r2 <- curation_commit(r, snap, row, selected_processing_settings(), label)
         commit_curated_result(input$inspect_sample, r2, label)
         rv$pending_curation <- NULL
         removeModal(); showNotification(paste0(label, "."), type = "message")
@@ -2017,7 +2227,7 @@ server <- function(input, output, session) {
                         Details = "Flagged position excluded from retained sequence", stringsAsFactors = FALSE)
       label <- paste0(if (side == "left") "Trim left through " else "Trim right from ", pos)
     }
-    r2 <- curation_commit(r, snap, row, rv$settings, label)
+    r2 <- curation_commit(r, snap, row, selected_processing_settings(), label)
     commit_curated_result(input$inspect_sample, r2, label)
     rv$pending_curation <- NULL
     removeModal()
@@ -2025,8 +2235,7 @@ server <- function(input, output, session) {
   }, ignoreInit = TRUE)
 
   observeEvent(input$auto_correct_settings, {
-    req(rv$settings)
-    p <- ambiguous_peak_params_from_settings(rv$settings)
+    p <- ambiguous_peak_params_from_settings(selected_processing_settings())
     showModal(modalDialog(
       title = "Auto-correction criteria",
       div(class = "compact-help-note",
@@ -2077,6 +2286,13 @@ server <- function(input, output, session) {
     settings$auto_correct_max_peak_offset <- as.integer(round(vals[["peak_offset"]]))
     settings$auto_correct_min_relative_signal <- vals[["relative_signal"]]
     rv$settings <- settings
+    for (nm in names(rv$results)) {
+      if (!is.list(rv$results[[nm]]$processing_settings)) rv$results[[nm]]$processing_settings <- settings
+      rv$results[[nm]]$processing_settings$auto_correct_min_alt_to_called <- vals[["alt_called"]]
+      rv$results[[nm]]$processing_settings$auto_correct_min_alt_to_third <- vals[["alt_third"]]
+      rv$results[[nm]]$processing_settings$auto_correct_max_peak_offset <- as.integer(round(vals[["peak_offset"]]))
+      rv$results[[nm]]$processing_settings$auto_correct_min_relative_signal <- vals[["relative_signal"]]
+    }
     rv$auto_correct_preview_df <- data.frame()
     removeModal()
     showNotification("Auto-correction criteria updated.", type = "message")
@@ -2085,7 +2301,7 @@ server <- function(input, output, session) {
   observeEvent(input$auto_correct_preview, {
     req(input$inspect_sample)
     r <- ensure_curation_state(selected_result())
-    df <- high_confidence_autocorrections(r, rv$settings)
+    df <- high_confidence_autocorrections(r, selected_processing_settings())
     if (nrow(df) && length(r$curation$reviewed_positions)) df <- df[!df$Position %in% r$curation$reviewed_positions, , drop = FALSE]
     if (!nrow(df)) {
       showNotification("No positions meet the current auto-correction criteria. Use Criteria to adjust the thresholds.", type = "message")
@@ -2122,7 +2338,7 @@ server <- function(input, output, session) {
       calls <- curated_raw_calls(temp); before <- calls[pos]
       snap_i <- curation_set_base_snapshot(temp, pos, new_base)
       if (is.null(snap_i)) next
-      temp <- curation_restore_snapshot(temp, snap_i, rv$settings)
+      temp <- curation_restore_snapshot(temp, snap_i, selected_processing_settings())
       ev <- paste0("alternative/current=", df$Alternative_to_called_ratio[i],
                    "; alternative/third=", df$Alternative_to_third_ratio[i],
                    "; peak offset=", df$Competitor_peak_offset[i],
@@ -2135,7 +2351,7 @@ server <- function(input, output, session) {
     action_rows <- do.call(rbind, rows)
     final_snap <- curation_snapshot(temp)
     label <- paste0("Auto-corrected ", nrow(action_rows), " high-confidence position(s)")
-    r2 <- curation_commit(r, final_snap, action_rows, rv$settings, label)
+    r2 <- curation_commit(r, final_snap, action_rows, selected_processing_settings(), label)
     commit_curated_result(input$inspect_sample, r2, label)
     rv$auto_correct_preview_df <- data.frame()
     removeModal()
@@ -2144,7 +2360,7 @@ server <- function(input, output, session) {
 
   observeEvent(input$curation_undo, {
     req(input$inspect_sample)
-    ans <- curation_undo(selected_result(), rv$settings)
+    ans <- curation_undo(selected_result(), selected_processing_settings())
     if (!isTRUE(ans$changed)) { showNotification("Nothing to undo for this sample.", type = "message"); return() }
     commit_curated_result(input$inspect_sample, ans$result, paste0("Undo: ", ans$label))
     showNotification(paste0("Undid: ", ans$label), type = "message")
@@ -2152,7 +2368,7 @@ server <- function(input, output, session) {
 
   observeEvent(input$curation_redo, {
     req(input$inspect_sample)
-    ans <- curation_redo(selected_result(), rv$settings)
+    ans <- curation_redo(selected_result(), selected_processing_settings())
     if (!isTRUE(ans$changed)) { showNotification("Nothing to redo for this sample.", type = "message"); return() }
     commit_curated_result(input$inspect_sample, ans$result, paste0("Redo: ", ans$label))
     showNotification(paste0("Redid: ", ans$label), type = "message")
@@ -2190,7 +2406,7 @@ server <- function(input, output, session) {
     row <- data.frame(Action="Reset to automatic processing", Position=NA_integer_, Before=paste0(r$summary$trim_start[1], "-", r$summary$trim_end[1]),
                       After=paste0(r$curation$auto_trim_start, "-", r$curation$auto_trim_end), Method="Manual reset", Evidence="",
                       Details="Manual trims, base edits and review marks cleared from active curation state", stringsAsFactors=FALSE)
-    r2 <- curation_commit(r, snap, row, rv$settings, "Reset to automatic processing")
+    r2 <- curation_commit(r, snap, row, selected_processing_settings(), "Reset to automatic processing")
     commit_curated_result(input$inspect_sample, r2, "Reset to automatic processing")
     removeModal(); showNotification("Sample reset to the automatic processing state.", type="message")
   }, ignoreInit = TRUE)
@@ -2199,85 +2415,123 @@ server <- function(input, output, session) {
     plot_result <- selected_result()
     plot_result$display_name <- qc_display_name(selected_sample_key())
     make_chromatogram_plotly(
-      plot_result, rv$settings,
+      plot_result, selected_processing_settings(),
       flags = current_peak_flags(),
       show_flags = isTRUE(input$show_peak_flags)
     )
   })
 
   output$qc_plot <- renderPlot({
-    draw_qc_metrics(selected_result(), rv$settings)
+    draw_qc_metrics(selected_result(), selected_processing_settings())
   })
 
   # ---------------- Rename key ----------------
   rename_key_data <- reactive({
     req(input$rename_key_file)
     f <- input$rename_key_file; ext <- tolower(tools::file_ext(f$name))
-    key <- if (ext=="xlsx") readxl::read_excel(f$datapath) else if (ext=="csv") read.csv(f$datapath,stringsAsFactors=FALSE,check.names=FALSE) else stop("Rename key must be XLSX or CSV.")
+    key <- if (ext=="xlsx") readxl::read_excel(f$datapath) else if (ext=="csv") read.csv(f$datapath,stringsAsFactors=FALSE,check.names=FALSE) else stop("Assignment key must be XLSX or CSV.")
     key <- as.data.frame(key,stringsAsFactors=FALSE)
-    if (!all(c("old_id","new_id") %in% names(key))) stop("Rename key must contain old_id and new_id columns.")
-    key$old_id <- trimws(as.character(key$old_id)); key$new_id <- trimws(as.character(key$new_id))
-    key[key$old_id!="" & key$new_id!="",,drop=FALSE]
+    normalized <- tolower(gsub("[^A-Za-z0-9]+", "_", names(key)))
+    names(key) <- normalized
+    if ("gene" %in% names(key) && !"locus" %in% names(key)) names(key)[names(key) == "gene"] <- "locus"
+    required <- c("old_id", "isolate", "locus", "direction")
+    if (!all(required %in% names(key))) stop("Assignment key must contain old_id, isolate, locus (or gene), and direction columns.")
+    key <- key[, required, drop = FALSE]
+    for (nm in names(key)) key[[nm]] <- trimws(as.character(key[[nm]]))
+    key$direction <- vapply(key$direction, stage2_normalize_direction, character(1))
+    key[key$old_id != "", , drop = FALSE]
   })
 
+  output$rename_key_status <- renderUI({
+    if (is.null(input$rename_key_file)) return(div(class = "compact-hint", "Key columns: old_id, isolate, locus or gene, direction."))
+    div(class = "compact-hint", paste("Selected:", input$rename_key_file$name))
+  })
+  output$download_assignment_key_template <- downloadHandler(
+    filename = function() "PITAX_assignment_key_template.csv",
+    content = function(file) file.copy("assignment_key_template.csv", file, overwrite = TRUE)
+  )
+
   observeEvent(input$apply_rename_key, {
-    req(rv$rename)
+    req(nrow(rv$read_assignments))
     key <- tryCatch(rename_key_data(), error=function(e){showNotification(conditionMessage(e),type="error");NULL})
     if (is.null(key)) return()
     matched <- 0L
-    for(i in seq_len(nrow(rv$rename))) {
-      original <- rv$rename$Original_name[i]
+    for(i in seq_len(nrow(rv$read_assignments))) {
+      original <- rv$read_assignments$Source_ID[i]
       idx <- which(key$old_id==original)
       if(!length(idx)) idx <- which(startsWith(original,key$old_id))
-      if(length(idx)==1) { rv$rename$New_name[i] <- key$new_id[idx]; matched <- matched+1L }
+      if(length(idx)==1) {
+        rv$read_assignments$Isolate[i] <- key$isolate[idx]
+        rv$read_assignments$Locus[i] <- key$locus[idx]
+        rv$read_assignments$Direction[i] <- key$direction[idx]
+        matched <- matched+1L
+      }
     }
-    showNotification(paste(matched,"of",nrow(rv$rename),"sample names matched."),type="message")
+    sync_assignment_state()
+    showNotification(paste(matched,"of",nrow(rv$read_assignments),"reads matched; identity fields and generated names were updated."),type="message")
   })
 
-  observeEvent(input$apply_batch_affixes, {
-    req(rv$rename)
-    x <- rv$rename$New_name
-    rem <- input$rename_remove_suffix
-    if(nzchar(rem)) x <- ifelse(endsWith(x, rem), substr(x, 1, nchar(x) - nchar(rem)), x)
-    if(nzchar(input$rename_prefix)) x <- paste0(input$rename_prefix,x)
-    if(nzchar(input$rename_suffix)) x <- paste0(x,input$rename_suffix)
-    rv$rename$New_name <- x
-  })
-  observeEvent(input$apply_find_replace, {
-    req(rv$rename)
-    if(!nzchar(input$rename_find)) return()
-    rv$rename$New_name <- gsub(input$rename_find,input$rename_replace,rv$rename$New_name,fixed=TRUE)
-  })
-  observeEvent(input$reset_names, { req(rv$rename); rv$rename$New_name <- rv$rename$Original_name })
+  selected_assignment_rows <- function() {
+    rows <- unique(c(input$assignment_upload_table_rows_selected, input$assignment_review_table_rows_selected))
+    rows <- rows[!is.na(rows) & rows >= 1L & rows <= nrow(rv$read_assignments)]
+    if (length(rows)) rows else seq_len(nrow(rv$read_assignments))
+  }
 
-  output$rename_table <- renderDT({
-    req(rv$rename)
-    datatable(rv$rename,rownames=FALSE,editable=list(target="cell",disable=list(columns=c(0))),options=list(pageLength=20,dom="tip"))
+  observeEvent(input$apply_assignment_batch, {
+    req(nrow(rv$read_assignments))
+    rows <- selected_assignment_rows()
+    isolate_values <- as.character(rv$read_assignments$Isolate[rows])
+    if (nzchar(input$batch_isolate_find)) isolate_values <- gsub(input$batch_isolate_find, input$batch_isolate_replace, isolate_values, fixed = TRUE)
+    if (nzchar(input$batch_isolate_prefix)) isolate_values <- paste0(input$batch_isolate_prefix, isolate_values)
+    if (nzchar(input$batch_isolate_suffix)) isolate_values <- paste0(isolate_values, input$batch_isolate_suffix)
+    rv$read_assignments$Isolate[rows] <- isolate_values
+    if (nzchar(trimws(input$batch_locus))) rv$read_assignments$Locus[rows] <- trimws(input$batch_locus)
+    if (nzchar(input$batch_direction)) rv$read_assignments$Direction[rows] <- input$batch_direction
+    sync_assignment_state()
+    showNotification(paste("Updated", length(rows), "read assignment(s)."), type = "message")
   })
-  observeEvent(input$rename_table_cell_edit, {
-    info <- input$rename_table_cell_edit
-    if(info$col==1) rv$rename[info$row,"New_name"] <- as.character(info$value)
+
+  observeEvent(input$reset_assignments, {
+    req(nrow(rv$read_assignments))
+    rows <- selected_assignment_rows()
+    rv$read_assignments$Isolate[rows] <- ""
+    rv$read_assignments$Locus[rows] <- ""
+    rv$read_assignments$Direction[rows] <- "Unknown"
+    rv$read_assignments$Primer[rows] <- ""
+    sync_assignment_state()
   })
+
+  assignment_table_widget <- function() {
+    req(nrow(rv$read_assignments))
+    df <- rv$read_assignments[, c("Source_ID", "Isolate", "Locus", "Direction", "Final_Name"), drop = FALSE]
+    names(df) <- c("Upload barcode / source", "Isolate", "Gene / locus", "Direction", "Final read / FASTA name")
+    datatable(df, rownames = FALSE, selection = "multiple",
+              editable = list(target = "cell", disable = list(columns = c(0, 4))),
+              options = list(pageLength = 20, scrollX = TRUE, dom = "tip"))
+  }
+  output$assignment_upload_table <- renderDT(assignment_table_widget())
+  output$assignment_review_table <- renderDT(assignment_table_widget())
+
+  apply_assignment_cell_edit <- function(info) {
+    if (is.null(info) || !info$col %in% 1:3) return(invisible(NULL))
+    field <- c("Isolate", "Locus", "Direction")[[info$col]]
+    value <- as.character(info$value)
+    if (field == "Direction") value <- stage2_normalize_direction(value)
+    rv$read_assignments[info$row, field] <- value
+    sync_assignment_state()
+  }
+  observeEvent(input$assignment_upload_table_cell_edit, apply_assignment_cell_edit(input$assignment_upload_table_cell_edit))
+  observeEvent(input$assignment_review_table_cell_edit, apply_assignment_cell_edit(input$assignment_review_table_cell_edit))
 
   rename_error <- reactive({
-    req(rv$rename)
-    x <- trimws(rv$rename$New_name)
-    if(any(x=="")) return("One or more sequence names are empty.")
-    clean <- clean_fasta_name(x)
-    if(anyDuplicated(clean)>0) return(paste0("Duplicate sequence name(s): ",paste(unique(clean[duplicated(clean)|duplicated(clean,fromLast=TRUE)]),collapse=", ")))
-    NULL
+    stage2_identity_error(rv$read_assignments)
   })
-  output$rename_validation <- renderUI({
-    e <- rename_error(); if(is.null(e)) div(class="status-ok","✓ Sequence names are valid.") else div(class="status-error",paste0("⚠ ",e))
-  })
-
-  observeEvent(input$to_qc, {
-    e <- rename_error()
-    if (!is.null(e)) { showNotification(e, type = "error"); return() }
-    sync_qc_sample_choices()
-    session$sendCustomMessage("showLoader", list(text = "Loading renamed QC workspace…"))
-    updateTabsetPanel(session, "pipeline_step", selected = "qc")
-  })
+  assignment_validation_ui <- function() {
+    e <- stage2_identity_error(rv$read_assignments)
+    if(is.null(e)) div(class="status-ok","✓ Explicit identity fields are complete; final read names were generated by PITAX.") else div(class="status-error",paste0("⚠ ",e))
+  }
+  output$rename_validation <- renderUI(assignment_validation_ui())
+  output$upload_assignment_validation <- renderUI(assignment_validation_ui())
 
   # ---------------- Export records ----------------
   export_records <- reactive({
@@ -2303,10 +2557,19 @@ server <- function(input, output, session) {
     updateTabsetPanel(session,"pipeline_step",selected="export")
   })
 
+  project_export_stem <- function() {
+    if (is.list(rv$architecture) && is.data.frame(rv$architecture$loci) && nrow(rv$architecture$loci) > 1L) return("PITAX_multi_locus")
+    if (!is.null(rv$settings)) return(clean_fasta_name(stage2_scalar_text(rv$settings$target, "PITAX_project")))
+    "PITAX_project"
+  }
+
   output$export_summary <- renderUI({
     req(rv$summary,rv$settings)
+    loci <- unique(as.character(rv$summary$target))
+    architecture_summary <- stage2_architecture_summary(rv$architecture)
     tagList(
-      p(strong("Target: "),rv$settings$target),
+      p(strong("Locus/loci: "), paste(loci, collapse = ", ")),
+      p(strong("Architecture: "), paste0(architecture_summary$Isolates, " isolate(s), ", architecture_summary$Loci, " locus/loci, ", architecture_summary$Reads, " read(s)")),
       p(strong("Forward primer: "),ifelse(rv$settings$forward_primer=="","Not specified",rv$settings$forward_primer)),
       p(strong("Reverse primer: "),ifelse(rv$settings$reverse_primer=="","Not specified",rv$settings$reverse_primer)),
       p(strong("Samples processed: "),nrow(rv$summary)),
@@ -2316,26 +2579,31 @@ server <- function(input, output, session) {
 
   # ---------------- Checkpoints ----------------
   output$download_trim_checkpoint <- downloadHandler(
-    filename=function() paste0(clean_fasta_name(rv$settings$target),"_checkpoint_B_qc.zip"),
+    filename=function() paste0(project_export_stem(),"_checkpoint_B_qc.zip"),
     content=function(file){
-      write_checkpoint_zip(file,"qc",export_records(),export_summary_df(),rv$settings,rv$rename,results=rv$results)
+      write_checkpoint_zip(file,"qc",export_records(),export_summary_df(),rv$settings,rv$rename,results=rv$results,
+                           read_assignments=rv$read_assignments,architecture=rv$architecture)
     })
   output$download_rename_checkpoint <- downloadHandler(
-    filename=function() paste0(clean_fasta_name(rv$settings$target),"_checkpoint_A_rename.zip"),
-    content=function(file) write_checkpoint_zip(file,"renamed",export_records(),export_summary_df(),rv$settings,rv$rename,results=rv$results))
+    filename=function() paste0(project_export_stem(),"_checkpoint_A_rename.zip"),
+    content=function(file) {
+      req(is.null(stage2_identity_error(rv$read_assignments)), is.list(rv$architecture), is.list(rv$settings))
+      write_assignment_checkpoint_zip(file, rv$rename, rv$read_assignments, rv$architecture, rv$settings)
+    })
 
   output$download_blast_fasta <- downloadHandler(
-    filename=function() paste0(clean_fasta_name(rv$settings$target),"_BLAST.fasta"),
+    filename=function() paste0(project_export_stem(),"_BLAST.fasta"),
     content=function(file) writeLines(make_fasta(export_records(),FALSE),file))
   output$download_full_fasta <- downloadHandler(
-    filename=function() paste0(clean_fasta_name(rv$settings$target),"_trimmed_sequences.fasta"),
+    filename=function() paste0(project_export_stem(),"_trimmed_sequences.fasta"),
     content=function(file) writeLines(make_fasta(export_records(),TRUE,export_summary_df()),file))
   output$download_summary_csv <- downloadHandler(
-    filename=function() paste0(clean_fasta_name(rv$settings$target),"_trim_summary.csv"),
+    filename=function() paste0(project_export_stem(),"_trim_summary.csv"),
     content=function(file) write.csv(export_summary_df(),file,row.names=FALSE,fileEncoding="UTF-8"))
   output$download_all_zip <- downloadHandler(
-    filename=function() paste0(clean_fasta_name(rv$settings$target),"_Sanger_pipeline_results.zip"),
-    content=function(file) write_checkpoint_zip(file,"final",export_records(),export_summary_df(),rv$settings,rv$rename,results=rv$results))
+    filename=function() paste0(project_export_stem(),"_Sanger_pipeline_results.zip"),
+    content=function(file) write_checkpoint_zip(file,"final",export_records(),export_summary_df(),rv$settings,rv$rename,results=rv$results,
+                                                read_assignments=rv$read_assignments,architecture=rv$architecture))
 
   # ---------------- BLAST workspace ----------------
   resolve_blast_original_name <- function(value, records = export_records()) {
@@ -2352,7 +2620,15 @@ server <- function(input, output, session) {
   # Keep the BLAST sequence selector synchronized with the current processed/renamed
   # record set without resetting the user's selection every time the tab is opened.
   observe({
+    if (!length(rv$results) || is.null(rv$rename)) {
+      updateSelectInput(session, "blast_sample", choices = character(), selected = character())
+      return()
+    }
     rec <- export_records()
+    if (!length(rec)) {
+      updateSelectInput(session, "blast_sample", choices = character(), selected = character())
+      return()
+    }
     final_names <- vapply(rec, function(x) as.character(x$final_name), character(1))
     choices <- setNames(names(rec), final_names)
     current <- isolate(input$blast_sample)
@@ -3024,6 +3300,8 @@ server <- function(input, output, session) {
     rid <- unique(as.character(src$rid))[1]
     final_name <- unique(as.character(src$final_name))[1]
     top_n <- nrow(src)
+    sample_settings <- settings_for_result(rv$results[[sample_key]])
+    sample_target <- if (is.list(sample_settings)) stage2_scalar_text(sample_settings$target, "Other") else "Other"
 
     enriched <- NULL
     result <- NULL
@@ -3034,7 +3312,7 @@ server <- function(input, output, session) {
     )
     if (!is.null(enriched)) {
       result <- tryCatch(
-        build_taxonomic_consensus(enriched, target=rv$settings$target, top_n=top_n),
+        build_taxonomic_consensus(enriched, target=sample_target, top_n=top_n),
         error=function(e) { err <<- conditionMessage(e); NULL }
       )
     }
@@ -3047,7 +3325,7 @@ server <- function(input, output, session) {
     sm$final_name <- final_name
     sm$original_name <- sample_key
     sm$rid <- rid
-    sm$target <- rv$settings$target
+    sm$target <- sample_target
     sm$max_hits_inspected <- top_n
     sm$analyzed_at <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
     sm$app_version <- APP_VERSION
@@ -3660,12 +3938,12 @@ server <- function(input, output, session) {
   })
 
   output$download_team_summary_csv <- downloadHandler(
-    filename=function() paste0(clean_fasta_name(ifelse(is.null(rv$settings), "Sanger", rv$settings$target)), "_team_identification_summary.csv"),
+    filename=function() paste0(project_export_stem(), "_team_identification_summary.csv"),
     content=function(file) write.csv(team_summary_df(), file, row.names=FALSE, fileEncoding="UTF-8")
   )
 
   output$download_team_summary_xlsx <- downloadHandler(
-    filename=function() paste0(clean_fasta_name(ifelse(is.null(rv$settings), "Sanger", rv$settings$target)), "_team_identification_summary.xlsx"),
+    filename=function() paste0(project_export_stem(), "_team_identification_summary.xlsx"),
     content=function(file) {
       req(nrow(team_summary_df()))
       wb <- openxlsx::createWorkbook(creator="Sanger Sequence Pipeline")
@@ -3691,6 +3969,12 @@ server <- function(input, output, session) {
       add_sheet("QC Flags", all_qc_peak_flags())
       add_sheet("Manual Curation", all_curation_log())
       if (!is.null(rv$rename)) add_sheet("Rename Map", rv$rename)
+      if (is.data.frame(rv$read_assignments) && nrow(rv$read_assignments)) add_sheet("Read Assignments", rv$read_assignments)
+      if (is.list(rv$architecture)) {
+        add_sheet("Isolates", rv$architecture$isolates)
+        add_sheet("Loci", rv$architecture$loci)
+        add_sheet("Reads", rv$architecture$reads)
+      }
       settings_df <- data.frame(
         Field=c("Application version","Exported at", if (!is.null(rv$settings)) names(rv$settings) else character()),
         Value=c(APP_VERSION, format(Sys.time(), "%Y-%m-%d %H:%M:%S"), if (!is.null(rv$settings)) unlist(rv$settings, use.names=FALSE) else character()),
@@ -3729,6 +4013,7 @@ server <- function(input, output, session) {
   # ---------------- Reset ----------------
   reset_pipeline_state <- function() {
     rv$results <- list(); rv$summary <- NULL; rv$rename <- NULL; rv$settings <- NULL
+    rv$read_assignments <- stage2_empty_assignments(); rv$architecture <- NULL; rv$project_migration_log <- ""
     rv$blast_jobs <- rv$blast_jobs[0,]; rv$blast_raw <- list(); rv$blast_ids <- data.frame(); rv$blast_hits <- data.frame()
     rv$ncbi_last_contact <- as.POSIXct(NA); rv$blast_batch_status_text <- "No batch operation has been run yet."
     rv$taxonomy_summary <- data.frame(); rv$taxonomy_hits <- data.frame(); rv$taxonomy_counts <- data.frame()

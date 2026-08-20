@@ -108,7 +108,7 @@ Quality fields are observations, not pass/fail thresholds yet.
 
 This is required for alpha.4:
 
-1. Run trimming; PITAX must continue to **3 · Rename**.
+1. Historical alpha.4 check: running trimming continued to **3 · Rename**. In alpha.6, the active Stage 2 flow is documented in `V3_STAGE2.md` and Rename precedes trimming.
 2. Apply a rename key or batch edit and confirm names are valid.
 3. Continue to **4 · QC & Chromatogram**.
 4. The QC sample selector, trimming table, chromatogram title and audit display must show the resolved name.

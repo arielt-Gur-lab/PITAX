@@ -2,6 +2,31 @@
 
 This file records changes that affect the way the pipeline behaves, presents results, or stores project data. Small internal refactors are omitted unless they change something visible or scientifically relevant.
 
+## 3.0.0-alpha.6
+**Stage 2 workflow and identity correction**
+- Separated the user-facing stages into Upload → Assay → Rename & Assign → Trim & QC.
+- Removed trimming from the Assay-to-Rename transition, so Rename opens immediately and processing starts only with **Start trimming**.
+- Added explicit Isolate, Gene/Locus and Direction editing directly on Upload, with expanded batch tools and an XLSX/CSV assignment key.
+- Kept the upload barcode immutable and removed filename/name parsing as a source of biological identity.
+- Generated `<Isolate>_<Locus>_<F/R>` from the explicit fields and stored both fields and generated name in project schema version 3.
+- Placed the generated-name assignment table before the architecture preview on Rename review.
+- Added a pre-trim architecture checkpoint and schema-2 → schema-3 migration.
+- Added regressions proving one read remains a single read and only distinct Forward plus Reverse reads form a pair.
+- Prioritized duplicate source/read-key validation so unsafe duplicate AB1 basenames are reported even while biological assignments are still incomplete.
+- Guarded empty pre-trim and all-failed-run selector states so QC/BLAST choice synchronization never calls `setNames()` on `NULL`.
+- Did not add Forward/Reverse consensus; that remains gated to Stage 3.
+
+## 3.0.0-alpha.5
+**Stage 2 isolate / locus / read architecture**
+- Started Stage 2 with a Project → Isolate → Locus → Read architecture and project schema version 2.
+- Added an editable read-assignment table with conservative filename inference and visible assay-default provenance.
+- Added separate per-read assignment and processing-settings provenance so mixed locus/direction metadata is not collapsed into one run-wide label.
+- Added in-memory migration for schema-1 projects while preserving established processing, curation, BLAST and taxonomy state.
+- Added unique default names for paired reads and retained one-read-per-locus as fully valid.
+- Added read-assignment and architecture CSVs to processing checkpoints.
+- Added Stage 2 architecture, migration and Shiny integration regression tests.
+- Did not add Forward/Reverse consensus; that remains gated to Stage 3.
+
 ## 3.0.0-alpha.4
 **Stage 1 gate-closing workflow order**
 - Moved Rename before QC in the user-facing workflow: Upload → Assay & Trim → Rename → QC → Export.

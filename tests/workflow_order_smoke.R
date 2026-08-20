@@ -1,4 +1,4 @@
-# PITAX v3.0.0-alpha.4 - user-facing workflow order smoke tests.
+# PITAX v3.0.0-alpha.6 - user-facing workflow order regression tests.
 
 get_this_script_dir <- function() {
   args <- commandArgs(trailingOnly = FALSE)
@@ -16,19 +16,25 @@ must_contain <- function(text, value) {
   if (!grepl(value, text, fixed = TRUE)) stop("Expected workflow marker was not found: ", value)
 }
 
+must_not_contain <- function(text, value) {
+  if (grepl(value, text, fixed = TRUE)) stop("Unexpected legacy workflow marker remains: ", value)
+}
+
 must_contain(app_text, paste(
   '"Upload",',
-  '    "Assay & Trim",',
-  '    "Rename",',
-  '    "QC",',
+  '    "Assay settings",',
+  '    "Rename & assign",',
+  '    "Trim & QC",',
   sep = "\n"
 ))
-must_contain(app_text, 'tabPanel("3 · Rename", value = "rename"')
-must_contain(app_text, 'tabPanel("4 · QC & Chromatogram", value = "qc"')
-must_contain(app_text, 'actionButton("to_qc", "Continue to QC"')
+must_contain(app_text, 'tabPanel("2 · Assay", value = "settings"')
+must_contain(app_text, 'tabPanel("3 · Rename & Assign", value = "rename"')
+must_contain(app_text, 'tabPanel("4 · Trim & QC", value = "qc"')
+must_contain(app_text, 'DTOutput("assignment_upload_table")')
+must_contain(app_text, 'actionButton("to_rename", "Continue to Rename"')
+must_contain(app_text, 'actionButton("run_trimming", "Start trimming"')
+must_contain(app_text, 'updateTabsetPanel(session,"pipeline_step",selected="qc")')
 must_contain(app_text, 'actionButton("to_export", "Continue to Export"')
-must_contain(app_text, 'Loading Rename workspace')
-must_contain(app_text, 'Loading renamed QC workspace')
 must_contain(app_text, 'renameTab.insertBefore(qcTab)')
 must_contain(app_text, '_checkpoint_A_rename.zip')
 must_contain(app_text, '_checkpoint_B_qc.zip')
@@ -36,8 +42,8 @@ must_contain(app_text, 'df$sample_id <- vapply(df$sample_id, qc_display_name, ch
 must_contain(sequence_text, 'result$display_name')
 must_contain(sequence_text, 'yaxis = list(rangemode = "fixed", range = c(0, ymax))')
 
-if (grepl('actionButton("to_rename"', app_text, fixed = TRUE)) {
-  stop("Legacy QC-to-Rename navigation button is still present.")
-}
+must_not_contain(app_text, 'actionButton("to_qc"')
+must_not_contain(app_text, 'actionButton("run_trimming", "Run trimming"')
+must_not_contain(app_text, 'Loading Rename workspace')
 
-cat("v3.0.0-alpha.4 workflow order tests passed.\n")
+cat("v3.0.0-alpha.6 workflow order tests passed.\n")

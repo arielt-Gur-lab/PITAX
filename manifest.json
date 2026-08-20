@@ -3897,10 +3897,13 @@
   },
   "files": {
     "app.R": {
-      "checksum": "5720ef87a151906a3a0b7fb78cf8c286"
+      "checksum": "e92fba31ee0de676ea6d20bd1dfff66d"
+    },
+    "assignment_key_template.csv": {
+      "checksum": "c0c2c530384487551c0c137d7e354549"
     },
     "CHANGELOG.md": {
-      "checksum": "9e81d383c67851459995eaba4147fa75"
+      "checksum": "2d6f09be6c6d549c1972b20ea566cf11"
     },
     "DEPLOYMENT.md": {
       "checksum": "b1d95c7b85a425daec686ba3cbaba436"
@@ -3912,37 +3915,40 @@
       "checksum": "6a06337ea09989e5a3b280ace3f6673b"
     },
     "logo.png": {
-      "checksum": "a14851bfff729b420f2b47743ec0f938"
+      "checksum": "f1e67ad4a15d181f7998cf93f81025ed"
     },
     "prepare_connect_cloud.R": {
       "checksum": "51cdca309fc3903a1375bbe95f7e907c"
     },
     "R/ab1_evidence.R": {
-      "checksum": "e45fbf4bd2ae9560073811ce16f5a1b2"
+      "checksum": "1485a7bda202c7d8c962d66cd98f525c"
     },
     "R/core_sanger.R": {
-      "checksum": "ec5756e96bb3a2de7e5b44356f2748f1"
+      "checksum": "0bd2f692de81f5f13e2d53642ecda900"
     },
     "R/export_tools.R": {
-      "checksum": "a15f44236bd6679104d231805d880cf9"
+      "checksum": "505191f4b9858646e4e46383119cd500"
     },
     "R/sequence_tools.R": {
       "checksum": "43bf50d3a4fae57324b864cd1217e288"
+    },
+    "R/stage2_architecture.R": {
+      "checksum": "6a9dee6a38df753299674129717b0fa9"
     },
     "R/taxonomy_tools.R": {
       "checksum": "7acc5a3befc0f17f7eeca489ce28440a"
     },
     "README.txt": {
-      "checksum": "19b9e578a7f17118728db12485c60caa"
+      "checksum": "74f1446da409666f2b59f72664e76e2c"
     },
     "run_app.bat": {
       "checksum": "e747f1c11fc42fde571e1ec7e14cd626"
     },
     "run_tests.bat": {
-      "checksum": "4cbcff0bed5f34f9d52ac0f2965b28c1"
+      "checksum": "198e606e5e0255b045511686dac6aed4"
     },
     "tests/ab1_evidence_smoke.R": {
-      "checksum": "41951b2ee240457c9396b88f34e2c780"
+      "checksum": "c76798581d12e80d86707cff65ac9a4b"
     },
     "tests/manual_curation_smoke.R": {
       "checksum": "2385057d4f1ecbfa2243a5ee46f81307"
@@ -3950,20 +3956,29 @@
     "tests/qc_peak_flags_smoke.R": {
       "checksum": "713a9e81778de7cb3a327327f51449cf"
     },
+    "tests/stage2_app_contract_smoke.R": {
+      "checksum": "e95e8f8d7f3c783bb9f32a3d2a61a7a1"
+    },
+    "tests/stage2_architecture_smoke.R": {
+      "checksum": "2156e476302923cd9bb5f8f809cf8b5c"
+    },
     "tests/taxonomy_logic_smoke.R": {
       "checksum": "b70df61aa963b37bffb0e00c990ff2a3"
     },
     "tests/workflow_order_smoke.R": {
-      "checksum": "1c9c78022c5edeb1cea27e87eae1e885"
+      "checksum": "f754a56543162d73b7671b5e837c220d"
     },
     "V3_ROADMAP.md": {
-      "checksum": "19e1759ff36d6fdabefacc020f9e6fc2"
+      "checksum": "c37edc7df1965091123ce4d66db6ba39"
     },
     "V3_STAGE1.md": {
-      "checksum": "4504bbc51e6eca21b14e16f2b72b0e07"
+      "checksum": "4f3046ca732302de7f5e16b59d6ec432"
+    },
+    "V3_STAGE2.md": {
+      "checksum": "9a95d3292af97b0ab0e5280ea213153b"
     },
     "VERSION.txt": {
-      "checksum": "821eba462b8a242e2cdfd88e8188666f"
+      "checksum": "c48b7f2f1568f8b8659d9ac866d3e27d"
     }
   },
   "users": null

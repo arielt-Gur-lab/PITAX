@@ -37,7 +37,31 @@ make_fasta <- function(records, include_metadata = FALSE, summary_df = NULL) {
   paste(out, collapse = "\n")
 }
 
-write_checkpoint_zip <- function(file, stage, records, summary_df, settings, rename_df = NULL, results = NULL) {
+write_assignment_checkpoint_zip <- function(file, rename_df, read_assignments, architecture, settings) {
+  temp_dir <- tempfile("pitax_assignment_")
+  dir.create(temp_dir, recursive = TRUE)
+  on.exit(unlink(temp_dir, recursive = TRUE, force = TRUE), add = TRUE)
+  write.csv(rename_df, file.path(temp_dir, "rename_map.csv"), row.names = FALSE, fileEncoding = "UTF-8")
+  write.csv(read_assignments, file.path(temp_dir, "read_assignments.csv"), row.names = FALSE, fileEncoding = "UTF-8")
+  architecture_dir <- file.path(temp_dir, "project_architecture")
+  dir.create(architecture_dir, recursive = TRUE, showWarnings = FALSE)
+  write.csv(architecture$isolates, file.path(architecture_dir, "isolates.csv"), row.names = FALSE, fileEncoding = "UTF-8")
+  write.csv(architecture$loci, file.path(architecture_dir, "loci.csv"), row.names = FALSE, fileEncoding = "UTF-8")
+  write.csv(architecture$reads, file.path(architecture_dir, "reads.csv"), row.names = FALSE, fileEncoding = "UTF-8")
+  app_version <- tryCatch(get("APP_VERSION", inherits = TRUE), error = function(e) "unknown")
+  settings_lines <- c(
+    paste0("application_version: ", app_version),
+    paste0("exported_at: ", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
+    "checkpoint_stage: renamed_and_assigned_before_trimming",
+    unlist(lapply(names(settings), function(nm) paste0(nm, ": ", settings[[nm]])))
+  )
+  writeLines(settings_lines, file.path(temp_dir, "run_settings.txt"))
+  files <- list.files(temp_dir, recursive = TRUE, full.names = TRUE)
+  zip::zipr(file, files, root = temp_dir)
+}
+
+write_checkpoint_zip <- function(file, stage, records, summary_df, settings, rename_df = NULL, results = NULL,
+                                 read_assignments = NULL, architecture = NULL) {
   temp_dir <- tempfile(paste0("sanger_", stage, "_"))
   dir.create(temp_dir, recursive = TRUE)
   on.exit(unlink(temp_dir, recursive = TRUE, force = TRUE), add = TRUE)
@@ -48,6 +72,16 @@ write_checkpoint_zip <- function(file, stage, records, summary_df, settings, ren
   writeLines(make_fasta(records, FALSE), file.path(temp_dir, paste0(target_name, "_", stage, ".fasta")))
   if (!is.null(rename_df)) {
     write.csv(rename_df, file.path(temp_dir, "rename_map.csv"), row.names = FALSE, fileEncoding = "UTF-8")
+  }
+  if (is.data.frame(read_assignments) && nrow(read_assignments)) {
+    write.csv(read_assignments, file.path(temp_dir, "read_assignments.csv"), row.names = FALSE, fileEncoding = "UTF-8")
+  }
+  if (is.list(architecture)) {
+    architecture_dir <- file.path(temp_dir, "project_architecture")
+    dir.create(architecture_dir, recursive = TRUE, showWarnings = FALSE)
+    if (is.data.frame(architecture$isolates)) write.csv(architecture$isolates, file.path(architecture_dir, "isolates.csv"), row.names = FALSE, fileEncoding = "UTF-8")
+    if (is.data.frame(architecture$loci)) write.csv(architecture$loci, file.path(architecture_dir, "loci.csv"), row.names = FALSE, fileEncoding = "UTF-8")
+    if (is.data.frame(architecture$reads)) write.csv(architecture$reads, file.path(architecture_dir, "reads.csv"), row.names = FALSE, fileEncoding = "UTF-8")
   }
   app_version <- tryCatch(get("APP_VERSION", inherits = TRUE), error = function(e) "unknown")
   settings_lines <- c(

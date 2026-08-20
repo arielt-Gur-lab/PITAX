@@ -12,15 +12,19 @@ Goal: validate the raw AB1 evidence model before changing any biological decisio
 
 Gate: real laboratory AB1 files produce interpretable audit evidence without processing failures; original and resolved sample identities remain traceable through Rename → QC; trimming, curation, BLAST and taxonomy decisions remain unchanged.
 
+Status: **Closed in v3.0.0-alpha.4** after the accepted three-sample validation and Rename-before-QC regression.
+
 ## Stage 2 — Isolate / locus / read architecture
 Goal: make the isolate the primary biological object while preserving single-read workflows.
 
 - Introduce Project → Isolate → Locus → Read data objects.
-- Add explicit read assignment (isolate, locus, direction, primer) with editable filename inference.
+- Resolve explicit read assignment (isolate, locus, direction, primer) in separate operator-edited fields; preserve the upload barcode and generate the FASTA name without parsing filenames.
 - Add project-schema migration from v2 projects.
 - Keep one-read-per-locus fully valid.
 
 Gate: old projects load; new projects can represent single and paired reads without losing any v2 evidence or audit trail.
+
+Status: **Gate candidate in v3.0.0-alpha.6**. Upload now supports explicit manual, batch and key-based assignment; PITAX generates `<Isolate>_<Locus>_<F/R>` without parsing the barcode, and single/pair counting has a regression test. Consensus remains reserved for Stage 3.
 
 ## Stage 3 — Forward / Reverse consensus
 Goal: build an auditable, quality-aware consensus rather than a majority vote.
