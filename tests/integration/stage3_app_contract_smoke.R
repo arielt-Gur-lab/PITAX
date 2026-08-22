@@ -9,7 +9,7 @@ must_contain <- function(text, marker) {
   if (!grepl(marker, text, fixed = TRUE)) stop(paste("Missing Stage 3 integration marker:", marker), call. = FALSE)
 }
 
-must_contain(app_text, 'source(file.path("R", "domain", "consensus", "stage3_consensus.R"), local = TRUE, encoding = "UTF-8")')
+must_contain(app_text, 'pitax_source(file.path("R", "domain", "consensus", "stage3_consensus.R"), local = TRUE)')
 must_contain(app_text, "PROJECT_SCHEMA_VERSION <- 6L")
 must_contain(app_text, 'tabPanel("5 · Analysis Sequence", value = "consensus"')
 must_contain(app_text, 'actionButton("to_consensus", "Continue to Consensus"')

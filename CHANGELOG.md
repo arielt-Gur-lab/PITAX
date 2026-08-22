@@ -2,6 +2,13 @@
 
 This file records changes that affect the way the pipeline behaves, presents results, or stores project data. Small internal refactors are omitted unless they change something visible or scientifically relevant.
 
+## 3.0.0-alpha.10.2
+**Cross-platform source-encoding startup hotfix**
+- Fixed the Connect Cloud startup failure at `assay_profiles.R:35` caused by forcing UTF-8 conversion after the Linux worker fell back to the `C` locale.
+- Added a platform-safe source helper: Windows explicitly decodes source files as UTF-8, while Linux/Connect retains the source bytes without locale-dependent conversion.
+- Replaced the Greek alpha/beta aliases in the new assay-domain source with ASCII Unicode escapes, preserving their runtime values without requiring non-ASCII parsing during startup.
+- Updated the structure contracts to protect both the Windows mojibake fix and the Linux/Connect startup path.
+
 ## 3.0.0-alpha.10.1
 **Alpha 10 foundation: schema 6, controlled loci and assay provenance**
 - Added the schema-6 assay domain with a controlled locus vocabulary; removed the free-text `Other` locus option from the assay screen.

@@ -13,7 +13,7 @@ must_not_contain <- function(text, marker) {
   if (grepl(marker, text, fixed = TRUE)) stop(paste("Unexpected marker in corrected Stage 2 alpha:", marker), call. = FALSE)
 }
 
-must_contain(app_text, 'source(file.path("R", "domain", "assignment", "stage2_architecture.R"), local = TRUE, encoding = "UTF-8")')
+must_contain(app_text, 'pitax_source(file.path("R", "domain", "assignment", "stage2_architecture.R"), local = TRUE)')
 must_contain(app_text, "PROJECT_SCHEMA_VERSION <- 6L")
 must_contain(app_text, 'actionButton("to_rename", "Continue to Rename"')
 must_contain(app_text, 'actionButton("run_trimming", "Start trimming"')

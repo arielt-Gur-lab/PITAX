@@ -3897,16 +3897,16 @@
   },
   "files": {
     "app.R": {
-      "checksum": "1d5ddee6fddce07b301c04b1d92c5c3b"
+      "checksum": "0311dcdbe54519f33f6d27d90133628a"
     },
     "CHANGELOG.md": {
-      "checksum": "db3ff67be94ced0aeedf947d406d2c04"
+      "checksum": "933ccc2785e74ac5d811e95df320ce38"
     },
     "docs/DEPLOYMENT.md": {
       "checksum": "5337b8749af3f0d03ce237ea1b8172c2"
     },
     "docs/PITAX_MASTER.md": {
-      "checksum": "346e60c2b5b7de44c0eaf25e5c54d7e2"
+      "checksum": "abc8e5cfbab84a06a4f54c1f275843a2"
     },
     "docs/stages/V3_STAGE1.md": {
       "checksum": "4f3046ca732302de7f5e16b59d6ec432"
@@ -3930,10 +3930,10 @@
       "checksum": "752ad74b377951879ba1b293b816f9a0"
     },
     "R/app/bootstrap.R": {
-      "checksum": "2fff0a294fe2ef717741e3e2e37cd011"
+      "checksum": "cc122bb17821316f435e5314a53e5af8"
     },
     "R/domain/assay/assay_profiles.R": {
-      "checksum": "83d59adf747ee2618fcecfcf5ecb171e"
+      "checksum": "51f42a7c6aa5a3524e5b2cbcddc56c67"
     },
     "R/domain/assignment/stage2_architecture.R": {
       "checksum": "d14bde829ae1fba1c080fa32413b9096"
@@ -3957,7 +3957,7 @@
       "checksum": "ea23390dcd5e3b3c75be6d015c3cc716"
     },
     "R/server/app_server.R": {
-      "checksum": "596c872592263d0ec970edb89b62fc55"
+      "checksum": "806aaba27f987d625ae927bb2d1e2b28"
     },
     "R/server/stages/00_state.R": {
       "checksum": "2881539e241a934757ac92f4664eb364"
@@ -4002,19 +4002,19 @@
       "checksum": "6aa0b9f331e5eaf8c319833b9bf49bc0"
     },
     "R/ui/app_ui.R": {
-      "checksum": "76a28d1fc98598c66ca3c1f92df484e6"
+      "checksum": "d343f1f7d2dcf95749ecc26a53307ac1"
     },
     "R/ui/components.R": {
       "checksum": "0d712dd4a83002fe6975675b668dc28d"
     },
     "README.md": {
-      "checksum": "ffa5280ce720606c66e109cf6caf6034"
+      "checksum": "b11e8572d6051af9bd72a6f8d448bc48"
     },
     "run_app.bat": {
       "checksum": "e747f1c11fc42fde571e1ec7e14cd626"
     },
     "run_tests.bat": {
-      "checksum": "f7b6875d86a2300bab7277b1a0d103c0"
+      "checksum": "f5fb5183c4dcfd40cab89707b0236c08"
     },
     "scripts/prepare_connect_cloud.R": {
       "checksum": "832c0a73719d2f94bdfe2fcbf72df9b6"
@@ -4026,13 +4026,13 @@
       "checksum": "563be3e842b0dacf92087122dcca0ce6"
     },
     "tests/contracts/project_structure_contract_smoke.R": {
-      "checksum": "6efd9e8604586639a18ac120404e7d74"
+      "checksum": "b4f521f6345861099655582890550a67"
     },
     "tests/contracts/stage2_app_contract_smoke.R": {
-      "checksum": "33c2162e0bcf05afa88fc8a08f08ce74"
+      "checksum": "0ab23ba61f37e732eff76548ef8f4cd8"
     },
     "tests/contracts/stage4_app_contract_smoke.R": {
-      "checksum": "6776e87f4b39b2f3aa01d5a4d0104393"
+      "checksum": "1a0a5999e86d966e50e8379dde745b16"
     },
     "tests/contracts/workflow_order_smoke.R": {
       "checksum": "5fcba55d58d149f2a7135f46a305f9d4"
@@ -4077,13 +4077,13 @@
       "checksum": "98efcd54416eea17cf40c7f9782f3910"
     },
     "tests/integration/stage3_app_contract_smoke.R": {
-      "checksum": "cc3e0de0e3e031deda0a78858d0458e2"
+      "checksum": "61dd327e592bab51335c7588a3edc8c6"
     },
     "tests/unit/ab1_evidence_smoke.R": {
       "checksum": "8f80a2843a08d49600bfc7d631145d56"
     },
     "tests/unit/alpha10_assay_schema_smoke.R": {
-      "checksum": "ad17afae050fe3236642b1af64600278"
+      "checksum": "6be8b63e1a6e58dd11d5e6fb9ac98080"
     },
     "tests/unit/manual_curation_smoke.R": {
       "checksum": "592834d5679188f1daff1b0c39d0f4a6"
@@ -4104,7 +4104,7 @@
       "checksum": "0001b593b531a6626c064bb68c4915f6"
     },
     "VERSION.txt": {
-      "checksum": "dbda42eb90ce649d93733f31e863317b"
+      "checksum": "9bca86e100915fff8dee02f1057d8576"
     },
     "www/logo.png": {
       "checksum": "a14851bfff729b420f2b47743ec0f938"

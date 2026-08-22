@@ -660,7 +660,7 @@ ui <- fluidPage(
                 h3("Stage 4 multi-locus profile"),
                 p("Each Gene/Locus is processed in its own PITAX project. Stage 4 imports those completed projects and joins their evidence only when the explicit Isolate code matches."),
                 p("Every locus retains its sequence, consensus revision, BLAST RID, taxonomic result, limitation and reference context. Two concordant loci may support the same rank; a conflicting locus is never removed by a numerical majority."),
-                div(class="about-callout", strong("Current alpha boundary: "), "alpha.10.1 establishes schema 6, controlled loci and explicit assay-linked reads. The multi-assay editor is the next Alpha 10 slice; taxon-specific marker recommendations still require a separately reviewed literature layer.")
+                div(class="about-callout", strong("Current alpha boundary: "), "alpha.10.2 establishes schema 6, controlled loci and explicit assay-linked reads. The multi-assay editor is the next Alpha 10 slice; taxon-specific marker recommendations still require a separately reviewed literature layer.")
               )
             ),
 

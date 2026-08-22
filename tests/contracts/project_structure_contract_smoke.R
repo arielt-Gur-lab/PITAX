@@ -28,8 +28,10 @@ if (length(missing)) stop("Missing organized project file(s): ", paste(missing, 
 app_lines <- readLines("app.R", warn = FALSE, encoding = "UTF-8")
 app_text <- paste(app_lines, collapse = "\n")
 if (length(app_lines) > 30L) stop("app.R must remain a small composition root.", call. = FALSE)
-if (!grepl('source(file.path("R", "app", "bootstrap.R"), local = TRUE, encoding = "UTF-8")', app_text, fixed = TRUE)) stop("app.R does not load bootstrap.R as UTF-8.", call. = FALSE)
-if (!grepl('source(file.path("R", "server", "app_server.R"), local = TRUE, encoding = "UTF-8")', app_text, fixed = TRUE)) stop("app.R does not load app_server.R as UTF-8.", call. = FALSE)
+if (!grepl('pitax_source(file.path("R", "app", "bootstrap.R"), local = TRUE)', app_text, fixed = TRUE)) stop("app.R does not load bootstrap.R through the platform-safe source helper.", call. = FALSE)
+if (!grepl('pitax_source(file.path("R", "server", "app_server.R"), local = TRUE)', app_text, fixed = TRUE)) stop("app.R does not load app_server.R through the platform-safe source helper.", call. = FALSE)
+if (!grepl('if (identical(.Platform$OS.type, "windows")) arguments$encoding <- "UTF-8"', app_text, fixed = TRUE)) stop("Windows UTF-8 source handling is missing.", call. = FALSE)
+if (grepl('(^|\n)[[:space:]]*source\\(file\\.path\\(', app_text, perl = TRUE)) stop("Application modules bypass the platform-safe source helper.", call. = FALSE)
 if (grepl("reactiveValues(", app_text, fixed = TRUE) || grepl("fluidPage(", app_text, fixed = TRUE)) stop("UI or server implementation leaked back into app.R.", call. = FALSE)
 
 ui_text <- paste(readLines(file.path("R", "ui", "app_ui.R"), warn = FALSE, encoding = "UTF-8"), collapse = "\n")
@@ -39,7 +41,9 @@ if (grepl("tags$style(HTML(", ui_text, fixed = TRUE)) stop("Large CSS must remai
 server_env <- new.env(parent = baseenv())
 sys.source(file.path("R", "server", "app_server.R"), envir = server_env)
 server_composition_text <- paste(readLines(file.path("R", "server", "app_server.R"), warn = FALSE, encoding = "UTF-8"), collapse = "\n")
-if (!grepl('source(module_path, local = server_environment, encoding = "UTF-8")', server_composition_text, fixed = TRUE)) stop("Server stages are not loaded with explicit UTF-8 encoding.", call. = FALSE)
+if (!grepl('pitax_source(module_path, local = server_environment)', server_composition_text, fixed = TRUE)) stop("Server stages do not use the platform-safe source helper.", call. = FALSE)
+bootstrap_text <- paste(readLines(file.path("R", "app", "bootstrap.R"), warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+if (grepl('encoding = "UTF-8"', bootstrap_text, fixed = TRUE) || grepl('encoding = "UTF-8"', server_composition_text, fixed = TRUE)) stop("Linux/Connect modules must not force locale-dependent UTF-8 conversion.", call. = FALSE)
 expected_modules <- file.path(
   "R", "server", "stages",
   c("00_state.R", "10_project.R", "20_upload.R", "30_trimming.R", "40_qc_summary.R",
