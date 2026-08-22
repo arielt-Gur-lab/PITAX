@@ -2,6 +2,14 @@
 
 This file records changes that affect the way the pipeline behaves, presents results, or stores project data. Small internal refactors are omitted unless they change something visible or scientifically relevant.
 
+## 3.0.0-alpha.10.3
+**Encoding and release-process recovery**
+- Removed all raw non-ASCII characters from runtime R and JavaScript source; UI punctuation and symbols now use ASCII Unicode escapes so Windows and Connect render the same text independently of locale.
+- Removed source-time encoding conversion entirely because runtime source files are now ASCII-only.
+- Added a contract that scans every runtime R, JavaScript and CSS source file and fails if a raw non-ASCII byte is introduced.
+- Updated `Git.BAT` to fetch and detect a remote-ahead or diverged branch before tests and commit, while still retrying a previously committed local push when there are no new file changes.
+- Release archives no longer include `.git`; updates must be copied over the existing Git working folder so repository history and credentials remain local and current.
+
 ## 3.0.0-alpha.10.2
 **Cross-platform source-encoding startup hotfix**
 - Fixed the Connect Cloud startup failure at `assay_profiles.R:35` caused by forcing UTF-8 conversion after the Linux worker fell back to the `C` locale.

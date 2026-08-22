@@ -145,7 +145,7 @@
     if (!identical(old_seq, new_seq)) {
       old_revision <- if (is.list(old_result$curation)) suppressWarnings(as.integer(old_result$curation$revision[1])) else NA_integer_
       new_revision <- if (is.list(new_result$curation)) suppressWarnings(as.integer(new_result$curation$revision[1])) else NA_integer_
-      revision_note <- if (is.finite(old_revision) && is.finite(new_revision)) paste0(label, "; revision ", old_revision, " → ", new_revision) else label
+      revision_note <- if (is.finite(old_revision) && is.finite(new_revision)) paste0(label, "; revision ", old_revision, " \u2192 ", new_revision) else label
       affected_consensus <- character()
       if (is.list(rv$consensus_set) && length(rv$consensus_set$records)) {
         affected_consensus <- names(Filter(
@@ -157,7 +157,7 @@
       for (consensus_id in affected_consensus) invalidate_downstream_for_sample(consensus_id, revision_note)
       invalidate_downstream_for_sample(sample_name, revision_note)
     }
-    rv$project_status_text <- paste0("Unsaved curation change: ", sample_name, " · ", label, ".")
+    rv$project_status_text <- paste0("Unsaved curation change: ", sample_name, " \u00B7 ", label, ".")
     invisible(!identical(old_seq, new_seq))
   }
 
@@ -320,9 +320,9 @@
     rv$project_loaded_name <- input$load_project$name
     rv$project_status_text <- paste0(
       "Loaded ", input$load_project$name,
-      " · saved with app v", ifelse(is.null(obj$app_version), "unknown", obj$app_version),
-      if (!is.null(obj$saved_at)) paste0(" · saved ", obj$saved_at) else "",
-      if (source_schema < PROJECT_SCHEMA_VERSION) paste0(" · migrated project schema ", source_schema, " → ", PROJECT_SCHEMA_VERSION, " in memory") else "",
+      " \u00B7 saved with app v", ifelse(is.null(obj$app_version), "unknown", obj$app_version),
+      if (!is.null(obj$saved_at)) paste0(" \u00B7 saved ", obj$saved_at) else "",
+      if (source_schema < PROJECT_SCHEMA_VERSION) paste0(" \u00B7 migrated project schema ", source_schema, " \u2192 ", PROJECT_SCHEMA_VERSION, " in memory") else "",
       ". BLAST hits were normalized to one row per accession."
     )
     showNotification(

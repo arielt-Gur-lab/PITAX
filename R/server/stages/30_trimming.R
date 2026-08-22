@@ -65,7 +65,7 @@
     rv$summary <- Reduce(rbind_fill, summaries); rownames(rv$summary) <- NULL
     rv$consensus_set <- stage3_empty_consensus_set()
     sync_qc_sample_choices()
-    session$sendCustomMessage("showLoader", list(text = "Opening Trim & QC workspace…"))
+    session$sendCustomMessage("showLoader", list(text = "Opening Trim & QC workspace\u2026"))
     updateTabsetPanel(session,"pipeline_step",selected="qc")
   })
 

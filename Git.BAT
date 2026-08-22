@@ -36,6 +36,13 @@ set "MANIFEST_MATCHES=0"
 for /f %%N in ('findstr /C:"prepare_connect_cloud.R" "manifest.json" 2^>nul ^| find /c /v ""') do set "MANIFEST_MATCHES=%%N"
 if not "%MANIFEST_MATCHES%"=="1" goto stale_manifest
 
+echo Checking origin/main before tests and commit...
+git.exe fetch origin main
+if errorlevel 1 goto fetch_failed
+
+git.exe merge-base --is-ancestor origin/main HEAD >nul 2>&1
+if errorlevel 1 goto remote_ahead
+
 echo Running all PITAX tests before commit...
 echo.
 call "run_tests.bat"
@@ -72,7 +79,7 @@ if errorlevel 1 goto add_failed
 git.exe diff --cached --quiet
 set "DIFF_EXIT=%ERRORLEVEL%"
 
-if "%DIFF_EXIT%"=="0" goto nothing_to_commit
+if "%DIFF_EXIT%"=="0" goto push_existing
 if not "%DIFF_EXIT%"=="1" goto diff_failed
 
 echo Committing...
@@ -118,6 +125,19 @@ echo ERROR: manifest.json still contains paths from the old structure.
 echo Run EDIT_CLOUD_CONNECT.bat once and then run Git.BAT again.
 goto failed
 
+:fetch_failed
+echo.
+echo ERROR: Could not fetch origin/main.
+echo No commit was created. Check the network or GitHub login and try again.
+goto failed
+
+:remote_ahead
+echo.
+echo ERROR: origin/main contains commits that are not in this local branch.
+echo Nothing was committed or changed by this script.
+echo Update the local repository before creating another PITAX commit.
+goto failed
+
 :tests_failed
 echo.
 echo ERROR: Tests failed.
@@ -147,8 +167,12 @@ echo ERROR: Push failed.
 echo The commit is saved locally.
 goto failed
 
-:nothing_to_commit
-echo Nothing to commit.
+:push_existing
+echo No new file changes to commit.
+echo Checking whether an existing local commit still needs to be pushed...
+git.exe push origin main
+if errorlevel 1 goto push_failed
+echo Local and remote main are synchronized.
 set "EXIT_CODE=0"
 goto finish
 

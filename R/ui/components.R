@@ -4,7 +4,7 @@
 
 panel_box <- function(...) div(class = "panel-box", ...)
 section_title <- function(x) div(class = "section-title", x)
-info_tip <- function(text) tags$span(class = "info-tip", title = text, "ⓘ")
+info_tip <- function(text) tags$span(class = "info-tip", title = text, "\u24D8")
 
 stage_heading <- function(icon_name, title, subtitle, badge = NULL) {
   div(

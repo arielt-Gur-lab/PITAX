@@ -1,13 +1,11 @@
 # ============================================================
-# PITAX v3.0.0-alpha.10.2
+# PITAX v3.0.0-alpha.10.3
 # Application entry point
 # ============================================================
 
 pitax_source <- function(path, local) {
   target_environment <- if (isTRUE(local)) parent.frame() else local
-  arguments <- list(file = path, local = target_environment)
-  if (identical(.Platform$OS.type, "windows")) arguments$encoding <- "UTF-8"
-  do.call(base::source, arguments)
+  base::source(file = path, local = target_environment)
 }
 
 pitax_source(file.path("R", "app", "bootstrap.R"), local = TRUE)

@@ -1,4 +1,4 @@
-PITAX v3.0.0-alpha.10.2 — Alpha 10 schema foundation
+PITAX v3.0.0-alpha.10.3 — Alpha 10 schema foundation
 =========================================================
 
 Purpose
@@ -7,11 +7,10 @@ Stage 3 is accepted for continued development using the controlled clean and
 single-conflict AB1 fixtures. A real independently sequenced Forward/Reverse
 pair remains a deferred biological validation item.
 
-Alpha.9.2 retains the visual review layer from Alpha.9.1 and reorganizes the
-project into maintainable application, domain, service, export, asset, test and
-documentation directories. It combines
-separately completed single-locus PITAX projects at isolate level without
-flattening their evidence into a vote.
+Alpha 10.3 retains the visual review and multi-locus layers, adds the schema-6
+assay foundation, and makes runtime source encoding independent of the Windows
+or Connect locale. Raw non-ASCII UI symbols are represented by Unicode escapes
+and protected by a source contract.
 
 The authoritative guide for continuing development is:
 
@@ -37,7 +36,7 @@ Scientific contract
 - Concordant loci may support the same rank.
 - A genus or species conflict is retained and no combined call is reported.
 - Missing locus-level taxonomy is shown as partial evidence.
-- Taxon-specific marker recommendations are not automated in alpha.9.2; that
+- Taxon-specific marker recommendations are not automated in Alpha 10.3; that
   layer will be added only after literature review and curated scenario tests.
 
 Stage 3 retained behavior
@@ -61,7 +60,7 @@ Run `run_tests.bat` on Windows with R installed.
 
 Expected final line:
 
-  All PITAX v3.0.0-alpha.10.2 tests passed.
+  All PITAX v3.0.0-alpha.10.3 tests passed.
 
 The suite now has 15 groups. Alpha 10 tests cover controlled loci, assay-linked reads,
 schema-5 migration and multi-assay architecture. Stage 4 tests prove duplicate Isolate/Locus
@@ -69,7 +68,15 @@ blocking, provenance retention, missing-evidence reporting, correct separation
 of multiple isolates in the visual selector and that a 2:1 locus majority
 cannot vote away a cross-genus conflict. Group 13 guards horizontal
 DataTables header/body alignment throughout the application. Group 14 protects
-the organized file/module boundaries.
+the organized file/module boundaries and rejects raw non-ASCII runtime source.
+
+Release update workflow
+-----------------------
+- Keep the existing Git working folder and its hidden `.git` directory.
+- Copy release files over that folder; release ZIP files do not contain `.git`.
+- Run `run_tests.bat`, then `Git.BAT`.
+- `Git.BAT` fetches `origin/main` and stops before commit if the remote branch
+  contains changes that are not present locally.
 
 Roadmap
 -------

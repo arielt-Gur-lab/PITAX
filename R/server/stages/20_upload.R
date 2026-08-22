@@ -115,8 +115,8 @@
     div(
       class = "compact-hint",
       paste0(
-        "Architecture preview: ", sm$Isolates, " isolate(s) · ", sm$Loci, " locus/loci · ", sm$Reads, " read(s) · ",
-        if (identical(rv$project_mode, "simple")) paste0(sm$Reads, " independent analysis sequence(s).") else paste0(sm$Paired_loci, " Forward/Reverse pair(s) · ", sm$Single_read_loci, " single-read locus/loci.")
+        "Architecture preview: ", sm$Isolates, " isolate(s) \u00B7 ", sm$Loci, " locus/loci \u00B7 ", sm$Reads, " read(s) \u00B7 ",
+        if (identical(rv$project_mode, "simple")) paste0(sm$Reads, " independent analysis sequence(s).") else paste0(sm$Paired_loci, " Forward/Reverse pair(s) \u00B7 ", sm$Single_read_loci, " single-read locus/loci.")
       )
     )
   }

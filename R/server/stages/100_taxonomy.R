@@ -110,8 +110,8 @@
 
     msg <- paste0(
       "Analysis complete for ", final_name, ": ",
-      sm$recommended_identification[1], " · ", sm$recommended_level[1],
-      " · confidence ", sm$confidence[1], "."
+      sm$recommended_identification[1], " \u00B7 ", sm$recommended_level[1],
+      " \u00B7 confidence ", sm$confidence[1], "."
     )
     if (!is.null(tax_error) && nzchar(tax_error)) msg <- paste0(msg, " Some NCBI lineage lookups reported: ", tax_error)
     list(ok=TRUE, message=msg, final_name=final_name)
@@ -143,7 +143,7 @@
     ok_n <- 0L; fail_n <- 0L; failures <- character()
     withProgress(message="Analyzing all retrieved sequences", value=0, {
       for (i in seq_along(samples)) {
-        incProgress(1/length(samples), detail=paste0(i, "/", length(samples), " · ", pairs$final_name[match(samples[i], pairs$original_name)]))
+        incProgress(1/length(samples), detail=paste0(i, "/", length(samples), " \u00B7 ", pairs$final_name[match(samples[i], pairs$original_name)]))
         ans <- analyze_taxonomy_sample(samples[i], quiet=TRUE)
         if (isTRUE(ans$ok)) ok_n <- ok_n + 1L else { fail_n <- fail_n + 1L; failures <- c(failures, paste0(samples[i], ": ", ans$message)) }
         if (i < length(samples)) Sys.sleep(0.35)
@@ -184,7 +184,7 @@
     sm <- selected_tax_summary()
     if (!nrow(sm)) return(NULL)
 
-    txt <- function(name, fallback = "—") {
+    txt <- function(name, fallback = "\u2014") {
       if (!name %in% names(sm)) return(fallback)
       x <- as.character(sm[[name]][1])
       if (is.na(x) || !nzchar(trimws(x))) fallback else x
@@ -193,7 +193,7 @@
       if (!name %in% names(sm)) return(NA_real_)
       suppressWarnings(as.numeric(sm[[name]][1]))
     }
-    fmt_pct <- function(x, digits=2) if (is.finite(x)) paste0(round(x, digits), "%") else "—"
+    fmt_pct <- function(x, digits=2) if (is.finite(x)) paste0(round(x, digits), "%") else "\u2014"
 
     recommendation <- txt("recommended_identification", "Unresolved")
     level <- txt("recommended_level", "unresolved")
@@ -221,7 +221,7 @@
     best_n <- num("best_species_database_accessions")
     alt_n <- num("closest_species_database_accessions")
 
-    why_title <- if (tolower(level) == "genus" && nzchar(best_match) && best_match != "—") {
+    why_title <- if (tolower(level) == "genus" && nzchar(best_match) && best_match != "\u2014") {
       "Why genus and not species?"
     } else if (tolower(level) == "species") {
       "Why this species?"
@@ -232,19 +232,19 @@
     }
     why_text <- txt("decision_reason", "Review the best molecular match and close alternatives below.")
 
-    best_line <- if (nzchar(best_match) && best_match != "—") {
+    best_line <- if (nzchar(best_match) && best_match != "\u2014") {
       div(class = "taxonomy-hero-line",
           span(class = "mini-icon", icon("flask")),
           div(strong("Best molecular match: "), tags$em(best_match),
-              if (nzchar(best_acc) && best_acc != "—") paste0(" · ", best_acc) else "",
-              paste0(" · Identity ", fmt_pct(best_id), " · Coverage ", fmt_pct(best_cov, 1))))
+              if (nzchar(best_acc) && best_acc != "\u2014") paste0(" \u00B7 ", best_acc) else "",
+              paste0(" \u00B7 Identity ", fmt_pct(best_id), " \u00B7 Coverage ", fmt_pct(best_cov, 1))))
     } else NULL
 
-    alt_line <- if (nzchar(alt) && alt != "—") {
+    alt_line <- if (nzchar(alt) && alt != "\u2014") {
       div(class = "taxonomy-hero-line",
           span(class = "mini-icon", icon("exchange-alt")),
           div(strong("Closest alternative: "), tags$em(alt),
-              if (is.finite(alt_id) || is.finite(alt_cov)) paste0(" · Identity ", fmt_pct(alt_id), " · Coverage ", fmt_pct(alt_cov, 1)) else ""))
+              if (is.finite(alt_id) || is.finite(alt_cov)) paste0(" \u00B7 Identity ", fmt_pct(alt_id), " \u00B7 Coverage ", fmt_pct(alt_cov, 1)) else ""))
     } else {
       div(class = "taxonomy-hero-line",
           span(class = "mini-icon", icon("check")),
@@ -255,8 +255,8 @@
       div(class = "taxonomy-hero-line",
           span(class = "mini-icon", icon("database")),
           div(strong("Database representation: "), paste0(round(best_n), " accession(s) for the best species"),
-              if (is.finite(alt_n) && alt_n > 0 && nzchar(alt) && alt != "—") paste0(" · ", round(alt_n), " for the closest alternative") else "",
-              span(style="color:#64748b;", " · context only")))
+              if (is.finite(alt_n) && alt_n > 0 && nzchar(alt) && alt != "\u2014") paste0(" \u00B7 ", round(alt_n), " for the closest alternative") else "",
+              span(style="color:#64748b;", " \u00B7 context only")))
     } else NULL
 
     div(class = hero_class,
@@ -267,18 +267,18 @@
         div(class = "taxonomy-hero-title",
           recommendation,
           span(class = "level", paste0(" (", level, ")")),
-          span(class = "taxonomy-hero-confidence", paste0("— ", confidence))
+          span(class = "taxonomy-hero-confidence", paste0("\u2014 ", confidence))
         ),
         div(class = "taxonomy-hero-lines",
           best_line,
           alt_line,
           div(class = "taxonomy-hero-line",
               span(class = "mini-icon", icon("chart-line")),
-              div(strong("Evidence: "), "Taxonomic support ", strong(tax_support), " · Sequence evidence ", strong(seq_evidence))),
+              div(strong("Evidence: "), "Taxonomic support ", strong(tax_support), " \u00B7 Sequence evidence ", strong(seq_evidence))),
           div(class = "taxonomy-hero-line",
               span(class = "mini-icon", icon("microscope")),
               div(strong("Locus discrimination: "), locus_disc,
-                  if (nzchar(species_conclusion) && species_conclusion != "—") paste0(" · ", species_conclusion) else "")),
+                  if (nzchar(species_conclusion) && species_conclusion != "\u2014") paste0(" \u00B7 ", species_conclusion) else "")),
           div(class = "taxonomy-hero-line",
               span(class = "mini-icon", icon("book")),
               div(strong("Reference support: "), ref_support)),
@@ -296,7 +296,7 @@
     sm <- selected_tax_summary()
     if (!nrow(sm)) return(NULL)
 
-    sval <- function(name, fallback = "—") {
+    sval <- function(name, fallback = "\u2014") {
       if (!name %in% names(sm)) return(fallback)
       x <- as.character(sm[[name]][1])
       if (is.na(x) || !nzchar(trimws(x))) fallback else x
@@ -305,7 +305,7 @@
       if (!name %in% names(sm)) return(NA_real_)
       suppressWarnings(as.numeric(sm[[name]][1]))
     }
-    pct <- function(x, digits=1) if (is.finite(x)) paste0(round(x, digits), "%") else "—"
+    pct <- function(x, digits=1) if (is.finite(x)) paste0(round(x, digits), "%") else "\u2014"
 
     ident <- nval("best_match_identity_percent")
     if (!is.finite(ident)) ident <- nval("candidate_identity_percent")
@@ -334,7 +334,7 @@
       div(class = "tax-metric metric-green",
         div(class = "tax-metric-icon", icon("clone")),
         div(class = "tax-metric-label", "Close species alternatives"),
-        div(class = "tax-metric-value", if (is.finite(close_n)) as.character(round(close_n)) else "—"),
+        div(class = "tax-metric-value", if (is.finite(close_n)) as.character(round(close_n)) else "\u2014"),
         div(class = "tax-metric-sub", "Nearly indistinguishable named species")
       ),
       div(class = "tax-metric metric-cyan",
@@ -410,8 +410,8 @@
       taxon="Species",
       best_identity_percent="Best Identity (%)",
       best_query_coverage_percent="Best coverage (%)",
-      delta_identity_pp="ΔIdentity (pp)",
-      delta_coverage_pp="ΔCoverage (pp)",
+      delta_identity_pp="\u0394Identity (pp)",
+      delta_coverage_pp="\u0394Coverage (pp)",
       accession_count="Accessions"
     )
     names(df) <- unname(friendly[names(df)])
@@ -515,7 +515,7 @@
       query_coverage_percent="Coverage (%)",
       evalue="E-value",
       bit_score="Bit score",
-      delta_bit_from_best="ΔBit",
+      delta_bit_from_best="\u0394Bit",
       reference_quality="Reference",
       hsp_count="HSP"
     )
@@ -530,7 +530,7 @@
       list(targets=idx("Family"), width="90px", className="dt-wrap-compact"),
       list(targets=idx("Accession"), width="88px", className="dt-nowrap"),
       list(targets=idx("TaxID"), width="62px", className="dt-compact-number"),
-      list(targets=unlist(lapply(c("Identity (%)","Coverage (%)","E-value","Bit score","ΔBit"), idx)), width="68px", className="dt-compact-number"),
+      list(targets=unlist(lapply(c("Identity (%)","Coverage (%)","E-value","Bit score","\u0394Bit"), idx)), width="68px", className="dt-compact-number"),
       list(targets=idx("Reference"), width="92px", className="dt-wrap-compact"),
       list(targets=idx("HSP"), width="40px", className="dt-compact-number")
     )

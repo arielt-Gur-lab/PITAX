@@ -90,7 +90,7 @@ echo [15/15] Alpha 10 assay and schema 6 foundation tests
 if errorlevel 1 goto :failed
 
 echo.
-echo All PITAX v3.0.0-alpha.10.2 tests passed.
+echo All PITAX v3.0.0-alpha.10.3 tests passed.
 pause
 exit /b 0
 

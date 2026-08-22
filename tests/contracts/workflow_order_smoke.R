@@ -28,9 +28,9 @@ must_contain(app_text, paste(
   '    "Trim & QC",',
   sep = "\n"
 ))
-must_contain(app_text, 'tabPanel("2 · Assay", value = "settings"')
-must_contain(app_text, 'tabPanel("3 · Rename & Assign", value = "rename"')
-must_contain(app_text, 'tabPanel("4 · Trim & QC", value = "qc"')
+must_contain(app_text, 'tabPanel("2 \\u00B7 Assay", value = "settings"')
+must_contain(app_text, 'tabPanel("3 \\u00B7 Rename & Assign", value = "rename"')
+must_contain(app_text, 'tabPanel("4 \\u00B7 Trim & QC", value = "qc"')
 must_contain(app_text, 'uiOutput("assignment_editor")')
 must_not_contain(app_text, 'DTOutput("assignment_upload_table")')
 must_contain(app_text, 'actionButton("to_rename", "Continue to Rename"')

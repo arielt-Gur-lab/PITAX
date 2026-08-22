@@ -1,4 +1,4 @@
-# PITAX v3.0.0-alpha.9.2 - organized project structure contract.
+# PITAX v3.0.0-alpha.10.3 - organized project structure contract.
 
 required_files <- c(
   "app.R",
@@ -25,12 +25,30 @@ required_files <- c(
 missing <- required_files[!file.exists(required_files)]
 if (length(missing)) stop("Missing organized project file(s): ", paste(missing, collapse = ", "), call. = FALSE)
 
+runtime_source_files <- c(
+  "app.R",
+  list.files("R", pattern = "[.]R$", recursive = TRUE, full.names = TRUE),
+  list.files("www", pattern = "[.](js|css)$", recursive = TRUE, full.names = TRUE)
+)
+contains_non_ascii <- vapply(runtime_source_files, function(path) {
+  size <- file.info(path)$size
+  if (!is.finite(size) || size < 1L) return(FALSE)
+  any(as.integer(readBin(path, what = "raw", n = size)) > 127L)
+}, logical(1))
+if (any(contains_non_ascii)) {
+  stop(
+    "Runtime source must be ASCII-only; use Unicode escapes instead: ",
+    paste(runtime_source_files[contains_non_ascii], collapse = ", "),
+    call. = FALSE
+  )
+}
+
 app_lines <- readLines("app.R", warn = FALSE, encoding = "UTF-8")
 app_text <- paste(app_lines, collapse = "\n")
 if (length(app_lines) > 30L) stop("app.R must remain a small composition root.", call. = FALSE)
 if (!grepl('pitax_source(file.path("R", "app", "bootstrap.R"), local = TRUE)', app_text, fixed = TRUE)) stop("app.R does not load bootstrap.R through the platform-safe source helper.", call. = FALSE)
 if (!grepl('pitax_source(file.path("R", "server", "app_server.R"), local = TRUE)', app_text, fixed = TRUE)) stop("app.R does not load app_server.R through the platform-safe source helper.", call. = FALSE)
-if (!grepl('if (identical(.Platform$OS.type, "windows")) arguments$encoding <- "UTF-8"', app_text, fixed = TRUE)) stop("Windows UTF-8 source handling is missing.", call. = FALSE)
+if (grepl('encoding = "UTF-8"', app_text, fixed = TRUE)) stop("Runtime modules must not require locale-dependent source conversion.", call. = FALSE)
 if (grepl('(^|\n)[[:space:]]*source\\(file\\.path\\(', app_text, perl = TRUE)) stop("Application modules bypass the platform-safe source helper.", call. = FALSE)
 if (grepl("reactiveValues(", app_text, fixed = TRUE) || grepl("fluidPage(", app_text, fixed = TRUE)) stop("UI or server implementation leaked back into app.R.", call. = FALSE)
 
@@ -53,4 +71,4 @@ expected_modules <- file.path(
 if (!identical(server_env$PITAX_SERVER_MODULES, expected_modules)) stop("Server stage order changed unexpectedly.", call. = FALSE)
 if (!all(file.exists(expected_modules))) stop("One or more server stage modules are missing.", call. = FALSE)
 
-cat("v3.0.0-alpha.9.2 project structure contract passed.\n")
+cat("v3.0.0-alpha.10.3 project structure contract passed.\n")

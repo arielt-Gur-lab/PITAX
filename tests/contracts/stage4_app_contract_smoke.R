@@ -10,7 +10,7 @@ must_contain <- function(text, marker) {
 
 must_contain(app_text, 'pitax_source(file.path("R", "domain", "multilocus", "stage4_multilocus.R"), local = TRUE)')
 must_contain(app_text, "PROJECT_SCHEMA_VERSION <- 6L")
-must_contain(app_text, 'tabPanel("9 · Multi-locus", value = "multilocus"')
+must_contain(app_text, 'tabPanel("9 \\u00B7 Multi-locus", value = "multilocus"')
 must_contain(app_text, 'actionButton("build_multilocus_profile", "Build / rebuild profile"')
 must_contain(app_text, 'stage4_build_profile(projects, source_names = source_names, source_md5 = source_md5)')
 must_contain(app_text, 'multilocus_profile = rv$multilocus_profile')

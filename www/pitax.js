@@ -29,7 +29,7 @@
         }
         function showStepLoader(text) {
           loaderShownAt = Date.now();
-          $('#app_loading_text').text(text || 'Loading workspace…');
+          $('#app_loading_text').text(text || 'Loading workspace\u2026');
           $('#app_loading_overlay').addClass('visible').attr('aria-hidden', 'false');
           clearTimeout(loaderFallback);
           loaderFallback = setTimeout(hideStepLoader, 20000);
@@ -43,7 +43,7 @@
           clearTimeout(loaderFallback);
         }
         Shiny.addCustomMessageHandler('showLoader', function(message) {
-          showStepLoader(message && message.text ? message.text : 'Loading workspace…');
+          showStepLoader(message && message.text ? message.text : 'Loading workspace\u2026');
         });
         Shiny.addCustomMessageHandler('hideLoader', function() { hideStepLoader(); });
         $(document).on('shiny:busy', function() { $('#shiny_activity_bar').addClass('visible'); });
@@ -58,7 +58,7 @@
         $(window).on('resize', function() { scheduleTableAdjust(100); });
         Shiny.addCustomMessageHandler('adjustDataTables', function() { scheduleTableAdjust(30); });
         $(document).on('click', '#pipeline_step > li > a', function() {
-          showStepLoader('Loading step…');
+          showStepLoader('Loading step\u2026');
         });
       })();
 

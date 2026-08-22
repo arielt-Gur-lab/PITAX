@@ -159,7 +159,7 @@ stage3_apply_consensus_call <- function(record, alignment_column, call, method =
   record$evidence$Manual_Review[idx] <- TRUE
   record$evidence$Review_Note[idx] <- stage3_scalar_text(note)
   record$evidence$Review_Revision[idx] <- record$curation$revision
-  record$evidence$Decision[idx] <- paste0("Manual review · ", stage3_scalar_text(method, "Selected call"))
+  record$evidence$Decision[idx] <- paste0("Manual review \u00B7 ", stage3_scalar_text(method, "Selected call"))
   record <- stage3_refresh_record(record)
   stage3_append_consensus_audit(record, "APPLY", column, previous, call, method, note)
 }
@@ -387,10 +387,10 @@ stage3_consensus_from_alignment <- function(alignment, forward_evidence, reverse
 
     if (fb == "-" && rb != "-") {
       call <- rb
-      if (within_overlap) { decision <- "Indel · Reverse base retained"; review <- TRUE } else decision <- "Reverse-only overhang"
+      if (within_overlap) { decision <- "Indel \u00B7 Reverse base retained"; review <- TRUE } else decision <- "Reverse-only overhang"
     } else if (rb == "-" && fb != "-") {
       call <- fb
-      if (within_overlap) { decision <- "Indel · Forward base retained"; review <- TRUE } else decision <- "Forward-only overhang"
+      if (within_overlap) { decision <- "Indel \u00B7 Forward base retained"; review <- TRUE } else decision <- "Forward-only overhang"
     } else if (fb == rb) {
       call <- fb
       decision <- if (fb == "N") "Shared N" else "Reads agree"
@@ -408,7 +408,7 @@ stage3_consensus_from_alignment <- function(alignment, forward_evidence, reverse
         call <- rb; decision <- "Reverse quality dominates"
       } else {
         call <- stage3_iupac_pair(fb, rb)
-        decision <- "Conflict · IUPAC review call"
+        decision <- "Conflict \u00B7 IUPAC review call"
         review <- TRUE
       }
     }
