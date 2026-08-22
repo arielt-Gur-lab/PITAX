@@ -10,15 +10,15 @@
     display$Sample <- vapply(display$Sample, qc_display_name, character(1))
     names(display) <- c(
       "Sample", "Evidence", "Quality tag", "Quality coverage (%)",
-      "Auto trim start", "Auto trim end", "Auto trim length", "Median quality \u00B7 auto trim",
-      "Q\u226520 \u00B7 auto trim (%)", "Q\u226530 \u00B7 auto trim (%)",
+      "Auto trim start", "Auto trim end", "Auto trim length", "Median quality | auto trim",
+      "Q>=20 | auto trim (%)", "Q>=30 | auto trim (%)",
       "PCON window start", "PCON window end", "PCON window length", "PCON window shift",
-      "Median quality \u00B7 PCON window", "Q\u226520 \u00B7 PCON window (%)", "Q\u226530 \u00B7 PCON window (%)",
+      "Median quality | PCON window", "Q>=20 | PCON window (%)", "Q>=30 | PCON window (%)",
       "Primary position source",
-      "Primary position coverage (%)", "Primary positions different (%)", "Median |position \u0394|",
+      "Primary position coverage (%)", "Primary positions different (%)", "Median |position Delta|",
       "Legacy map", "Canonical A/C/G/T map", "Maps match",
       "Legacy call is max (%)", "Canonical call is max (%)",
-      "Canonical call is max \u00B7 auto trim (%)", "Median called/alternative ratio \u00B7 auto trim"
+      "Canonical call is max | auto trim (%)", "Median called/alternative ratio | auto trim"
     )
     datatable(
       display,
@@ -63,7 +63,7 @@
       div(class = "peak-flag-summary",
           div(class = "peak-flag-pill", tags$strong(sm$Quality_tag[1]), " quality tag"),
           div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Median_quality_auto_trim[1]), sm$Median_quality_auto_trim[1], "NA")), " median quality in auto trim"),
-          div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Q20_auto_trim_percent[1]), paste0(sm$Q20_auto_trim_percent[1], "%"), "NA")), " Q\u226520 in auto trim"),
+          div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Q20_auto_trim_percent[1]), paste0(sm$Q20_auto_trim_percent[1], "%"), "NA")), " Q>=20 in auto trim"),
           div(class = "peak-flag-pill", tags$strong(ifelse(is.finite(sm$Primary_position_difference_percent[1]), paste0(sm$Primary_position_difference_percent[1], "%"), "NA")), " PLOC vs legacy positions differ")),
       div(class = "compact-hint",
           "The current build retains the active legacy auto trim and a same-length PCON-only comparison. The comparison is observational and does not change the processed sequence.")
@@ -74,7 +74,7 @@
     d <- pitax_trim_window_comparison(selected_result())
     names(d) <- c(
       "Window", "Status", "Start", "End", "Length", "Quality coverage (%)",
-      "Median quality", "Q\u226520 (%)", "Q\u226530 (%)", "Start shift"
+      "Median quality", "Q>=20 (%)", "Q>=30 (%)", "Start shift"
     )
     datatable(d, rownames = FALSE, selection = "none", options = list(dom = "t", scrollX = TRUE, autoWidth = TRUE))
   })
@@ -145,7 +145,7 @@
   output$expected_amplicon_note <- renderUI({
     settings <- selected_processing_settings()
     span(class = "peak-flag-pill", title = "Assay metadata only; not a fixed coordinate on the Sanger read.",
-         paste0("Expected amplicon: ", settings$expected_amplicon_len, " bp \u00B7 Locus: ", settings$target))
+         paste0("Expected amplicon: ", settings$expected_amplicon_len, " bp | Locus: ", settings$target))
   })
 
   all_current_peak_flags <- reactive({
@@ -271,7 +271,7 @@
       title = paste0("Review chromatogram position ", pos),
       easyClose = TRUE, size = "m",
       div(class = "about-callout",
-          tags$strong(paste0(call, "  \u2194  ", comp)), tags$br(),
+          tags$strong(paste0(call, "  <->  ", comp)), tags$br(),
           span(flag_evidence_text(flag_row))),
       if (nzchar(recommendation)) div(class = "status-note", recommendation) else NULL,
       selectInput("manual_base_choice", "Change current base to", choices = base_choices, selected = if (length(comp_candidates)) comp_candidates[1] else "N"),
@@ -308,7 +308,7 @@
       after <- toupper(as.character(value))
       title <- "Confirm base edit"
       body <- tagList(
-        h4(paste0("Position ", pos, ": ", before, " \u2192 ", after)),
+        h4(paste0("Position ", pos, ": ", before, " -> ", after)),
         p(evidence),
         div(class = "status-note", "The raw AB1 trace and original base call are preserved. This edit changes only the curated sequence and will be recorded in the audit log."))
     } else {
@@ -317,8 +317,8 @@
       new_len <- if (side == "left") en - pos else pos - st
       title <- "Confirm manual trimming"
       body <- tagList(
-        h4(if (side == "left") paste0("Remove positions ", st, "\u2013", pos) else paste0("Remove positions ", pos, "\u2013", en)),
-        p(paste0("Current length: ", en - st + 1L, " bp \u00B7 New length: ", max(0, new_len), " bp")),
+        h4(if (side == "left") paste0("Remove positions ", st, "-", pos) else paste0("Remove positions ", pos, "-", en)),
+        p(paste0("Current length: ", en - st + 1L, " bp | New length: ", max(0, new_len), " bp")),
         p(evidence),
         div(class = "status-note", "The automatic trimming boundaries remain stored separately. This manual boundary change is reversible and logged."))
     }
@@ -392,7 +392,7 @@
       method <- if (new_base %in% c("R","Y","S","W","K","M")) "Manual IUPAC ambiguity" else "Manual base correction"
       row <- data.frame(Action = "Base edit", Position = pos, Before = before_call, After = new_base,
                         Method = method, Evidence = pnd$evidence, Details = "Confirmed by user", stringsAsFactors = FALSE)
-      label <- paste0("Base edit at ", pos, ": ", before_call, "\u2192", new_base)
+      label <- paste0("Base edit at ", pos, ": ", before_call, "->", new_base)
     } else {
       side <- as.character(pnd$value)
       st <- as.integer(r$summary$trim_start[1]); en <- as.integer(r$summary$trim_end[1])
@@ -419,12 +419,12 @@
           span(icon("info-circle"), " These values control only automatic correction proposals. Flags and manual curation remain available even when a position does not meet these criteria.")),
       fluidRow(
         column(6,
-          numericInput("auto_cfg_alt_called", "Alternative / current signal \u2265", value = p$auto_min_alt_to_called, min = 1.01, max = 10, step = 0.05),
-          numericInput("auto_cfg_alt_third", "Alternative / third channel \u2265", value = p$auto_min_alt_to_third, min = 1.01, max = 10, step = 0.05)
+          numericInput("auto_cfg_alt_called", "Alternative / current signal >=", value = p$auto_min_alt_to_called, min = 1.01, max = 10, step = 0.05),
+          numericInput("auto_cfg_alt_third", "Alternative / third channel >=", value = p$auto_min_alt_to_third, min = 1.01, max = 10, step = 0.05)
         ),
         column(6,
           numericInput("auto_cfg_peak_offset", "Maximum peak offset (trace samples)", value = p$auto_max_peak_offset, min = 0, max = 10, step = 1),
-          numericInput("auto_cfg_relative_signal", "Alternative signal / retained median \u2265", value = p$auto_min_relative_signal, min = 0.05, max = 3, step = 0.05)
+          numericInput("auto_cfg_relative_signal", "Alternative signal / retained median >=", value = p$auto_min_relative_signal, min = 0.05, max = 3, step = 0.05)
         )
       ),
       footer = tagList(
@@ -560,7 +560,7 @@
 
   observeEvent(input$curation_history, {
     req(input$inspect_sample)
-    showModal(modalDialog(title = paste0("Curation history \u2014 ", input$inspect_sample), DTOutput("curation_history_table"), size="l", easyClose=TRUE, footer=modalButton("Close")))
+    showModal(modalDialog(title = paste0("Curation history - ", input$inspect_sample), DTOutput("curation_history_table"), size="l", easyClose=TRUE, footer=modalButton("Close")))
   }, ignoreInit = TRUE)
 
   observeEvent(input$curation_reset, {

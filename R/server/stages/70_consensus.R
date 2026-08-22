@@ -95,9 +95,9 @@
   output$consensus_gate_status <- renderUI({
     error <- stage3_consensus_gate_error(rv$consensus_set, rv$results)
     if (is.null(error)) {
-      div(class = "status-ok", "\u2713 Every expected analysis sequence is current and review-complete.")
+      div(class = "status-ok", "OK: Every expected analysis sequence is current and review-complete.")
     } else {
-      div(class = "status-warning", paste0("\u26A0 ", error))
+      div(class = "status-warning", paste0("Warning: ", error))
     }
   })
 
@@ -143,8 +143,8 @@
     }
     values <- as.character(review$Alignment_Column)
     labels <- paste0(
-      "Position ", review$Consensus_Position, " \u00B7 F:", review$Forward_Base,
-      " / R:", review$Reverse_Base, ifelse(review$Needs_Review, " \u00B7 unresolved", " \u00B7 reviewed")
+      "Position ", review$Consensus_Position, " | F:", review$Forward_Base,
+      " / R:", review$Reverse_Base, ifelse(review$Needs_Review, " | unresolved", " | reviewed")
     )
     selected <- if (!is.null(preferred) && as.character(preferred) %in% values) as.character(preferred) else values[1]
     updateSelectInput(session, "consensus_review_position", choices = setNames(values, labels), selected = selected)
@@ -165,7 +165,7 @@
   output$consensus_review_call_ui <- renderUI({
     row <- selected_consensus_review_row()
     candidate_values <- c(as.character(row$Forward_Base), as.character(row$Reverse_Base), as.character(row$Automatic_Call))
-    candidate_labels <- c(paste0("Forward \u00B7 ", row$Forward_Base), paste0("Reverse \u00B7 ", row$Reverse_Base), paste0("IUPAC / automatic \u00B7 ", row$Automatic_Call))
+    candidate_labels <- c(paste0("Forward | ", row$Forward_Base), paste0("Reverse | ", row$Reverse_Base), paste0("IUPAC / automatic | ", row$Automatic_Call))
     candidates <- setNames(candidate_values, candidate_labels)
     candidates <- candidates[candidates != "-" & nzchar(candidates)]
     candidates <- candidates[!duplicated(unname(candidates))]
@@ -179,7 +179,7 @@
     reviewable <- stage3_reviewable_evidence(record)
     unresolved <- if (nrow(record$evidence)) sum(record$evidence$Needs_Review, na.rm = TRUE) else 0L
     div(class = if (unresolved) "status-warning" else "status-ok",
-        paste0("Revision ", record$curation$revision, " \u00B7 ", unresolved, " unresolved \u00B7 ", nrow(reviewable), " reviewable position(s)."))
+        paste0("Revision ", record$curation$revision, " | ", unresolved, " unresolved | ", nrow(reviewable), " reviewable position(s)."))
   })
 
   consensus_review_plot <- function(direction) {
@@ -188,7 +188,7 @@
     source_id <- if (identical(direction, "Forward")) stage3_scalar_text(record$forward_read) else stage3_scalar_text(record$reverse_read)
     raw_position <- if (identical(direction, "Forward")) row$Forward_Raw_Position else row$Reverse_Raw_Position
     result <- if (nzchar(source_id)) rv$results[[source_id]] else NULL
-    title <- paste0(direction, " evidence", if (nzchar(source_id)) paste0(" \u00B7 ", source_id) else "")
+    title <- paste0(direction, " evidence", if (nzchar(source_id)) paste0(" | ", source_id) else "")
     make_chromatogram_focus_plot(result, settings_for_result(result), raw_position, title)
   }
 
@@ -203,7 +203,7 @@
       id,
       paste0("Consensus ", action_label, if (sequence_changed) " changed the sequence" else " changed the review state", "; revision ", record$curation$revision)
     )
-    rv$project_status_text <- paste0("Unsaved consensus ", action_label, ": ", record$final_name, " \u00B7 revision ", record$curation$revision, ".")
+    rv$project_status_text <- paste0("Unsaved consensus ", action_label, ": ", record$final_name, " | revision ", record$curation$revision, ".")
     sync_consensus_review_choices(input$consensus_review_position)
   }
 
@@ -247,7 +247,7 @@
     output$consensus_review_history_table <- renderDT({
       datatable(record$curation$audit_log, rownames = FALSE, options = list(pageLength = 12, scrollX = TRUE, autoWidth = TRUE, order = list(list(0, "desc"))))
     })
-    showModal(modalDialog(title = paste0("Consensus revision history \u00B7 ", record$final_name),
+    showModal(modalDialog(title = paste0("Consensus revision history | ", record$final_name),
                           DTOutput("consensus_review_history_table"), size = "l", easyClose = TRUE, footer = modalButton("Close")))
   })
 
@@ -255,12 +255,12 @@
     record <- selected_consensus()
     class_name <- if (record$status %in% c("READY", "SINGLE_READ", "INDEPENDENT_READ")) "status-ok" else if (record$status == "REVIEW_REQUIRED") "status-warning" else "status-error"
     label <- switch(record$status,
-      READY = "Ready \u00B7 Forward and Reverse overlap passed",
-      SINGLE_READ = "Valid single-read representative \u00B7 not a two-read consensus",
-      INDEPENDENT_READ = "Ready \u00B7 independent read, oriented without Forward/Reverse matching",
-      REVIEW_REQUIRED = "Review required \u00B7 unresolved conflicts are retained as IUPAC calls",
-      NO_RELIABLE_OVERLAP = "Blocked \u00B7 no reliable Forward/Reverse overlap",
-      SOURCE_MISSING = "Blocked \u00B7 a processed source read is missing",
+      READY = "Ready | Forward and Reverse overlap passed",
+      SINGLE_READ = "Valid single-read representative | not a two-read consensus",
+      INDEPENDENT_READ = "Ready | independent read, oriented without Forward/Reverse matching",
+      REVIEW_REQUIRED = "Review required | unresolved conflicts are retained as IUPAC calls",
+      NO_RELIABLE_OVERLAP = "Blocked | no reliable Forward/Reverse overlap",
+      SOURCE_MISSING = "Blocked | a processed source read is missing",
       record$status
     )
     div(class = class_name, label)
@@ -270,9 +270,9 @@
     record <- selected_consensus()
     df <- data.frame(
       Metric = c("Isolate", "Locus", "Forward read", "Reverse read", "Sequence length", "Overlap", "Overlap identity", "Mismatches", "Indels", "Review positions"),
-      Value = c(record$isolate, record$locus, stage3_scalar_text(record$forward_read, "\u2014"), stage3_scalar_text(record$reverse_read, "\u2014"),
+      Value = c(record$isolate, record$locus, stage3_scalar_text(record$forward_read, "-"), stage3_scalar_text(record$reverse_read, "-"),
                 nchar(stage3_scalar_text(record$sequence)), record$metrics$overlap,
-                if (is.finite(record$metrics$identity_percent)) paste0(record$metrics$identity_percent, "%") else "\u2014",
+                if (is.finite(record$metrics$identity_percent)) paste0(record$metrics$identity_percent, "%") else "-",
                 record$metrics$mismatches, record$metrics$indels, record$metrics$review_positions),
       stringsAsFactors = FALSE
     )

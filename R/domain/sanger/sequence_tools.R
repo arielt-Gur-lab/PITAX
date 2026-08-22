@@ -237,7 +237,7 @@ primer_alignment_text <- function(result, settings) {
     marks <- ifelse(qchars == tchars & qchars != "N" & tchars != "N", "|", " ")
     pieces <- c(
       pieces,
-      paste0(m$Primer, " primer \u2014 ", m$Role),
+      paste0(m$Primer, " primer - ", m$Role),
       paste0("Search region: bases ", m$search_from, "-", m$search_to,
              " | best site: ", m$start, "-", m$end,
              " | ", m$identity, "% identity | expected ", m$Expected_sequence),
@@ -278,7 +278,7 @@ draw_chromatogram <- function(result, settings, start_base=1L, visible_bases=50L
 
   plot(x_base, trace[idx, cmap[["A"]]], type="l", col="green3", lwd=1,
        xlab="Base position", ylab="Signal", xlim=c(from_base, to_base), ylim=c(0, ymax*1.20),
-       xaxt="n", main=paste0(result$sample_id, " \u2014 bases ", from_base, "-", to_base))
+       xaxt="n", main=paste0(result$sample_id, " - bases ", from_base, "-", to_base))
   lines(x_base, trace[idx, cmap[["C"]]], col="blue3", lwd=1)
   lines(x_base, trace[idx, cmap[["G"]]], col="black", lwd=1)
   lines(x_base, trace[idx, cmap[["T"]]], col="red3", lwd=1)
@@ -320,7 +320,7 @@ draw_chromatogram <- function(result, settings, start_base=1L, visible_bases=50L
 draw_amplicon_overview <- function(result, settings) {
   n <- nchar(result$raw_seq)
   plot(c(1,n), c(0,1), type="n", xlab="Base position", ylab="", yaxt="n", ylim=c(0,1),
-       main=paste0(result$sample_id, " \u2014 read / trim overview"))
+       main=paste0(result$sample_id, " - read / trim overview"))
   segments(1,0.78,n,0.78,lwd=5,col="grey70")
   text(1,0.88,"RAW READ",adj=0,cex=0.8)
   sm <- result$summary
@@ -1025,7 +1025,7 @@ make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags 
 make_chromatogram_focus_plot <- function(result, settings, raw_position, title, window = 12L) {
   position <- suppressWarnings(as.integer(raw_position[1]))
   if (!is.list(result) || !length(position) || !is.finite(position[1])) {
-    return(plotly::plot_ly() |> plotly::layout(title = list(text = paste0(title, " \u00B7 no linked raw position"), x = 0)))
+    return(plotly::plot_ly() |> plotly::layout(title = list(text = paste0(title, " | no linked raw position"), x = 0)))
   }
   focused <- result
   focused$display_name <- title
@@ -1063,7 +1063,7 @@ draw_qc_metrics <- function(result, settings) {
   plot(
     metrics$index, metrics$called_signal, type = "l",
     xlab = "Base-call index", ylab = "Called-base signal",
-    main = paste0(result$sample_id, " \u2014 called-base signal")
+    main = paste0(result$sample_id, " - called-base signal")
   )
   if (!is.na(sm$trim_start)) abline(v = sm$trim_start, lty = 2)
   if (!is.na(sm$trim_end)) abline(v = sm$trim_end, lty = 2)
@@ -1075,7 +1075,7 @@ draw_qc_metrics <- function(result, settings) {
   plot(
     metrics$index, metrics$peak_ratio, type = "l",
     xlab = "Base-call index", ylab = "Called peak / second peak",
-    main = paste0(result$sample_id, " \u2014 peak ratio"), ylim = c(0, ymax)
+    main = paste0(result$sample_id, " - peak ratio"), ylim = c(0, ymax)
   )
   if (!is.null(settings$min_peak_ratio)) abline(h = settings$min_peak_ratio, lty = 2)
   if (!is.na(sm$trim_start)) abline(v = sm$trim_start, lty = 2)

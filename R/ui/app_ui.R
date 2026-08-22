@@ -1,6 +1,6 @@
 ui <- fluidPage(
   tags$head(
-    tags$title("PITAX \u2014 Taxonomic Identification Tool"),
+    tags$title("PITAX - Taxonomic Identification Tool"),
     tags$link(rel = "stylesheet", type = "text/css", href = "pitax.css"),
     tags$script(src = "pitax.js")
   ),
@@ -9,21 +9,21 @@ ui <- fluidPage(
   div(id = "app_loading_overlay", class = "app-loading-overlay", `aria-hidden` = "true",
       div(class = "app-loading-card",
           div(class = "app-loading-spinner"),
-          div(id = "app_loading_text", "Loading workspace\u2026")
+          div(id = "app_loading_text", "Loading workspace...")
       )
   ),
 
   div(class = "pipeline-container",
     div(class = "app-header app-shell-header",
       if (PITAX_LOGO_AVAILABLE)
-        tags$img(src = "logo.png", class = "app-brand-logo", alt = "PITAX \u2014 Taxonomic Identification Tool")
+        tags$img(src = "logo.png", class = "app-brand-logo", alt = "PITAX - Taxonomic Identification Tool")
       else
         tagList(
           div(class = "app-brand-mark", icon("flask")),
           div(class = "app-brand-copy", h2("PITAX"), p("Taxonomic Identification Tool"))
         ),
       div(class = "app-brand-copy",
-        p("Sanger sequence analysis \u00B7 quality review \u00B7 BLAST \u00B7 taxonomic interpretation")
+        p("Sanger sequence analysis | quality review | BLAST | taxonomic interpretation")
       ),
       div(class = "app-version-badge", paste0("v", APP_VERSION))
     ),
@@ -41,7 +41,7 @@ ui <- fluidPage(
       # --------------------------------------------------------
       # 1. Upload
       # --------------------------------------------------------
-      tabPanel("1 \u00B7 Upload", value = "upload",
+      tabPanel("1 | Upload", value = "upload",
         stage_heading("upload", "Upload chromatograms", "Keep the sequencer barcode and source filename unchanged. Biological identity is assigned later in Rename.", "Step 1 of 9"),
         stage_topbar(
           div(class = "stage-topbar-spacer"),
@@ -65,8 +65,8 @@ ui <- fluidPage(
             radioButtons(
               "project_mode", NULL,
               choices = c(
-                "Simple reads \u2014 no Forward/Reverse matching" = "simple",
-                "Paired reads \u2014 build Forward/Reverse consensus" = "paired_consensus"
+                "Simple reads - no Forward/Reverse matching" = "simple",
+                "Paired reads - build Forward/Reverse consensus" = "paired_consensus"
               ),
               selected = "simple", inline = FALSE
             )
@@ -78,7 +78,7 @@ ui <- fluidPage(
       # --------------------------------------------------------
       # 2. Assay and trimming settings
       # --------------------------------------------------------
-      tabPanel("2 \u00B7 Assay", value = "settings",
+      tabPanel("2 | Assay", value = "settings",
         stage_heading("sliders", "Assay setup", "Define the assay profile and project-level automatic trimming defaults. Trimming starts only after Rename.", "Step 2 of 9"),
         stage_topbar(
           actionButton("back_upload", "Back", icon = icon("arrow-left")),
@@ -96,8 +96,8 @@ ui <- fluidPage(
               textInput("reverse_primer", "Reverse primer name", "")
             ),
             div(class = "form-grid-2",
-              textInput("forward_primer_seq", "Forward primer sequence (5'\u21923')", ""),
-              textInput("reverse_primer_seq", "Reverse primer sequence (5'\u21923')", "")
+              textInput("forward_primer_seq", "Forward primer sequence (5'->3')", ""),
+              textInput("reverse_primer_seq", "Reverse primer sequence (5'->3')", "")
             ),
             radioButtons(
               "sequencing_primer", "Primer used for this Sanger read",
@@ -130,7 +130,7 @@ ui <- fluidPage(
       # --------------------------------------------------------
       # 4. QC, chromatogram & sequence preview
       # --------------------------------------------------------
-      tabPanel("4 \u00B7 Trim & QC", value = "qc",
+      tabPanel("4 | Trim & QC", value = "qc",
         stage_heading("bar-chart", "Trimming results, QC & curation", "Review the completed trim, inspect renamed chromatograms, and document manual sequence curation.", "Step 4 of 9"),
         stage_topbar(
           actionButton("back_rename_from_qc", "Back to Rename", icon = icon("arrow-left")),
@@ -167,7 +167,7 @@ ui <- fluidPage(
           )
         ),
         div(class = "panel-box stage1-evidence-card",
-          card_title("Stage 1 \u00B7 AB1 evidence audit", "Observational audit of the established PITAX v2 read model against raw ABIF primary-call coordinates, basecaller quality and canonical A/C/G/T trace evidence. This panel does not alter trimming, curation, BLAST or taxonomy.", "microscope"),
+          card_title("Stage 1 | AB1 evidence audit", "Observational audit of the established PITAX v2 read model against raw ABIF primary-call coordinates, basecaller quality and canonical A/C/G/T trace evidence. This panel does not alter trimming, curation, BLAST or taxonomy.", "microscope"),
           tags$details(
             class = "stage1-audit-details",
             tags$summary(class = "stage1-audit-toggle", "Open evidence audit"),
@@ -181,7 +181,7 @@ ui <- fluidPage(
               downloadButton("download_ab1_evidence_detail", "Download selected-base audit CSV", class = "btn-default")
             ),
             div(class = "subsection-divider"),
-            div(class = "subsection-title", "Selected sample \u00B7 per-base evidence"),
+            div(class = "subsection-title", "Selected sample | per-base evidence"),
             uiOutput("ab1_evidence_selected_note"),
             div(class = "subsection-title", "Legacy auto trim vs PCON-only comparison"),
             DTOutput("ab1_trim_comparison_table"),
@@ -227,7 +227,7 @@ ui <- fluidPage(
         ),
         div(class = "panel-box checkpoint checkpoint-modern",
           div(class = "checkpoint-copy",
-            card_title("Checkpoint B \u00B7 Renamed and curated sequences", "Save the resolved naming and QC/curation state before export.", "save")
+            card_title("Checkpoint B | Renamed and curated sequences", "Save the resolved naming and QC/curation state before export.", "save")
           ),
           downloadButton("download_trim_checkpoint", "Download checkpoint ZIP")
         ),
@@ -236,7 +236,7 @@ ui <- fluidPage(
       # --------------------------------------------------------
       # 3. Rename
       # --------------------------------------------------------
-      tabPanel("3 \u00B7 Rename & Assign", value = "rename",
+      tabPanel("3 | Rename & Assign", value = "rename",
         stage_heading("tags", "Rename and assign read identity", "Assign isolate, gene and Forward/Reverse direction here, after Upload and Assay and before trimming. The upload barcode remains unchanged.", "Step 3 of 9"),
         stage_topbar(
           actionButton("back_settings_from_rename", "Back to Assay", icon = icon("arrow-left")),
@@ -279,11 +279,11 @@ ui <- fluidPage(
           uiOutput("rename_validation")
         ),
         div(class = "panel-box stage2-assignment-card",
-          card_title("Stage 2 \u00B7 Architecture preview", "Built directly from the explicit identity fields. Project mode determines whether matching Forward/Reverse reads will later be merged or remain independent.", "sitemap"),
+          card_title("Stage 2 | Architecture preview", "Built directly from the explicit identity fields. Project mode determines whether matching Forward/Reverse reads will later be merged or remain independent.", "sitemap"),
           uiOutput("architecture_summary")
         ),
         div(class = "panel-box checkpoint checkpoint-modern",
-          div(class = "checkpoint-copy", card_title("Checkpoint A \u00B7 Renamed and assigned reads", "Save resolved read names and biological identity before trimming.", "save")),
+          div(class = "checkpoint-copy", card_title("Checkpoint A | Renamed and assigned reads", "Save resolved read names and biological identity before trimming.", "save")),
           downloadButton("download_rename_checkpoint", "Download checkpoint ZIP")
         ),
         pipeline_stage_footer(3)
@@ -291,8 +291,8 @@ ui <- fluidPage(
       # --------------------------------------------------------
       # 5. Forward / Reverse consensus
       # --------------------------------------------------------
-      tabPanel("5 \u00B7 Analysis Sequence", value = "consensus",
-        stage_heading("random", "Stage 3 \u00B7 Analysis sequence", "Create the sequence used for export and BLAST according to the project read model selected at Upload.", "Step 5 of 9"),
+      tabPanel("5 | Analysis Sequence", value = "consensus",
+        stage_heading("random", "Stage 3 | Analysis sequence", "Create the sequence used for export and BLAST according to the project read model selected at Upload.", "Step 5 of 9"),
         stage_topbar(
           actionButton("back_qc_from_consensus", "Back to QC", icon = icon("arrow-left")),
           div(class = "stage-topbar-spacer"),
@@ -321,7 +321,7 @@ ui <- fluidPage(
           )
         ),
         div(class = "panel-box stage-table-card",
-          card_title("Analysis sequence summary", "Simple mode keeps one oriented sequence per read. Paired mode creates one row per Isolate\u2013Locus and labels unpaired reads as single-read representatives.", "table"),
+          card_title("Analysis sequence summary", "Simple mode keeps one oriented sequence per read. Paired mode creates one row per Isolate-Locus and labels unpaired reads as single-read representatives.", "table"),
           DTOutput("consensus_summary_table")
         ),
         div(class = "panel-box consensus-review-card",
@@ -372,7 +372,7 @@ ui <- fluidPage(
       # --------------------------------------------------------
       # 6. Export
       # --------------------------------------------------------
-      tabPanel("6 \u00B7 Export", value = "export",
+      tabPanel("6 | Export", value = "export",
         stage_heading("download", "Export analysis sequences", "Create working FASTA files or an auditable package containing the analysis sequence and original read evidence.", "Step 6 of 9"),
         stage_topbar(
           actionButton("back_consensus_from_export", "Back to Consensus", icon = icon("arrow-left")),
@@ -394,7 +394,7 @@ ui <- fluidPage(
       # --------------------------------------------------------
       # 7. NCBI BLAST
       # --------------------------------------------------------
-      tabPanel("7 \u00B7 NCBI BLAST", value = "blast",
+      tabPanel("7 | NCBI BLAST", value = "blast",
         stage_heading("search", "NCBI BLAST workspace", "Submit analysis sequences, retrieve accession-level hits, and keep each RID linked to the active sequence revision.", "Step 7 of 9"),
         stage_topbar(
           actionButton("back_export", "Back to Export", icon = icon("arrow-left")),
@@ -449,7 +449,7 @@ ui <- fluidPage(
           )
         ),
         div(class = "panel-box checkpoint checkpoint-modern",
-          div(class = "checkpoint-copy", card_title("Checkpoint D \u00B7 BLAST workspace", "Export BLAST job metadata and accession-level hits.", "save")),
+          div(class = "checkpoint-copy", card_title("Checkpoint D | BLAST workspace", "Export BLAST job metadata and accession-level hits.", "save")),
           div(class = "button-row",
             downloadButton("download_blast_jobs", "Job/results CSV"),
             downloadButton("download_blast_hits", "All BLAST hits CSV")
@@ -460,7 +460,7 @@ ui <- fluidPage(
       # --------------------------------------------------------
       # 8. Taxonomic interpretation
       # --------------------------------------------------------
-      tabPanel("8 \u00B7 Taxonomic summary", value = "taxonomy",
+      tabPanel("8 | Taxonomic summary", value = "taxonomy",
         stage_heading("sitemap", "Taxonomic interpretation", "Identify the best molecular match, inspect close alternatives and report the most conservative supported taxonomic level.", "Step 8 of 9"),
         stage_topbar(
           actionButton("back_blast", "Back to NCBI BLAST", icon = icon("arrow-left")),
@@ -517,7 +517,7 @@ ui <- fluidPage(
           )
         ),
         div(class = "panel-box checkpoint checkpoint-modern",
-          div(class = "checkpoint-copy", card_title("Checkpoint E \u00B7 Taxonomic interpretation", "Save the final taxonomic evidence and interpretation package.", "save")),
+          div(class = "checkpoint-copy", card_title("Checkpoint E | Taxonomic interpretation", "Save the final taxonomic evidence and interpretation package.", "save")),
           div(class = "button-row",
             downloadButton("download_taxonomy_summary", "Summary CSV"),
             downloadButton("download_taxonomy_hits", "Enriched hits CSV"),
@@ -529,8 +529,8 @@ ui <- fluidPage(
       # --------------------------------------------------------
       # 9. Multi-locus isolate profile
       # --------------------------------------------------------
-      tabPanel("9 \u00B7 Multi-locus", value = "multilocus",
-        stage_heading("th", "Stage 4 \u00B7 Multi-locus isolate profile", "Combine separately completed single-locus PITAX projects by explicit Isolate code while retaining every locus-specific sequence and taxonomic limitation.", "Step 9 of 9"),
+      tabPanel("9 | Multi-locus", value = "multilocus",
+        stage_heading("th", "Stage 4 | Multi-locus isolate profile", "Combine separately completed single-locus PITAX projects by explicit Isolate code while retaining every locus-specific sequence and taxonomic limitation.", "Step 9 of 9"),
         stage_topbar(
           actionButton("back_taxonomy_from_multilocus", "Back to Taxonomic Summary", icon = icon("arrow-left")),
           div(class = "stage-topbar-spacer"),
@@ -577,11 +577,11 @@ ui <- fluidPage(
           DTOutput("multilocus_profiles_table")
         ),
         div(class = "panel-box stage-table-card",
-          card_title("Per-locus evidence", "One row per Isolate\u2013Locus with sequence revision, BLAST/taxonomy result and reference provenance retained separately.", "list-alt"),
+          card_title("Per-locus evidence", "One row per Isolate-Locus with sequence revision, BLAST/taxonomy result and reference provenance retained separately.", "list-alt"),
           DTOutput("multilocus_evidence_table")
         ),
         div(class = "panel-box checkpoint checkpoint-modern",
-          div(class = "checkpoint-copy", card_title("Checkpoint F \u00B7 Multi-locus profile", "Export the isolate profile, every locus-specific evidence row and all included sequences.", "save")),
+          div(class = "checkpoint-copy", card_title("Checkpoint F | Multi-locus profile", "Export the isolate profile, every locus-specific evidence row and all included sequences.", "save")),
           div(class = "button-row",
             downloadButton("download_multilocus_profiles", "Profiles CSV"),
             downloadButton("download_multilocus_evidence", "Per-locus evidence CSV"),
@@ -600,7 +600,7 @@ ui <- fluidPage(
           p(class="about-lead",
             "Documentation for the laboratory workflow, the BLAST/taxonomy interpretation logic, and the scientific sources used to guide the application. Published evidence and application-specific heuristics are labeled separately."),
           div(class="help-flow",
-              "AB1 upload + project mode  \u2192  Assay settings  \u2192  Rename & read assignment  \u2192  Trim & QC  \u2192  Analysis sequence  \u2192  Export  \u2192  NCBI BLAST  \u2192  Taxonomic interpretation  \u2192  Multi-locus profile")
+              "AB1 upload + project mode  ->  Assay settings  ->  Rename & read assignment  ->  Trim & QC  ->  Analysis sequence  ->  Export  ->  NCBI BLAST  ->  Taxonomic interpretation  ->  Multi-locus profile")
         ),
 
         div(class="about-section",
@@ -621,15 +621,15 @@ ui <- fluidPage(
                 column(6,
                   div(class="help-card",
                     h3("Workflow"),
-                    p(strong("1. Upload"), " \u2014 raw AB1 chromatograms and the project read model; source barcodes remain unchanged."),
-                    p(strong("2. Assay"), " \u2014 run-level primer defaults and trimming parameters; no trimming starts yet."),
-                    p(strong("3. Rename & Assign"), " \u2014 import a key, batch-edit or manually assign explicit identity fields and PITAX-generated <Isolate>_<Locus>_<F/R> names."),
-                    p(strong("4. Trim & QC"), " \u2014 start trimming explicitly, then review Quality Control plots, chromatograms and processed sequences."),
-                    p(strong("5. Analysis Sequence"), " \u2014 keep independent reads in Simple mode or create an auditable F/R consensus in Paired mode; Reverse reads are oriented without changing the source."),
-                    p(strong("6. Export"), " \u2014 isolate-level FASTA plus source-read QC and consensus evidence checkpoints."),
-                    p(strong("7. NCBI BLAST"), " \u2014 submit isolate-level sequences and retrieve accession-level hits."),
-                    p(strong("8. Taxonomic summary"), " \u2014 compare competitive hits and report identification plus confidence."),
-                    p(strong("9. Multi-locus profile"), " \u2014 import separately completed locus projects, join them by explicit Isolate code and retain concordance or conflict without flat voting.")
+                    p(strong("1. Upload"), " - raw AB1 chromatograms and the project read model; source barcodes remain unchanged."),
+                    p(strong("2. Assay"), " - run-level primer defaults and trimming parameters; no trimming starts yet."),
+                    p(strong("3. Rename & Assign"), " - import a key, batch-edit or manually assign explicit identity fields and PITAX-generated <Isolate>_<Locus>_<F/R> names."),
+                    p(strong("4. Trim & QC"), " - start trimming explicitly, then review Quality Control plots, chromatograms and processed sequences."),
+                    p(strong("5. Analysis Sequence"), " - keep independent reads in Simple mode or create an auditable F/R consensus in Paired mode; Reverse reads are oriented without changing the source."),
+                    p(strong("6. Export"), " - isolate-level FASTA plus source-read QC and consensus evidence checkpoints."),
+                    p(strong("7. NCBI BLAST"), " - submit isolate-level sequences and retrieve accession-level hits."),
+                    p(strong("8. Taxonomic summary"), " - compare competitive hits and report identification plus confidence."),
+                    p(strong("9. Multi-locus profile"), " - import separately completed locus projects, join them by explicit Isolate code and retain concordance or conflict without flat voting.")
                   )
                 ),
                 column(6,
@@ -643,7 +643,7 @@ ui <- fluidPage(
               ),
               div(class="help-card",
                 h3("Stage 2 project architecture"),
-                p("PITAX stores Project \u2192 Isolate \u2192 Locus \u2192 Read as explicit linked objects. One isolate may have several loci, and one locus may have a single read or separate Forward and Reverse reads."),
+                p("PITAX stores Project -> Isolate -> Locus -> Read as explicit linked objects. One isolate may have several loci, and one locus may have a single read or separate Forward and Reverse reads."),
                 p("The upload barcode is an immutable technical source ID and is never parsed as biological identity. Isolate, Gene/Locus and Direction are edited as separate fields in Rename before trimming; PITAX generates the final <Isolate>_<Locus>_<F/R> label from those fields. Duplicate AB1 basenames are blocked because they cannot be represented safely by the established source-read key."),
                 div(class="about-callout",
                   strong("Stage boundary: "),
@@ -660,7 +660,7 @@ ui <- fluidPage(
                 h3("Stage 4 multi-locus profile"),
                 p("Each Gene/Locus is processed in its own PITAX project. Stage 4 imports those completed projects and joins their evidence only when the explicit Isolate code matches."),
                 p("Every locus retains its sequence, consensus revision, BLAST RID, taxonomic result, limitation and reference context. Two concordant loci may support the same rank; a conflicting locus is never removed by a numerical majority."),
-                div(class="about-callout", strong("Current alpha boundary: "), "alpha.10.3 establishes schema 6, controlled loci and explicit assay-linked reads. The multi-assay editor is the next Alpha 10 slice; taxon-specific marker recommendations still require a separately reviewed literature layer.")
+                div(class="about-callout", strong("Current version boundary: "), paste0("v", APP_VERSION, " retains schema 6, controlled loci and explicit assay-linked reads while stabilizing cross-platform text rendering. The multi-assay editor remains the next feature slice; taxon-specific marker recommendations still require a separately reviewed literature layer."))
               )
             ),
 
@@ -687,7 +687,7 @@ ui <- fluidPage(
                   div(class="method-num", "5"),
                   div(h4("Ambiguous peak review"),
                       p("The app flags individual called-base positions where another A/C/G/T dye channel competes strongly with the current call, where the current call is not locally dominant, or where the call is ambiguous."),
-                      p("The comparison uses a narrow trace window around each called peak and suppresses weak-signal competition using a run-specific signal baseline. By default, a called/competitor peak ratio \u22641.25 is Strong and \u22641.75 is Moderate; the local signal must be at least 20% of the retained-region median called signal. These are application review heuristics, not biological diagnoses."),
+                      p("The comparison uses a narrow trace window around each called peak and suppresses weak-signal competition using a run-specific signal baseline. By default, a called/competitor peak ratio <=1.25 is Strong and <=1.75 is Moderate; the local signal must be at least 20% of the retained-region median called signal. These are application review heuristics, not biological diagnoses."),
                       p("Flags are review targets. Left-click centers the chromatogram; right-click opens manual curation actions. No sequence-changing action is applied without an explicit confirmation step."))
                 ),
                 div(class="method-step",
@@ -695,12 +695,12 @@ ui <- fluidPage(
                   div(h4("Manual curation and provenance"),
                       p("The raw AB1 trace and original automatic base calls are never overwritten. The app maintains a curated sequence layer on top of the automatic trim. A user can change a base, set a two-base IUPAC ambiguity code, trim from either side through a flagged position, or mark the call as reviewed and unchanged."),
                       p("Every confirmed action is written to the Manual Curation audit log with sample, raw base position, before/after values, method, chromatogram evidence, timestamp, transaction ID and revision. Undo and redo are logged as well. Automatic trim boundaries are retained separately so the curated result can always be compared with the automatic result."),
-                      p("For a flagged position inside the retained read, the curation menu shows both left- and right-trim actions. A directional recommendation is displayed only when the flag is near a current trim edge: within 15% of the retained length, bounded to 8\u201340 bases. The recommendation never performs a trim by itself and still requires explicit confirmation."))
+                      p("For a flagged position inside the retained read, the curation menu shows both left- and right-trim actions. A directional recommendation is displayed only when the flag is near a current trim edge: within 15% of the retained length, bounded to 8-40 bases. The recommendation never performs a trim by itself and still requires explicit confirmation."))
                 ),
                 div(class="method-step",
                   div(class="method-num", "7"),
                   div(h4("High-confidence bulk correction"),
-                      p("The bulk correction tool always shows a preview before applying changes. By default, a position is proposed only when the current called base is not locally dominant, the alternative channel is the strongest local channel, alternative/current signal is at least 1.80, alternative/third-channel signal is at least 2.00, the alternative peak maximum lies within \u00B12 trace samples of the called-base peak position, and the alternative signal is at least 50% of the retained-region median called signal."),
+                      p("The bulk correction tool always shows a preview before applying changes. By default, a position is proposed only when the current called base is not locally dominant, the alternative channel is the strongest local channel, alternative/current signal is at least 1.80, alternative/third-channel signal is at least 2.00, the alternative peak maximum lies within +/-2 trace samples of the called-base peak position, and the alternative signal is at least 50% of the retained-region median called signal."),
                       p("These thresholds are application heuristics and can be edited from QC & Chromatogram using the Criteria button next to Auto-correct. The active values are saved in the project/run settings and therefore remain part of the analysis provenance. The complete batch is applied as one undoable transaction after user confirmation. Ambiguous double peaks are not bulk-corrected merely because two channels are similar."))
                 )
               ),
@@ -717,7 +717,7 @@ ui <- fluidPage(
                 h3("How BLAST evidence is represented"),
                 div(class="method-step",
                   div(class="method-num", "1"),
-                  div(h4("RID \u2014 Request ID"), p("Identifier returned by NCBI for an individual BLAST job. The app keeps Sample \u2194 RID \u2194 retrieved hits linked."))
+                  div(h4("RID - Request ID"), p("Identifier returned by NCBI for an individual BLAST job. The app keeps Sample <-> RID <-> retrieved hits linked."))
                 ),
                 div(class="method-step",
                   div(class="method-num", "2"),
@@ -733,7 +733,7 @@ ui <- fluidPage(
                 ),
                 div(class="method-step",
                   div(class="method-num", "5"),
-                  div(h4("HSP \u2014 High-scoring Segment Pair"), p("A local alignment segment within a BLAST hit. Multiple HSPs for the same accession are aggregated so that one NCBI record contributes one accession-level hit."))
+                  div(h4("HSP - High-scoring Segment Pair"), p("A local alignment segment within a BLAST hit. Multiple HSPs for the same accession are aggregated so that one NCBI record contributes one accession-level hit."))
                 )
               ),
               div(class="about-callout",
@@ -809,45 +809,45 @@ ui <- fluidPage(
                 "The links below are the main scientific and NCBI sources used to justify the biological context of the workflow. External links open in a new browser tab."),
 
               div(class="reference-card",
-                h4("Schoch et al. 2012 \u2014 ITS as the primary fungal DNA barcode"),
+                h4("Schoch et al. 2012 - ITS as the primary fungal DNA barcode"),
                 p("Compared candidate fungal barcode regions and proposed the nuclear ribosomal ITS region as the universal DNA barcode marker for Fungi."),
-                tags$a(href="https://www.pnas.org/doi/10.1073/pnas.1117018109", target="_blank", rel="noopener noreferrer", "Open PNAS article \u2197")
+                tags$a(href="https://www.pnas.org/doi/10.1073/pnas.1117018109", target="_blank", rel="noopener noreferrer", "Open PNAS article (external)")
               ),
 
               div(class="reference-card",
-                h4("Vu et al. 2018 \u2014 large-scale fungal barcode thresholds"),
+                h4("Vu et al. 2018 - large-scale fungal barcode thresholds"),
                 p("Large-scale analysis of filamentous fungal DNA barcodes. The broad ITS benchmarks used as context in the app (approximately 99.6% species and 94.3% genus) come from this work."),
-                tags$a(href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6020082/", target="_blank", rel="noopener noreferrer", "Open full text at NCBI/PMC \u2197")
+                tags$a(href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6020082/", target="_blank", rel="noopener noreferrer", "Open full text at NCBI/PMC (external)")
               ),
 
               div(class="reference-card",
-                h4("Garnica et al. 2016 \u2014 lineage-dependent ITS thresholds"),
+                h4("Garnica et al. 2016 - lineage-dependent ITS thresholds"),
                 p("Shows that optimal ITS similarity thresholds vary among lineages and that no single identity cutoff is universally reliable even within a diverse fungal genus."),
-                tags$a(href="https://academic.oup.com/femsec/article/92/4/fiw045/2197947", target="_blank", rel="noopener noreferrer", "Open FEMS Microbiology Ecology article \u2197")
+                tags$a(href="https://academic.oup.com/femsec/article/92/4/fiw045/2197947", target="_blank", rel="noopener noreferrer", "Open FEMS Microbiology Ecology article (external)")
               ),
 
               div(class="reference-card",
-                h4("Stielow et al. 2015 \u2014 secondary fungal DNA barcodes"),
+                h4("Stielow et al. 2015 - secondary fungal DNA barcodes"),
                 p("Evaluated secondary fungal barcode loci and universal primers, supporting the use of additional loci when ITS alone does not provide sufficient resolution."),
-                tags$a(href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4713107/", target="_blank", rel="noopener noreferrer", "Open full text at NCBI/PMC \u2197")
+                tags$a(href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4713107/", target="_blank", rel="noopener noreferrer", "Open full text at NCBI/PMC (external)")
               ),
 
               div(class="reference-card",
-                h4("NCBI RefSeq Targeted Loci \u2014 fungal ITS"),
+                h4("NCBI RefSeq Targeted Loci - fungal ITS"),
                 p("Describes NCBI's curated fungal ITS reference collection. Sequences are mostly derived from type material and are maintained with specimen/taxonomic context."),
-                tags$a(href="https://www.ncbi.nlm.nih.gov/refseq/targetedloci/", target="_blank", rel="noopener noreferrer", "Open NCBI RefSeq Targeted Loci \u2197")
+                tags$a(href="https://www.ncbi.nlm.nih.gov/refseq/targetedloci/", target="_blank", rel="noopener noreferrer", "Open NCBI RefSeq Targeted Loci (external)")
               ),
 
               div(class="reference-card",
                 h4("NCBI BLAST documentation"),
                 p("Technical definitions for BLAST output fields including Bit score, HSPs and query-coverage measures used by the application parser."),
-                tags$a(href="https://www.ncbi.nlm.nih.gov/books/NBK279684/", target="_blank", rel="noopener noreferrer", "Open NCBI BLAST+ manual \u2197")
+                tags$a(href="https://www.ncbi.nlm.nih.gov/books/NBK279684/", target="_blank", rel="noopener noreferrer", "Open NCBI BLAST+ manual (external)")
               ),
 
               div(class="reference-card",
-                h4("UNITE \u2014 fungal ITS reference and Species Hypotheses"),
+                h4("UNITE - fungal ITS reference and Species Hypotheses"),
                 p("A fungal ITS-centered identification resource and Species Hypotheses system. It is included here as scientific context and a possible future curated-reference extension; the current app does not query UNITE directly."),
-                tags$a(href="https://unite.ut.ee/", target="_blank", rel="noopener noreferrer", "Open UNITE \u2197")
+                tags$a(href="https://unite.ut.ee/", target="_blank", rel="noopener noreferrer", "Open UNITE (external)")
               ),
 
               div(class="about-callout",

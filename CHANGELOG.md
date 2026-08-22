@@ -1,6 +1,27 @@
 # Changelog
 
+## 3.0.3
+
+- Test-harness stabilization patch: fixed the undefined `app_dir` reference introduced by the 3.0.2 project-structure preflight.
+- Moved R syntax validation to a dedicated preflight that parses every application, test, and script R file before test group 1; this catches invalid string escapes and other parse failures before the numbered suite starts.
+- Test-runner success output now reads the current version from `VERSION.txt`, preventing stale hard-coded release labels.
+- Installed the user-approved canonical PITAX logo as `www/logo.png` and added a byte-level MD5 regression guard so older logo assets cannot silently return.
+- No schema, scientific algorithm, workflow order, folder organization, BLAST/taxonomy logic, QC logic, or consensus behavior changed.
+
+## 3.0.2
+
+- Test-suite hotfix only; no application runtime, UI, scientific logic, schema, assets, or folder changes.
+- Fixed invalid R string escapes (`\|` and `\-`) introduced in regression-test markers during the 3.0.1 ASCII-safe punctuation conversion.
+- Added a static preflight check to the project-structure contract so invalid punctuation escapes in R test sources are caught before the numbered test groups run.
+
 This file records changes that affect the way the pipeline behaves, presents results, or stores project data. Small internal refactors are omitted unless they change something visible or scientifically relevant.
+
+## 3.0.1
+
+- Encoding stabilization patch only; no folder reorganization, scientific logic, schema, or logo changes.
+- Removed runtime Unicode escape sequences from UI/server/browser strings and replaced them with ASCII-safe display equivalents to prevent literal `<U+XXXX>` and locale-dependent mojibake on Windows/Shiny hosts.
+- Updated the project-structure regression contract: runtime source remains ASCII-safe and now also rejects `\uXXXX` escapes that can leak as literal Unicode placeholders.
+- Adopted PITAX X.Y.Z versioning: X = major/dramatic tool change, Y = incremental feature/improvement release, Z = fixes/stabilization.
 
 ## 3.0.0-alpha.10.3
 **Encoding and release-process recovery**

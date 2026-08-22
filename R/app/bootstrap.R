@@ -23,6 +23,6 @@ pitax_source(file.path("R", "domain", "sanger", "sequence_tools.R"), local = TRU
 pitax_source(file.path("R", "export", "export_tools.R"), local = TRUE)
 pitax_source(file.path("R", "services", "taxonomy_tools.R"), local = TRUE)
 
-APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.0.0-alpha.10.3")
-APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "3.0.0-alpha.10.3", APP_VERSION)
+APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.0.3")
+APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "3.0.3", APP_VERSION)
 PROJECT_SCHEMA_VERSION <- 6L

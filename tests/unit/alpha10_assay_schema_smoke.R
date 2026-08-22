@@ -1,4 +1,4 @@
-# PITAX v3.0.0-alpha.10.3 - schema 6 assay/locus foundation tests.
+# PITAX - schema 6 assay/locus foundation tests.
 
 source(file.path("R", "domain", "assay", "assay_profiles.R"))
 source(file.path("R", "domain", "assignment", "stage2_architecture.R"))
@@ -63,4 +63,4 @@ assert_true(all(migrated$read_assignments$Assay_ID == migrated$assay_profiles$As
 assert_true(identical(migrated$results$FB120_1$evidence_marker, "preserve-me"), "Schema-5 migration changed read evidence.")
 assert_true(identical(migrated$blast_hits$accession, "NR_000001.1"), "Schema-5 migration changed BLAST evidence.")
 
-cat("v3.0.0-alpha.10.3 assay/schema-6 foundation tests passed.\n")
+cat("Assay/schema-6 foundation tests passed.\n")

@@ -1,4 +1,4 @@
-PITAX v3.0.0-alpha.10.3 — Alpha 10 schema foundation
+PITAX v3.0.3 - Alpha 10 schema foundation
 =========================================================
 
 Purpose
@@ -60,7 +60,7 @@ Run `run_tests.bat` on Windows with R installed.
 
 Expected final line:
 
-  All PITAX v3.0.0-alpha.10.3 tests passed.
+  All PITAX v3.0.3 tests passed.
 
 The suite now has 15 groups. Alpha 10 tests cover controlled loci, assay-linked reads,
 schema-5 migration and multi-assay architecture. Stage 4 tests prove duplicate Isolate/Locus

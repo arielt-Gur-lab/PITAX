@@ -228,10 +228,10 @@
     })
 
     rv$blast_batch_status_text <- paste0(
-      "Batch submission complete \u00B7 submitted: ", submitted,
-      " \u00B7 skipped matching active jobs: ", skipped,
-      " \u00B7 failed: ", failed,
-      if (length(failures)) paste0(" \u00B7 ", paste(failures, collapse=" | ")) else ""
+      "Batch submission complete | submitted: ", submitted,
+      " | skipped matching active jobs: ", skipped,
+      " | failed: ", failed,
+      if (length(failures)) paste0(" | ", paste(failures, collapse=" | ")) else ""
     )
     showNotification(rv$blast_batch_status_text, type=if(failed) "warning" else "message", duration=10)
   })
@@ -448,13 +448,13 @@
     })
 
     rv$blast_batch_status_text <- paste0(
-      "Selected retrieval \u00B7 jobs: ", length(selected_rows),
-      " \u00B7 ready: ", ready,
-      " \u00B7 still running: ", waiting,
-      " \u00B7 too soon to poll: ", too_soon,
-      " \u00B7 no parsed hits: ", no_hits,
-      " \u00B7 stale: ", stale,
-      " \u00B7 failed: ", failed
+      "Selected retrieval | jobs: ", length(selected_rows),
+      " | ready: ", ready,
+      " | still running: ", waiting,
+      " | too soon to poll: ", too_soon,
+      " | no parsed hits: ", no_hits,
+      " | stale: ", stale,
+      " | failed: ", failed
     )
     showNotification(rv$blast_batch_status_text, type=if(failed) "warning" else "message", duration=10)
   })
@@ -500,12 +500,12 @@
     })
 
     rv$blast_batch_status_text <- paste0(
-      "Batch retrieval \u00B7 ready: ", ready,
-      " \u00B7 still running: ", waiting,
-      " \u00B7 too soon to poll: ", too_soon,
-      " \u00B7 no parsed hits: ", no_hits,
-      " \u00B7 stale: ", stale,
-      " \u00B7 failed: ", failed
+      "Batch retrieval | ready: ", ready,
+      " | still running: ", waiting,
+      " | too soon to poll: ", too_soon,
+      " | no parsed hits: ", no_hits,
+      " | stale: ", stale,
+      " | failed: ", failed
     )
     showNotification(rv$blast_batch_status_text, type=if(failed) "warning" else "message", duration=10)
   })
@@ -521,7 +521,7 @@
     j <- jobs[nrow(jobs), ]
     div(
       class=if(j$status == "READY") "status-ok" else "status-warning",
-      paste("Selected sequence \u00B7 RID:", j$rid, "| Status:", j$status,
+      paste("Selected sequence | RID:", j$rid, "| Status:", j$status,
             "| Database:", if (nzchar(as.character(j$database))) j$database else "legacy/unknown",
             "| Requested hits:", j$hitlist_size,
             "| Estimated wait (RTOE):", j$rtoe, "seconds")

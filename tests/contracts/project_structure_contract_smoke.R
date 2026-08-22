@@ -1,4 +1,4 @@
-# PITAX v3.0.0-alpha.10.3 - organized project structure contract.
+# PITAX - organized project structure contract.
 
 required_files <- c(
   "app.R",
@@ -37,8 +37,17 @@ contains_non_ascii <- vapply(runtime_source_files, function(path) {
 }, logical(1))
 if (any(contains_non_ascii)) {
   stop(
-    "Runtime source must be ASCII-only; use Unicode escapes instead: ",
+    "Runtime source must remain ASCII-safe: ",
     paste(runtime_source_files[contains_non_ascii], collapse = ", "),
+    call. = FALSE
+  )
+}
+runtime_text <- vapply(runtime_source_files, function(path) paste(readLines(path, warn = FALSE), collapse = "\n"), character(1))
+has_unicode_escape <- grepl("\\\\u[0-9A-Fa-f]{4}", runtime_text, perl = TRUE)
+if (any(has_unicode_escape)) {
+  stop(
+    "Runtime source contains Unicode escape sequences that can leak as <U+XXXX> on locale-sensitive hosts: ",
+    paste(runtime_source_files[has_unicode_escape], collapse = ", "),
     call. = FALSE
   )
 }
@@ -71,4 +80,15 @@ expected_modules <- file.path(
 if (!identical(server_env$PITAX_SERVER_MODULES, expected_modules)) stop("Server stage order changed unexpectedly.", call. = FALSE)
 if (!all(file.exists(expected_modules))) stop("One or more server stage modules are missing.", call. = FALSE)
 
-cat("v3.0.0-alpha.10.3 project structure contract passed.\n")
+current_version <- trimws(readLines("VERSION.txt", warn = FALSE, n = 1L))
+if (length(current_version) != 1L || !grepl("^[0-9]+[.][0-9]+[.][0-9]+$", current_version)) {
+  stop("VERSION.txt must contain one X.Y.Z version string.", call. = FALSE)
+}
+
+canonical_logo_md5 <- "f1e67ad4a15d181f7998cf93f81025ed"
+actual_logo_md5 <- unname(tools::md5sum(file.path("www", "logo.png")))
+if (!identical(actual_logo_md5, canonical_logo_md5)) {
+  stop("www/logo.png is not the approved canonical PITAX logo asset.", call. = FALSE)
+}
+
+cat("PITAX v", current_version, " project structure contract passed.\n", sep = "")

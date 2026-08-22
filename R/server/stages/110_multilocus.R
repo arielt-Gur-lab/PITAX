@@ -31,7 +31,7 @@
 
   multilocus_metric_text <- function(x) {
     value <- suppressWarnings(as.numeric(x[1]))
-    if (!length(value) || !is.finite(value)) return("\u2014")
+    if (!length(value) || !is.finite(value)) return("-")
     paste0(format(round(value, 2), trim = TRUE, scientific = FALSE), "%")
   }
 
@@ -134,7 +134,7 @@
           span(class = "multilocus-status-badge", multilocus_status_label(status))),
       div(class = "multilocus-profile-conclusion", stage4_scalar_text(row$Profile_Conclusion)),
       div(class = "multilocus-next-action",
-          strong(paste0(stage4_scalar_text(row$Locus_Count, "0"), " loci \u00B7 ", stage4_scalar_text(row$Taxonomy_Complete, "0/0"), " taxonomically interpreted")),
+          strong(paste0(stage4_scalar_text(row$Locus_Count, "0"), " loci | ", stage4_scalar_text(row$Taxonomy_Complete, "0/0"), " taxonomically interpreted")),
           tags$br(),
           strong("Next action: "), stage4_scalar_text(row$Next_Action))
     )
@@ -170,15 +170,15 @@
             span(stage4_scalar_text(row$Locus, "Unknown locus")),
             span(class = "multilocus-locus-state", if (analyzed) "Analyzed" else "Not analyzed")),
         div(class = "multilocus-locus-call", call),
-        div(class = "multilocus-locus-meta", paste0("Rank: ", rank, " \u00B7 Confidence: ", confidence)),
+        div(class = "multilocus-locus-meta", paste0("Rank: ", rank, " | Confidence: ", confidence)),
         div(class = "multilocus-locus-bars",
             bar("Identity", row$Best_Match_Identity),
             bar("Coverage", row$Best_Match_Coverage)),
         div(class = "multilocus-locus-meta", strong("Best match: "), best_match,
-            if (nzchar(accession)) paste0(" \u00B7 ", accession) else NULL),
+            if (nzchar(accession)) paste0(" | ", accession) else NULL),
         div(class = "multilocus-locus-meta", strong("Reference: "), reference),
         div(class = "multilocus-locus-meta", strong("Discrimination: "), discrimination),
-        div(class = "multilocus-locus-meta", strong("Source: "), stage4_scalar_text(row$Source), " \u00B7 ", rid)
+        div(class = "multilocus-locus-meta", strong("Source: "), stage4_scalar_text(row$Source), " | ", rid)
       )
     })
     div(class = "multilocus-locus-grid", tagList(cards))
@@ -238,14 +238,14 @@
     profile <- stage4_ensure_profile(rv$multilocus_profile)
     error <- stage4_profile_gate_error(profile)
     if (!isTRUE(multilocus_current_session_matches())) {
-      return(div(class = "status-error", "\u26A0 The current session changed after this profile was built. Rebuild Stage 4 before export."))
+      return(div(class = "status-error", "Warning: The current session changed after this profile was built. Rebuild Stage 4 before export."))
     }
-    if (!is.null(error)) return(div(class = "status-warning", paste0("\u26A0 ", error)))
+    if (!is.null(error)) return(div(class = "status-warning", paste0("Warning: ", error)))
     conflict_n <- if (nrow(profile$profiles)) sum(profile$profiles$Profile_Status %in% c("GENUS_CONFLICT", "SPECIES_CONFLICT")) else 0L
     if (conflict_n > 0L) {
-      return(div(class = "status-warning", paste0("\u2713 Structure is valid. ", conflict_n, " isolate profile(s) retain a biological conflict; no combined call is made for them.")))
+      return(div(class = "status-warning", paste0("OK: Structure is valid. ", conflict_n, " isolate profile(s) retain a biological conflict; no combined call is made for them.")))
     }
-    div(class = "status-ok", "\u2713 At least two loci are present and every Isolate/Locus evidence row is unique.")
+    div(class = "status-ok", "OK: At least two loci are present and every Isolate/Locus evidence row is unique.")
   })
 
   output$multilocus_sources_table <- renderDT({

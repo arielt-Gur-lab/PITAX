@@ -2,6 +2,10 @@
 setlocal
 cd /d "%~dp0"
 
+set "PITAX_VERSION="
+set /p PITAX_VERSION=<VERSION.txt
+if not defined PITAX_VERSION set "PITAX_VERSION=unknown"
+
 set "RDIR="
 for /d %%D in ("C:\Program Files\R\R-*") do set "RDIR=%%D"
 
@@ -15,6 +19,11 @@ echo Using R from:
 echo %RDIR%
 echo.
 
+echo [preflight] Parse all R sources
+"%RDIR%\bin\Rscript.exe" "tests\preflight\parse_all_r_sources.R"
+if errorlevel 1 goto :failed
+
+echo.
 echo [1/15] Taxonomy logic smoke tests
 "%RDIR%\bin\Rscript.exe" "tests\unit\taxonomy_logic_smoke.R"
 if errorlevel 1 goto :failed
@@ -90,7 +99,7 @@ echo [15/15] Alpha 10 assay and schema 6 foundation tests
 if errorlevel 1 goto :failed
 
 echo.
-echo All PITAX v3.0.0-alpha.10.3 tests passed.
+echo All PITAX v%PITAX_VERSION% tests passed.
 pause
 exit /b 0
 

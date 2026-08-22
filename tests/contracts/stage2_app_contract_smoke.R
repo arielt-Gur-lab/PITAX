@@ -24,8 +24,8 @@ must_contain(app_text, 'tags$option(value = "Forward"')
 must_contain(app_text, 'tags$option(value = "Reverse"')
 must_contain(app_text, 'collect_assignment_editor <- function()')
 must_contain(app_text, 'radioButtons(')
-must_contain(app_text, '"Simple reads \\u2014 no Forward/Reverse matching" = "simple"')
-must_contain(app_text, '"Paired reads \\u2014 build Forward/Reverse consensus" = "paired_consensus"')
+must_contain(app_text, '"Simple reads - no Forward/Reverse matching" = "simple"')
+must_contain(app_text, '"Paired reads - build Forward/Reverse consensus" = "paired_consensus"')
 must_contain(app_text, 'Assignment key must contain old_id, isolate, direction, and assay_id or locus (gene).')
 must_contain(app_text, 'name_error <- stage2_identity_error(rv$read_assignments)')
 must_contain(app_text, 'sync_assignment_state()')
@@ -70,7 +70,7 @@ must_not_contain(to_rename_contract, 'trim_one_ab1(')
 must_contain(substr(app_text, run_trimming_pos, nchar(app_text)), 'trim_one_ab1(')
 
 final_names_pos <- regexpr('card_title("Final read / FASTA names and biological identity"', app_text, fixed = TRUE)[1]
-architecture_pos <- regexpr('card_title("Stage 2 \\u00B7 Architecture preview"', app_text, fixed = TRUE)[1]
+architecture_pos <- regexpr('card_title("Stage 2 | Architecture preview"', app_text, fixed = TRUE)[1]
 if (final_names_pos < 1L || architecture_pos < 1L || final_names_pos >= architecture_pos) {
   stop("Generated final names must appear before the architecture preview.", call. = FALSE)
 }
