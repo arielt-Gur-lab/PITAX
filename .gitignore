@@ -17,6 +17,9 @@ Old/
 # Raw sequencing files
 *.ab1
 
+# Controlled AB1 fixtures are part of the automated test suite.
+!tests/fixtures/**/*.ab1
+
 # PITAX project/session files
 *.sangerproject
 *.rds

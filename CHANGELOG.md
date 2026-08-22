@@ -2,6 +2,38 @@
 
 This file records changes that affect the way the pipeline behaves, presents results, or stores project data. Small internal refactors are omitted unless they change something visible or scientifically relevant.
 
+## 3.0.0-alpha.9.2
+**Project structure and development continuity**
+- Reduced `app.R` to a small application entry point and separated bootstrap, UI, server, browser assets, domain logic, services and exports by responsibility.
+- Grouped automated tests into unit, integration and contract suites, and moved controlled AB1 data under `tests/fixtures`.
+- Moved documentation, deployment utilities, static assets and reusable templates into dedicated directories.
+- Updated all source paths, download paths and the Windows test runner to the organized layout.
+- Added `docs/PITAX_MASTER.md` as the authoritative development guide for product intent, scientific invariants, data dependencies, lessons learned and the agreed roadmap.
+- Added a fourteenth contract test that protects the composition root, module locations, external browser assets and server-stage load order.
+- Kept project schema 5 and all processing, consensus, BLAST, taxonomy and multi-locus behavior unchanged.
+
+## 3.0.0-alpha.9.1
+**Multi-locus visual interpretation and global table alignment**
+- Added a visual Stage 4 interpretation workspace with isolate selection, project-wide overview counts, a status/conclusion panel, Identity/coverage comparison and one evidence card per locus.
+- Kept the complete source, isolate-profile and per-locus audit tables below the new visual layer.
+- Kept multiple isolates strictly separated in the visual selector while showing all imported loci for the selected isolate.
+- Fixed horizontal DataTables header/body drift by removing the global forced-width override, enabling automatic width calculation for scrolling tables, recalculating visible tables after tab/data changes and synchronizing header/body scrolling.
+- Added multi-isolate visual-selection tests and a thirteenth regression group covering the global DataTables alignment contract.
+- No project schema or scientific interpretation rules changed in this maintenance release.
+
+## 3.0.0-alpha.9
+**Stage 4 multi-locus isolate profile foundation**
+- Added a ninth workflow screen that imports separately completed single-locus PITAX projects and joins evidence only by the explicit Isolate field.
+- Added project schema 5 with a persistent `pitax-multilocus-profile-v1` snapshot while preserving all Stage 3, BLAST and taxonomy evidence during migration.
+- Retained one evidence row per Isolate/Locus with sequence, consensus revision, source-project fingerprint, BLAST RID, taxonomic interpretation, locus limitation and reference context.
+- Blocked duplicate Isolate/Locus evidence and repeated source files.
+- Added conservative profile states for concordant species, concordant genus, missing taxonomy, partial evidence, species conflict and genus conflict.
+- Explicitly prohibited flat locus voting: even a 2:1 majority cannot erase a conflicting genus call.
+- Added current-session staleness detection and disabled Stage 4 downloads until a changed current project is rebuilt into the profile.
+- Added profile/evidence CSV, multi-locus FASTA and Checkpoint F ZIP exports.
+- Expanded the Windows test runner from 10 to 12 groups with Stage 4 logic and Shiny integration contracts.
+- Stage 3 controlled-fixture validation is accepted for continued development; independently sequenced paired-AB1 validation remains deferred.
+
 ## 3.0.0-alpha.8.2
 **Shiny reactive-context startup hotfix**
 - Removed the hidden `rv$project_mode` read from the navigation helper and now pass project mode explicitly from reactive observers.

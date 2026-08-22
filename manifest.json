@@ -3897,139 +3897,217 @@
   },
   "files": {
     "app.R": {
-      "checksum": "f99cd10f9dc394b167c40ccea916b894"
-    },
-    "assignment_key_template.csv": {
-      "checksum": "c0c2c530384487551c0c137d7e354549"
+      "checksum": "0c74eb4d2c9365e7b864615848937469"
     },
     "CHANGELOG.md": {
-      "checksum": "b9fe2a14e1295df111292b57e2a4c422"
+      "checksum": "e5555b5a199ce6a3cf94f05d571dc6ee"
     },
-    "DEPLOYMENT.md": {
-      "checksum": "b1d95c7b85a425daec686ba3cbaba436"
+    "docs/DEPLOYMENT.md": {
+      "checksum": "5337b8749af3f0d03ce237ea1b8172c2"
+    },
+    "docs/PITAX_MASTER.md": {
+      "checksum": "15081a67bf04273fc4288cd62e66e4b5"
+    },
+    "docs/stages/V3_STAGE1.md": {
+      "checksum": "4f3046ca732302de7f5e16b59d6ec432"
+    },
+    "docs/stages/V3_STAGE2.md": {
+      "checksum": "09df045fc9b7dc48d654b7863b7f8576"
+    },
+    "docs/stages/V3_STAGE3.md": {
+      "checksum": "055766fa3757c777c631ae5fa97209a9"
+    },
+    "docs/stages/V3_STAGE4.md": {
+      "checksum": "8ca4efb3171d96e86ab1fd58654d9cfd"
+    },
+    "docs/V3_ROADMAP.md": {
+      "checksum": "95bec75eea915d11e6edd5688909c8b5"
     },
     "EDIT_CLOUD_CONNECT.bat": {
-      "checksum": "9dd6a4d8257df1953af291b2e65b06a3"
+      "checksum": "aa1d4ab88d66ab05a02f872a8a50aedd"
     },
     "Git.BAT": {
-      "checksum": "6a06337ea09989e5a3b280ace3f6673b"
+      "checksum": "cd00470efb61d69bfe08a7c4ed724e0d"
     },
-    "logo.png": {
-      "checksum": "a14851bfff729b420f2b47743ec0f938"
+    "R/app/bootstrap.R": {
+      "checksum": "65d30693928f0fcb3d396db3d737285e"
     },
-    "prepare_connect_cloud.R": {
-      "checksum": "51cdca309fc3903a1375bbe95f7e907c"
-    },
-    "R/ab1_evidence.R": {
-      "checksum": "1485a7bda202c7d8c962d66cd98f525c"
-    },
-    "R/core_sanger.R": {
-      "checksum": "0bd2f692de81f5f13e2d53642ecda900"
-    },
-    "R/export_tools.R": {
-      "checksum": "d568337691ed79e178d0c50ae8b6fc19"
-    },
-    "R/sequence_tools.R": {
-      "checksum": "3759be3c74b297f2172c47c1b6bce4dc"
-    },
-    "R/stage2_architecture.R": {
+    "R/domain/assignment/stage2_architecture.R": {
       "checksum": "6a9dee6a38df753299674129717b0fa9"
     },
-    "R/stage3_consensus.R": {
+    "R/domain/consensus/stage3_consensus.R": {
       "checksum": "5d3a0de7f92e86295ef20c381e14d78f"
     },
-    "R/taxonomy_tools.R": {
+    "R/domain/multilocus/stage4_multilocus.R": {
+      "checksum": "b0c7060086f8b21b50c5594193b31126"
+    },
+    "R/domain/sanger/ab1_evidence.R": {
+      "checksum": "1485a7bda202c7d8c962d66cd98f525c"
+    },
+    "R/domain/sanger/core_sanger.R": {
+      "checksum": "0bd2f692de81f5f13e2d53642ecda900"
+    },
+    "R/domain/sanger/sequence_tools.R": {
+      "checksum": "3759be3c74b297f2172c47c1b6bce4dc"
+    },
+    "R/export/export_tools.R": {
+      "checksum": "d568337691ed79e178d0c50ae8b6fc19"
+    },
+    "R/server/app_server.R": {
+      "checksum": "802c2775739238674a698671f113065c"
+    },
+    "R/server/stages/00_state.R": {
+      "checksum": "dd593160b8f9c3c0cfa91c10838a4c5b"
+    },
+    "R/server/stages/10_project.R": {
+      "checksum": "91ff35d102e4028fb54ce33f91bf007a"
+    },
+    "R/server/stages/100_taxonomy.R": {
+      "checksum": "b91b607a16c9c780fedcef556d3ca850"
+    },
+    "R/server/stages/110_multilocus.R": {
+      "checksum": "cbae56794684e0e500fbe222fea64e51"
+    },
+    "R/server/stages/120_reset.R": {
+      "checksum": "e63e4a1259ba321be966034e44645ebf"
+    },
+    "R/server/stages/20_upload.R": {
+      "checksum": "208d2905a4640223324430ca5b5ea380"
+    },
+    "R/server/stages/30_trimming.R": {
+      "checksum": "32be0b5c9f239b18d44710d860946377"
+    },
+    "R/server/stages/40_qc_summary.R": {
+      "checksum": "288d5816c8a8123e3ed4817bdd6c0d6f"
+    },
+    "R/server/stages/50_evidence_review.R": {
+      "checksum": "cc9ec4d114c1109307156592ff8f62c8"
+    },
+    "R/server/stages/60_assignment.R": {
+      "checksum": "07605ce23002a7306b0b8cc5d30a736d"
+    },
+    "R/server/stages/70_consensus.R": {
+      "checksum": "cb45e8df8912c4b8cc6356bf4e0ed393"
+    },
+    "R/server/stages/80_export.R": {
+      "checksum": "9ab34897c6a88340ad835cbc55aec6db"
+    },
+    "R/server/stages/90_blast.R": {
+      "checksum": "c31d37de6eae0b654f057d514aa9aa27"
+    },
+    "R/services/taxonomy_tools.R": {
       "checksum": "6aa0b9f331e5eaf8c319833b9bf49bc0"
     },
-    "README.txt": {
-      "checksum": "1d5b3b9f95d4fab7732f8ed5f8d2dcb3"
+    "R/ui/app_ui.R": {
+      "checksum": "95a7fd6e2a69e89f48de56a35754b47f"
+    },
+    "R/ui/components.R": {
+      "checksum": "0d712dd4a83002fe6975675b668dc28d"
+    },
+    "README.md": {
+      "checksum": "e978779a6700f0ab9c7cc7db74243d0b"
     },
     "run_app.bat": {
       "checksum": "e747f1c11fc42fde571e1ec7e14cd626"
     },
     "run_tests.bat": {
-      "checksum": "232b3e3f89d08859d7d4884602e7da5c"
+      "checksum": "2c09d56b5712d1a65ba1d28a5f10bbf3"
     },
-    "TEST/Stage3_conflict_pair/assignment_key.csv": {
-      "checksum": "7e9f078cc40c681922cf043da58e7154"
+    "scripts/prepare_connect_cloud.R": {
+      "checksum": "832c0a73719d2f94bdfe2fcbf72df9b6"
     },
-    "TEST/Stage3_conflict_pair/README.txt": {
-      "checksum": "789228657eb58d1159de2e3f6c4d4c9a"
+    "templates/assignment_key_template.csv": {
+      "checksum": "c0c2c530384487551c0c137d7e354549"
     },
-    "TEST/Stage3_conflict_pair/TESTCONFLICT001_forward.ab1": {
-      "checksum": "7524afd17cc8415170e35bb1be3eca91"
+    "tests/contracts/datatables_alignment_contract_smoke.R": {
+      "checksum": "563be3e842b0dacf92087122dcca0ce6"
     },
-    "TEST/Stage3_conflict_pair/TESTCONFLICT001_reverse.ab1": {
-      "checksum": "a9d449473e239aaab3177f82f641a453"
+    "tests/contracts/project_structure_contract_smoke.R": {
+      "checksum": "af983fb5f7eae71f1b98a4f85c2df59e"
     },
-    "TEST/Stage3_synthetic_pair/assignment_key.csv": {
-      "checksum": "b722d1df0e1c105e88dbff278ce72622"
+    "tests/contracts/stage2_app_contract_smoke.R": {
+      "checksum": "93b38546845b93bafb06ba390a8ab832"
     },
-    "TEST/Stage3_synthetic_pair/BIOPYTHON_LICENSE.rst": {
-      "checksum": "c52c51048a819935fe8b93eb2bbda611"
+    "tests/contracts/stage4_app_contract_smoke.R": {
+      "checksum": "e24555de828cabe6d85ce531a04b88fb"
     },
-    "TEST/Stage3_synthetic_pair/expected_forward_calls.fasta": {
-      "checksum": "3cffe6a1b6fb5698c263754deff1d87d"
+    "tests/contracts/workflow_order_smoke.R": {
+      "checksum": "5fcba55d58d149f2a7135f46a305f9d4"
     },
-    "TEST/Stage3_synthetic_pair/README.txt": {
-      "checksum": "af62bd79d262fb51f6e7c59f8c44fe64"
-    },
-    "TEST/Stage3_synthetic_pair/TESTPAIR001_forward.ab1": {
-      "checksum": "7524afd17cc8415170e35bb1be3eca91"
-    },
-    "TEST/Stage3_synthetic_pair/TESTPAIR001_reverse.ab1": {
-      "checksum": "80b8bf468b4b03dd3c3b722baeb069d9"
-    },
-    "tests/__pycache__/generate_stage3_ab1_fixture.cpython-312.pyc": {
-      "checksum": "510eef7f96544e0236c41b6cac8e7b49"
-    },
-    "tests/ab1_evidence_smoke.R": {
-      "checksum": "c76798581d12e80d86707cff65ac9a4b"
-    },
-    "tests/generate_stage3_ab1_fixture.py": {
+    "tests/fixtures/generate_stage3_ab1_fixture.py": {
       "checksum": "52c677cd1006e183731a4d3c8b9d8d4f"
     },
-    "tests/manual_curation_smoke.R": {
-      "checksum": "2385057d4f1ecbfa2243a5ee46f81307"
+    "tests/fixtures/Stage3_conflict_pair/assignment_key.csv": {
+      "checksum": "7e9f078cc40c681922cf043da58e7154"
     },
-    "tests/qc_peak_flags_smoke.R": {
-      "checksum": "713a9e81778de7cb3a327327f51449cf"
+    "tests/fixtures/Stage3_conflict_pair/README.txt": {
+      "checksum": "789228657eb58d1159de2e3f6c4d4c9a"
     },
-    "tests/stage2_app_contract_smoke.R": {
-      "checksum": "a5f06cb09851eb7b8b28d8bbb4dd003b"
+    "tests/fixtures/Stage3_conflict_pair/TESTCONFLICT001_forward.ab1": {
+      "checksum": "7524afd17cc8415170e35bb1be3eca91"
     },
-    "tests/stage2_architecture_smoke.R": {
-      "checksum": "2156e476302923cd9bb5f8f809cf8b5c"
+    "tests/fixtures/Stage3_conflict_pair/TESTCONFLICT001_reverse.ab1": {
+      "checksum": "a9d449473e239aaab3177f82f641a453"
     },
-    "tests/stage3_ab1_fixture_smoke.R": {
-      "checksum": "60c406b93003f48a95726ff51be71ba7"
+    "tests/fixtures/Stage3_synthetic_pair/assignment_key.csv": {
+      "checksum": "b722d1df0e1c105e88dbff278ce72622"
     },
-    "tests/stage3_app_contract_smoke.R": {
-      "checksum": "09f46705c704887342c174eb1fddb22c"
+    "tests/fixtures/Stage3_synthetic_pair/BIOPYTHON_LICENSE.rst": {
+      "checksum": "c52c51048a819935fe8b93eb2bbda611"
     },
-    "tests/stage3_consensus_smoke.R": {
-      "checksum": "a8d18d83672dc7d71db5525f90f37901"
+    "tests/fixtures/Stage3_synthetic_pair/expected_forward_calls.fasta": {
+      "checksum": "3cffe6a1b6fb5698c263754deff1d87d"
     },
-    "tests/taxonomy_logic_smoke.R": {
-      "checksum": "d31f5a597f2c6b6009303a9f1dc97521"
+    "tests/fixtures/Stage3_synthetic_pair/README.txt": {
+      "checksum": "af62bd79d262fb51f6e7c59f8c44fe64"
     },
-    "tests/workflow_order_smoke.R": {
-      "checksum": "d3fd5f1b4d8be01cf36d451aebb3fd7d"
+    "tests/fixtures/Stage3_synthetic_pair/TESTPAIR001_forward.ab1": {
+      "checksum": "7524afd17cc8415170e35bb1be3eca91"
     },
-    "V3_ROADMAP.md": {
-      "checksum": "1266a6104aa8d0e555e8f71da67a010c"
+    "tests/fixtures/Stage3_synthetic_pair/TESTPAIR001_reverse.ab1": {
+      "checksum": "80b8bf468b4b03dd3c3b722baeb069d9"
     },
-    "V3_STAGE1.md": {
-      "checksum": "4f3046ca732302de7f5e16b59d6ec432"
+    "tests/helpers/test_paths.R": {
+      "checksum": "61695a3b4b893705cb6369ab6afd4ec3"
     },
-    "V3_STAGE2.md": {
-      "checksum": "425ebc9cb5ef9a9583ef0f54d1b381a8"
+    "tests/integration/stage3_ab1_fixture_smoke.R": {
+      "checksum": "98efcd54416eea17cf40c7f9782f3910"
     },
-    "V3_STAGE3.md": {
-      "checksum": "fecab61284c8d45fba5f95c88b8f9742"
+    "tests/integration/stage3_app_contract_smoke.R": {
+      "checksum": "e90197470f77dab55094416d46dee3aa"
+    },
+    "tests/unit/ab1_evidence_smoke.R": {
+      "checksum": "8f80a2843a08d49600bfc7d631145d56"
+    },
+    "tests/unit/manual_curation_smoke.R": {
+      "checksum": "592834d5679188f1daff1b0c39d0f4a6"
+    },
+    "tests/unit/qc_peak_flags_smoke.R": {
+      "checksum": "f66c98c6be3b89360efe7b3bd88d4c67"
+    },
+    "tests/unit/stage2_architecture_smoke.R": {
+      "checksum": "aae40a43035dd37356bf1ab24b8da5e6"
+    },
+    "tests/unit/stage3_consensus_smoke.R": {
+      "checksum": "3a4b0d116b9787dee1943512ead4a574"
+    },
+    "tests/unit/stage4_multilocus_smoke.R": {
+      "checksum": "88936ac87cded792183386d8fa8f9a26"
+    },
+    "tests/unit/taxonomy_logic_smoke.R": {
+      "checksum": "0001b593b531a6626c064bb68c4915f6"
     },
     "VERSION.txt": {
-      "checksum": "e83adb4c02a6ef90b5f720736b968c41"
+      "checksum": "26a6376549bfb080c2a1c5d14527b65b"
+    },
+    "www/logo.png": {
+      "checksum": "a14851bfff729b420f2b47743ec0f938"
+    },
+    "www/pitax.css": {
+      "checksum": "5642211e6f450fa6fa9ac4d99de18c6f"
+    },
+    "www/pitax.js": {
+      "checksum": "8f8d0c81baa021fe71fcc3e6c47cf442"
     }
   },
   "users": null

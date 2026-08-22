@@ -1,10 +1,27 @@
 @echo off
+setlocal
 cd /d "%~dp0"
 
-REM Run the R script and wait until it finishes
-"C:\Program Files\R\R-4.5.2\bin\Rscript.exe" "prepare_connect_cloud.R"
+set "RDIR="
+for /d %%D in ("C:\Program Files\R\R-*") do set "RDIR=%%D"
 
-REM Open the generated manifest
+if not defined RDIR (
+  echo R installation was not found under C:\Program Files\R\
+  pause
+  exit /b 1
+)
+
+echo Using R from:
+echo %RDIR%
+echo.
+
+"%RDIR%\bin\Rscript.exe" "scripts\prepare_connect_cloud.R"
+if errorlevel 1 (
+  echo.
+  echo Failed to create manifest.json.
+  pause
+  exit /b 1
+)
+
 start "" "manifest.json"
-
-exit
+exit /b 0
