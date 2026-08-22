@@ -79,7 +79,7 @@ ui <- fluidPage(
       # 2. Assay and trimming settings
       # --------------------------------------------------------
       tabPanel("2 · Assay", value = "settings",
-        stage_heading("sliders", "Assay setup", "Define run-level locus/primer defaults and the automatic trimming rules. Trimming starts only after Rename.", "Step 2 of 9"),
+        stage_heading("sliders", "Assay setup", "Define the assay profile and project-level automatic trimming defaults. Trimming starts only after Rename.", "Step 2 of 9"),
         stage_topbar(
           actionButton("back_upload", "Back", icon = icon("arrow-left")),
           div(class = "stage-topbar-spacer"),
@@ -87,9 +87,9 @@ ui <- fluidPage(
         ),
         div(class = "stage-grid stage-grid-2",
           div(class = "panel-box settings-card",
-            card_title("Assay information", "Primer metadata is retained for provenance. Experimental primer-site mapping is optional and does not control trimming.", "flask"),
-            selectInput("target", "Target / Gene",
-                        c("ITS", "LSU", "TEF1 / EF1-alpha", "RPB2", "Beta-tubulin", "CYP51", "SDHB", "IGS", "Other"),
+            card_title("Assay profile", "The locus comes from the controlled PITAX vocabulary. Primer metadata is retained for provenance.", "flask"),
+            selectInput("target", "Locus",
+                        pitax_locus_choices(),
                         selected = "ITS"),
             div(class = "form-grid-2",
               textInput("forward_primer", "Forward primer name", ""),
@@ -114,7 +114,7 @@ ui <- fluidPage(
             )
           ),
           div(class = "panel-box settings-card",
-            card_title("Automatic trimming", "These parameters define good-start detection and sustained signal-collapse detection. Full definitions are available in Help / About.", "cut"),
+            card_title("Project trimming defaults", "These defaults apply to every assay unless a later assay-specific override is explicitly defined. Full definitions are available in Help / About.", "cut"),
             div(class = "form-grid-2",
               numericInput("window", "Window size", 25, min = 5),
               numericInput("min_peak_ratio", "Minimum peak ratio", 3, min = 0, step = 0.1),
@@ -262,7 +262,7 @@ ui <- fluidPage(
               textInput("batch_isolate_replace", "Replace with", "")
             ),
             div(class = "form-grid-2",
-              textInput("batch_locus", "Set gene / locus", ""),
+              uiOutput("batch_assay_control"),
               selectInput("batch_direction", "Set direction", c("No change" = "", "Forward" = "Forward", "Reverse" = "Reverse"), selected = "")
             ),
             actionButton("apply_assignment_batch", "Apply to checked / all", class = "btn-primary"),
@@ -270,7 +270,7 @@ ui <- fluidPage(
           )
         ),
         div(class = "panel-box stage-table-card",
-          card_title("Final read / FASTA names and biological identity", "The generated name is shown beside the immutable barcode. Edit Isolate and Gene, then choose Forward or Reverse from the list. Changes are committed together, without refreshing the table after every cell.", "list-alt"),
+          card_title("Final read / FASTA names and biological identity", "The generated name is shown beside the immutable barcode. Assign Isolate, Assay and direction; the locus is inherited from the assay profile.", "list-alt"),
           uiOutput("assignment_editor"),
           div(class = "assignment-editor-actions",
             actionButton("save_assignment_edits", "Apply table changes", icon = icon("check"), class = "btn-primary"),
@@ -660,7 +660,7 @@ ui <- fluidPage(
                 h3("Stage 4 multi-locus profile"),
                 p("Each Gene/Locus is processed in its own PITAX project. Stage 4 imports those completed projects and joins their evidence only when the explicit Isolate code matches."),
                 p("Every locus retains its sequence, consensus revision, BLAST RID, taxonomic result, limitation and reference context. Two concordant loci may support the same rank; a conflicting locus is never removed by a numerical majority."),
-                div(class="about-callout", strong("Current alpha boundary: "), "alpha.9.2 retains the evidence-preserving profile, visual multi-isolate review, provenance, duplicate Isolate/Locus blocking, concordance/conflict states and exports. Taxon-specific marker recommendations still require a separately reviewed literature layer.")
+                div(class="about-callout", strong("Current alpha boundary: "), "alpha.10.1 establishes schema 6, controlled loci and explicit assay-linked reads. The multi-assay editor is the next Alpha 10 slice; taxon-specific marker recommendations still require a separately reviewed literature layer.")
               )
             ),
 

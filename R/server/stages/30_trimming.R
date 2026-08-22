@@ -8,7 +8,7 @@
       return()
     }
     sync_assignment_state()
-    assignment_error <- stage2_validate_assignments(rv$read_assignments, current_upload_source_ids())
+    assignment_error <- stage2_validate_assignments(rv$read_assignments, current_upload_source_ids(), rv$assay_profiles)
     if (!is.null(assignment_error)) {
       showNotification(paste("Read assignment error:", assignment_error), type = "error", duration = 10)
       return()
@@ -20,7 +20,7 @@
     }
     rv$read_assignments <- stage2_coerce_assignments(rv$read_assignments)
     rv$architecture <- tryCatch(
-      stage2_build_architecture(rv$read_assignments),
+      stage2_build_architecture(rv$read_assignments, assay_profiles = rv$assay_profiles),
       error = function(e) {
         showNotification(paste("Could not build project architecture:", conditionMessage(e)), type = "error", duration = 10)
         NULL
@@ -28,7 +28,7 @@
     )
     if (is.null(rv$architecture)) return()
     settings <- current_settings_from_inputs()
-    settings$target <- unique(trimws(as.character(rv$read_assignments$Locus)))[1]
+    rv$project_defaults <- assay_project_defaults_from_legacy_settings(settings)
     rv$settings <- settings
     all_results <- list(); summaries <- list(); files <- input$ab1_files
 
@@ -37,11 +37,12 @@
         sample_id <- sub("\\.ab1$", "", files$name[i], ignore.case=TRUE)
         assignment_idx <- match(sample_id, rv$read_assignments$Source_ID)
         assignment <- rv$read_assignments[assignment_idx, , drop = FALSE]
-        read_settings <- settings
-        read_settings$target <- assignment$Locus[1]
-        read_settings$sequencing_primer <- assignment$Direction[1]
-        if (assignment$Direction[1] == "Forward" && nzchar(trimws(assignment$Primer[1]))) read_settings$forward_primer <- assignment$Primer[1]
-        if (assignment$Direction[1] == "Reverse" && nzchar(trimws(assignment$Primer[1]))) read_settings$reverse_primer <- assignment$Primer[1]
+        profile_idx <- match(assignment$Assay_ID[1], rv$assay_profiles$Assay_ID)
+        read_settings <- assay_resolve_read_settings(
+          rv$assay_profiles[profile_idx, , drop = FALSE],
+          rv$project_defaults,
+          assignment$Direction[1]
+        )
         incProgress(1/nrow(files), detail=paste("Processing", files$name[i]))
         result <- tryCatch(
           trim_one_ab1(files$datapath[i], sample_id, read_settings),
@@ -87,4 +88,3 @@
     selected <- if (!is.null(current) && length(current) == 1L && current %in% keys) current else if (length(keys)) keys[1] else character()
     updateSelectInput(session, "inspect_sample", choices = choices, selected = selected)
   }
-

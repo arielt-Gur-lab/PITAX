@@ -1,5 +1,7 @@
   rv <- reactiveValues(
     results = list(), summary = NULL, rename = NULL, settings = NULL,
+    assay_profiles = assay_default_profiles(),
+    project_defaults = assay_project_defaults_from_legacy_settings(),
     read_assignments = stage2_empty_assignments(), architecture = NULL,
     consensus_set = stage3_empty_consensus_set(),
     multilocus_profile = stage4_empty_profile(),
@@ -51,12 +53,15 @@
 
   initialize_current_read_assignments <- function() {
     if (is.null(input$ab1_files) || !nrow(input$ab1_files)) return(stage2_empty_assignments())
+    default_profile <- assay_coerce_profiles(rv$assay_profiles)
+    default_assay_id <- if (nrow(default_profile)) default_profile$Assay_ID[1] else ""
     stage2_make_read_assignments(
       input$ab1_files$name,
       default_locus = input$target,
       default_direction = input$sequencing_primer,
       forward_primer = input$forward_primer,
-      reverse_primer = input$reverse_primer
+      reverse_primer = input$reverse_primer,
+      default_assay_id = default_assay_id
     )
   }
 
@@ -76,4 +81,3 @@
     }
     invisible(NULL)
   }
-

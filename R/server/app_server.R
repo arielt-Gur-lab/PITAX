@@ -24,6 +24,6 @@ PITAX_SERVER_MODULES <- file.path(
 server <- function(input, output, session) {
   server_environment <- environment()
   for (module_path in PITAX_SERVER_MODULES) {
-    sys.source(module_path, envir = server_environment)
+    source(module_path, local = server_environment, encoding = "UTF-8")
   }
 }

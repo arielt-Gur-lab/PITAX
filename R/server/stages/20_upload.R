@@ -66,7 +66,8 @@
     rv$read_assignments <- stage2_sync_generated_names(
       rv$read_assignments,
       forward_primer = input$forward_primer,
-      reverse_primer = input$reverse_primer
+      reverse_primer = input$reverse_primer,
+      assay_profiles = rv$assay_profiles
     )
     new_signature <- assignment_state_signature(rv$read_assignments)
     identity_changed <- nzchar(rv$assignment_signature) && !identical(new_signature, rv$assignment_signature)
@@ -78,7 +79,8 @@
     rv$assignment_signature <- new_signature
     rv$rename <- stage2_default_rename_map(rv$read_assignments)
     assignment_error <- stage2_identity_error(rv$read_assignments)
-    rv$architecture <- if (is.null(assignment_error)) stage2_build_architecture(rv$read_assignments) else NULL
+    if (is.null(assignment_error)) assignment_error <- stage2_validate_assignments(rv$read_assignments, assay_profiles = rv$assay_profiles)
+    rv$architecture <- if (is.null(assignment_error)) stage2_build_architecture(rv$read_assignments, assay_profiles = rv$assay_profiles) else NULL
     if (is.null(assignment_error) && length(rv$results)) {
       for (source_id in intersect(names(rv$results), rv$read_assignments$Source_ID)) {
         i <- match(source_id, rv$read_assignments$Source_ID)
@@ -96,13 +98,18 @@
 
   observeEvent(list(input$target, input$sequencing_primer, input$forward_primer, input$reverse_primer), {
     if (is.null(input$ab1_files) || !nrow(input$ab1_files)) return()
+    current_id <- if (is.data.frame(rv$assay_profiles) && nrow(rv$assay_profiles)) rv$assay_profiles$Assay_ID[1] else NULL
+    current <- current_settings_from_inputs()
+    rv$assay_profiles <- assay_profile_from_legacy_settings(current, assay_id = current_id)
+    rv$project_defaults <- assay_project_defaults_from_legacy_settings(current)
     sync_assignment_state()
   }, ignoreInit = TRUE)
 
   architecture_summary_ui <- function() {
     error <- stage2_identity_error(rv$read_assignments)
+    if (is.null(error)) error <- stage2_validate_assignments(rv$read_assignments, assay_profiles = rv$assay_profiles)
     if (!is.null(error)) return(div(class = "status-warning", "Architecture preview will appear after every read has explicit Isolate, Gene / locus and Forward / Reverse fields."))
-    architecture <- tryCatch(stage2_build_architecture(rv$read_assignments), error = function(e) NULL)
+    architecture <- tryCatch(stage2_build_architecture(rv$read_assignments, assay_profiles = rv$assay_profiles), error = function(e) NULL)
     if (is.null(architecture)) return(NULL)
     sm <- stage2_architecture_summary(architecture)
     div(
@@ -166,7 +173,9 @@
       rv$read_assignments <- initialize_current_read_assignments()
     }
     rv$settings <- current_settings_from_inputs()
+    current_id <- if (is.data.frame(rv$assay_profiles) && nrow(rv$assay_profiles)) rv$assay_profiles$Assay_ID[1] else NULL
+    rv$assay_profiles <- assay_profile_from_legacy_settings(rv$settings, assay_id = current_id)
+    rv$project_defaults <- assay_project_defaults_from_legacy_settings(rv$settings)
     sync_assignment_state()
     updateTabsetPanel(session, "pipeline_step", selected = "rename")
   })
-

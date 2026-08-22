@@ -8,13 +8,13 @@ must_contain <- function(text, marker) {
   if (!grepl(marker, text, fixed = TRUE)) stop(paste("Missing Stage 4 integration marker:", marker), call. = FALSE)
 }
 
-must_contain(app_text, 'source(file.path("R", "domain", "multilocus", "stage4_multilocus.R"), local = TRUE)')
-must_contain(app_text, "PROJECT_SCHEMA_VERSION <- 5L")
+must_contain(app_text, 'source(file.path("R", "domain", "multilocus", "stage4_multilocus.R"), local = TRUE, encoding = "UTF-8")')
+must_contain(app_text, "PROJECT_SCHEMA_VERSION <- 6L")
 must_contain(app_text, 'tabPanel("9 · Multi-locus", value = "multilocus"')
 must_contain(app_text, 'actionButton("build_multilocus_profile", "Build / rebuild profile"')
 must_contain(app_text, 'stage4_build_profile(projects, source_names = source_names, source_md5 = source_md5)')
 must_contain(app_text, 'multilocus_profile = rv$multilocus_profile')
-must_contain(app_text, 'if (source_schema <= 4L) st <- stage4_migrate_v4_state(st)')
+must_contain(app_text, 'if (source_schema == 5L) st <- assay_migrate_schema5_state(st)')
 must_contain(app_text, 'rv$multilocus_profile <- stage4_ensure_profile')
 must_contain(app_text, 'stage4_current_project_matches(profile, make_project_bundle(), "Current session")')
 must_contain(app_text, 'write_stage4_checkpoint_zip(file, rv$multilocus_profile)')

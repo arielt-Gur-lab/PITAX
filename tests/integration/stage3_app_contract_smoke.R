@@ -9,14 +9,14 @@ must_contain <- function(text, marker) {
   if (!grepl(marker, text, fixed = TRUE)) stop(paste("Missing Stage 3 integration marker:", marker), call. = FALSE)
 }
 
-must_contain(app_text, 'source(file.path("R", "domain", "consensus", "stage3_consensus.R"), local = TRUE)')
-must_contain(app_text, "PROJECT_SCHEMA_VERSION <- 5L")
+must_contain(app_text, 'source(file.path("R", "domain", "consensus", "stage3_consensus.R"), local = TRUE, encoding = "UTF-8")')
+must_contain(app_text, "PROJECT_SCHEMA_VERSION <- 6L")
 must_contain(app_text, 'tabPanel("5 · Analysis Sequence", value = "consensus"')
 must_contain(app_text, 'actionButton("to_consensus", "Continue to Consensus"')
 must_contain(app_text, 'stage3_build_consensus_set(')
 must_contain(app_text, 'stage3_consensus_gate_error(rv$consensus_set, rv$results)')
 must_contain(app_text, 'rv$consensus_set <- stage3_empty_consensus_set()')
-must_contain(app_text, 'if (source_schema <= 3L) st <- stage3_migrate_v3_state(st)')
+must_contain(app_text, 'if (source_schema == 5L) st <- assay_migrate_schema5_state(st)')
 must_contain(app_text, 'consensus_set = rv$consensus_set')
 must_contain(app_text, 'stage3_analysis_records(rv$consensus_set)')
 must_contain(app_text, 'write_consensus_checkpoint_zip(file, rv$consensus_set, rv$read_assignments, rv$settings)')

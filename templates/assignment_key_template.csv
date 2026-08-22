@@ -1,3 +1,3 @@
-old_id,isolate,locus,direction
-sequencer_barcode_001,FB120,ITS,Forward
-sequencer_barcode_002,FB120,ITS,Reverse
+old_id,isolate,assay_id,locus,direction
+sequencer_barcode_001,FB120,assay-its,ITS,Forward
+sequencer_barcode_002,FB120,assay-its,ITS,Reverse

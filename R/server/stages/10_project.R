@@ -23,6 +23,8 @@
         summary = rv$summary,
         rename = rv$rename,
         settings = rv$settings,
+        assay_profiles = rv$assay_profiles,
+        project_defaults = rv$project_defaults,
         project_mode = rv$project_mode,
         read_assignments = rv$read_assignments,
         architecture = rv$architecture,
@@ -198,14 +200,24 @@
       showNotification("This project was created by a newer project schema and cannot be loaded safely.", type = "error", duration = 10)
       return()
     }
+    if (source_schema < 5L) {
+      showNotification(
+        "This project predates schema 5 and cannot be migrated safely in Alpha 10. Open it with PITAX Alpha 9.1 and resave it first.",
+        type = "error", duration = 12
+      )
+      return()
+    }
 
     st <- obj$state
-    if (source_schema < 2L) st <- stage2_migrate_v1_state(st)
-    if (source_schema == 2L) st <- stage2_migrate_v2_state(st)
-    if (source_schema <= 3L) st <- stage3_migrate_v3_state(st)
-    if (source_schema <= 4L) st <- stage4_migrate_v4_state(st)
+    if (source_schema == 5L) st <- assay_migrate_schema5_state(st)
+    loaded_profiles <- assay_coerce_profiles(st$assay_profiles)
+    profile_error <- assay_validate_profiles(loaded_profiles)
+    if (!is.null(profile_error)) {
+      showNotification(paste("Project assay profiles are invalid:", profile_error), type = "error", duration = 10)
+      return()
+    }
     loaded_assignments <- stage2_coerce_assignments(st$read_assignments)
-    assignment_error <- stage2_validate_assignments(loaded_assignments)
+    assignment_error <- stage2_validate_assignments(loaded_assignments, assay_profiles = loaded_profiles)
     if (length(st$results) && !is.null(assignment_error)) {
       showNotification(paste("Project read architecture is invalid:", assignment_error), type = "error", duration = 10)
       return()
@@ -213,7 +225,8 @@
     loaded_architecture <- if (nrow(loaded_assignments) && is.null(assignment_error)) tryCatch(
       stage2_build_architecture(
         loaded_assignments,
-        project_id = if (is.list(st$architecture)) stage2_scalar_text(st$architecture$project_id, "project") else "project"
+        project_id = if (is.list(st$architecture)) stage2_scalar_text(st$architecture$project_id, "project") else "project",
+        assay_profiles = loaded_profiles
       ),
       error = function(e) NULL
     ) else NULL
@@ -232,6 +245,8 @@
     rv$summary <- st$summary
     rv$rename <- st$rename
     rv$settings <- st$settings
+    rv$assay_profiles <- loaded_profiles
+    rv$project_defaults <- assay_project_defaults_from_legacy_settings(st$project_defaults)
     rv$project_mode <- if (!is.null(st$project_mode) && st$project_mode %in% c("simple", "paired_consensus")) st$project_mode else "paired_consensus"
     rv$read_assignments <- loaded_assignments
     rv$assignment_signature <- assignment_state_signature(loaded_assignments)
@@ -315,4 +330,3 @@
       type = "message", duration = 8
     )
   })
-

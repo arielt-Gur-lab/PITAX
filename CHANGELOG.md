@@ -2,6 +2,18 @@
 
 This file records changes that affect the way the pipeline behaves, presents results, or stores project data. Small internal refactors are omitted unless they change something visible or scientifically relevant.
 
+## 3.0.0-alpha.10.1
+**Alpha 10 foundation: schema 6, controlled loci and assay provenance**
+- Added the schema-6 assay domain with a controlled locus vocabulary; removed the free-text `Other` locus option from the assay screen.
+- Split assay-specific fields (locus, primers and length limits) from project-level trimming defaults.
+- Added persistent `assay_profiles` and `project_defaults` state and linked every read to an explicit `Assay_ID`.
+- Made read locus and direction-specific primer provenance resolve from the assigned assay profile instead of editable locus text.
+- Added the direct schema-5 to schema-6 migration: the former run-level settings become one assay and all existing reads are linked to it without changing read, BLAST or taxonomy evidence.
+- Blocked speculative loading of project schemas 1–4; those projects must first be opened and resaved with the frozen Alpha 9.1 application.
+- Added assay metadata to project architecture and checkpoint exports.
+- Fixed Windows mojibake such as `<c2><b7>` and `<e2><80><94>` by loading every application and server module explicitly as UTF-8.
+- Expanded the Windows test runner to 15 groups with multi-assay, controlled-vocabulary, dangling-reference and schema-5 migration coverage.
+
 ## 3.0.0-alpha.9.2
 **Project structure and development continuity**
 - Reduced `app.R` to a small application entry point and separated bootstrap, UI, server, browser assets, domain logic, services and exports by responsibility.

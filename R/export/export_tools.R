@@ -45,6 +45,7 @@ write_assignment_checkpoint_zip <- function(file, rename_df, read_assignments, a
   write.csv(read_assignments, file.path(temp_dir, "read_assignments.csv"), row.names = FALSE, fileEncoding = "UTF-8")
   architecture_dir <- file.path(temp_dir, "project_architecture")
   dir.create(architecture_dir, recursive = TRUE, showWarnings = FALSE)
+  if (is.data.frame(architecture$assays)) write.csv(architecture$assays, file.path(architecture_dir, "assays.csv"), row.names = FALSE, fileEncoding = "UTF-8")
   write.csv(architecture$isolates, file.path(architecture_dir, "isolates.csv"), row.names = FALSE, fileEncoding = "UTF-8")
   write.csv(architecture$loci, file.path(architecture_dir, "loci.csv"), row.names = FALSE, fileEncoding = "UTF-8")
   write.csv(architecture$reads, file.path(architecture_dir, "reads.csv"), row.names = FALSE, fileEncoding = "UTF-8")
@@ -148,6 +149,7 @@ write_checkpoint_zip <- function(file, stage, records, summary_df, settings, ren
   if (is.list(architecture)) {
     architecture_dir <- file.path(temp_dir, "project_architecture")
     dir.create(architecture_dir, recursive = TRUE, showWarnings = FALSE)
+    if (is.data.frame(architecture$assays)) write.csv(architecture$assays, file.path(architecture_dir, "assays.csv"), row.names = FALSE, fileEncoding = "UTF-8")
     if (is.data.frame(architecture$isolates)) write.csv(architecture$isolates, file.path(architecture_dir, "isolates.csv"), row.names = FALSE, fileEncoding = "UTF-8")
     if (is.data.frame(architecture$loci)) write.csv(architecture$loci, file.path(architecture_dir, "loci.csv"), row.names = FALSE, fileEncoding = "UTF-8")
     if (is.data.frame(architecture$reads)) write.csv(architecture$reads, file.path(architecture_dir, "reads.csv"), row.names = FALSE, fileEncoding = "UTF-8")

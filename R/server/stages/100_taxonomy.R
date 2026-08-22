@@ -740,6 +740,7 @@
       if (!is.null(rv$rename)) add_sheet("Rename Map", rv$rename)
       if (is.data.frame(rv$read_assignments) && nrow(rv$read_assignments)) add_sheet("Read Assignments", rv$read_assignments)
       if (is.list(rv$architecture)) {
+        add_sheet("Assays", rv$architecture$assays)
         add_sheet("Isolates", rv$architecture$isolates)
         add_sheet("Loci", rv$architecture$loci)
         add_sheet("Reads", rv$architecture$reads)
@@ -753,4 +754,3 @@
       openxlsx::saveWorkbook(wb, file, overwrite=TRUE)
     }
   )
-
