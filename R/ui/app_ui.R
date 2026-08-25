@@ -33,20 +33,31 @@ ui <- fluidPage(
       downloadButton("save_project", "Save project", class = "btn-project"),
       fileInput("load_project", NULL, multiple = FALSE, accept = c(".sangerproject", ".rds"),
                 buttonLabel = "Load project", placeholder = "No project selected"),
+      actionButton("open_export_output", "Export", icon = icon("download"), class = "btn-project"),
       div(class = "project-status", uiOutput("project_status"))
     ),
 
-    tabsetPanel(id = "pipeline_step", type = "tabs",
+    div(class = "workflow-chrome",
+      div(class = "workflow-nav-shell",
+        uiOutput("workflow_stepper"),
+        actionButton(
+          "workflow_open_help",
+          tagList(icon("question-circle"), span("Help", class = "workflow-chip-label")),
+          class = "workflow-chip workflow-help-always available"
+        )
+      ),
+      uiOutput("workflow_stage_actions")
+    ),
+
+    # Content panels only — navigation is the category stepper above.
+    tabsetPanel(id = "pipeline_step", type = "hidden",
 
       # --------------------------------------------------------
       # 1. Upload
       # --------------------------------------------------------
-      tabPanel("1 | Upload", value = "upload",
-        stage_heading("upload", "Upload chromatograms", "Keep the sequencer barcode and source filename unchanged. Biological identity is assigned later in Rename.", "Step 1 of 9"),
-        stage_topbar(
-          div(class = "stage-topbar-spacer"),
-          actionButton("to_settings", "Continue to Assay", icon = icon("arrow-right"), class = "btn-primary")
-        ),
+      tabPanel("Upload", value = "upload",
+        stage_heading("upload", "Upload chromatograms", "Keep the sequencer barcode and source filename unchanged. Biological identity is assigned later in Assign.", "SETUP | 1"),
+
         div(class = "stage-grid stage-grid-upload",
           div(class = "panel-box upload-drop-card",
             card_title("Raw AB1 files", "Select one or more .ab1 chromatogram files. The original files remain the immutable source for all later QC and curation.", "upload"),
@@ -72,22 +83,23 @@ ui <- fluidPage(
             )
           ),
           div(class = "compact-hint", icon("info-circle"), span("Direction is still required in both modes so Reverse reads can be oriented correctly. The mode can be changed before Stage 3 is built."))
-        ),
-        pipeline_stage_footer(1)
+        )
       ),
       # --------------------------------------------------------
       # 2. Assay and trimming settings
       # --------------------------------------------------------
-      tabPanel("2 | Assay", value = "settings",
-        stage_heading("sliders", "Assay setup", "Define the assay profile and project-level automatic trimming defaults. Trimming starts only after Rename.", "Step 2 of 9"),
-        stage_topbar(
-          actionButton("back_upload", "Back", icon = icon("arrow-left")),
-          div(class = "stage-topbar-spacer"),
-          actionButton("to_rename", "Continue to Rename", icon = icon("arrow-right"), class = "btn-primary")
-        ),
+      tabPanel("Assay", value = "settings",
+        stage_heading("sliders", "Assay setup", "Define one or more assay profiles and shared project trimming defaults. Trimming starts only after Assign.", "SETUP | 2"),
+
         div(class = "stage-grid stage-grid-2",
           div(class = "panel-box settings-card",
-            card_title("Assay profile", "The locus comes from the controlled PITAX vocabulary. Primer metadata is retained for provenance.", "flask"),
+            card_title("Assay profiles", "Each assay has a controlled locus, primers and length limits. Assign every read to one assay later in Assign.", "flask"),
+            div(class = "button-row",
+              selectInput("assay_editor_select", "Active assay", choices = NULL),
+              actionButton("assay_add_profile", "Add assay", icon = icon("plus")),
+              actionButton("assay_remove_profile", "Remove", icon = icon("trash"))
+            ),
+            textInput("assay_name", "Assay display name", ""),
             selectInput("target", "Locus",
                         pitax_locus_choices(),
                         selected = "ITS"),
@@ -100,7 +112,7 @@ ui <- fluidPage(
               textInput("reverse_primer_seq", "Reverse primer sequence (5'->3')", "")
             ),
             radioButtons(
-              "sequencing_primer", "Primer used for this Sanger read",
+              "sequencing_primer", "Default direction hint for new uploads",
               choices = c("Forward" = "Forward", "Reverse" = "Reverse", "Unknown / infer" = "Unknown"),
               selected = "Forward", inline = TRUE
             ),
@@ -125,18 +137,63 @@ ui <- fluidPage(
             )
           )
         ),
-        pipeline_stage_footer(2)
       ),
       # --------------------------------------------------------
-      # 4. QC, chromatogram & sequence preview
+      # 3. Assign
       # --------------------------------------------------------
-      tabPanel("4 | Trim & QC", value = "qc",
-        stage_heading("bar-chart", "Trimming results, QC & curation", "Review the completed trim, inspect renamed chromatograms, and document manual sequence curation.", "Step 4 of 9"),
-        stage_topbar(
-          actionButton("back_rename_from_qc", "Back to Rename", icon = icon("arrow-left")),
-          div(class = "stage-topbar-spacer"),
-          actionButton("to_consensus", "Continue to Consensus", icon = icon("arrow-right"), class = "btn-primary")
+      tabPanel("Assign", value = "rename",
+        stage_heading("tags", "Assign read identity", "Assign isolate, assay and Forward/Reverse direction here, after Upload and Assay and before trimming. The upload barcode remains unchanged.", "SETUP | 3"),
+
+        div(class = "stage-grid stage-grid-rename",
+          div(class = "panel-box",
+            card_title("Assignment key", "Import XLSX/CSV with old_id, isolate, locus (or gene), and direction columns. old_id matches the uploaded barcode; prefix matching is supported.", "key"),
+            fileInput("rename_key_file", NULL, multiple = FALSE, accept = c(".xlsx", ".csv"), buttonLabel = "Choose assignment key", placeholder = "XLSX or CSV"),
+            actionButton("apply_rename_key", "Apply assignment key", icon = icon("check"), class = "btn-primary"),
+            downloadButton("download_assignment_key_template", "Download key template"),
+            uiOutput("rename_key_status")
+          ),
+          div(class = "panel-box",
+            card_title("Batch assignment", "Apply isolate edits, gene and direction to checked rows. If no rows are checked, the action applies to all uploaded reads.", "edit"),
+            div(class = "form-grid-2",
+              textInput("batch_isolate_prefix", "Isolate prefix", ""),
+              textInput("batch_isolate_suffix", "Isolate suffix", "")
+            ),
+            div(class = "form-grid-2",
+              textInput("batch_isolate_find", "Find in isolate", ""),
+              textInput("batch_isolate_replace", "Replace with", "")
+            ),
+            div(class = "form-grid-2",
+              uiOutput("batch_assay_control"),
+              selectInput("batch_direction", "Set direction", c("No change" = "", "Forward" = "Forward", "Reverse" = "Reverse"), selected = "")
+            ),
+            actionButton("apply_assignment_batch", "Apply to checked / all", class = "btn-primary"),
+            actionButton("reset_assignments", "Clear checked / all")
+          )
         ),
+        div(class = "panel-box stage-table-card",
+          card_title("Final read / FASTA names and biological identity", "The generated name is shown beside the immutable barcode. Assign Isolate, Assay and direction; the locus is inherited from the assay profile.", "list-alt"),
+          uiOutput("assignment_editor"),
+          div(class = "assignment-editor-actions",
+            actionButton("save_assignment_edits", "Apply table changes", icon = icon("check"), class = "btn-primary"),
+            div(class = "compact-hint", icon("info-circle"), span("The table stays stable while you edit; generated names update after Apply."))
+          ),
+          uiOutput("rename_validation")
+        ),
+        div(class = "panel-box stage2-assignment-card",
+          card_title("Stage 2 | Architecture preview", "Built directly from the explicit identity fields. Project mode determines whether matching Forward/Reverse reads will later be merged or remain independent.", "sitemap"),
+          uiOutput("architecture_summary")
+        ),
+        div(class = "panel-box checkpoint checkpoint-modern",
+          div(class = "checkpoint-copy", card_title("Checkpoint A | Renamed and assigned reads", "Save resolved read names and biological identity before trimming.", "save")),
+          downloadButton("download_rename_checkpoint", "Download checkpoint ZIP")
+        ),
+              ),
+      # --------------------------------------------------------
+      # 4. Trim & QC
+      # --------------------------------------------------------
+      tabPanel("Trim & QC", value = "qc",
+        stage_heading("bar-chart", "Trimming results, QC & curation", "Review the completed trim, inspect assigned chromatograms, and document manual sequence curation.", "PROCESS | 4"),
+
         uiOutput("qc_summary_cards"),
         div(class = "panel-box stage-table-card",
           card_title("Trimming results", "Run-level summary of automatic trimming for all uploaded chromatograms.", "table"),
@@ -231,74 +288,13 @@ ui <- fluidPage(
           ),
           downloadButton("download_trim_checkpoint", "Download checkpoint ZIP")
         ),
-        pipeline_stage_footer(4)
-      ),
-      # --------------------------------------------------------
-      # 3. Rename
-      # --------------------------------------------------------
-      tabPanel("3 | Rename & Assign", value = "rename",
-        stage_heading("tags", "Rename and assign read identity", "Assign isolate, gene and Forward/Reverse direction here, after Upload and Assay and before trimming. The upload barcode remains unchanged.", "Step 3 of 9"),
-        stage_topbar(
-          actionButton("back_settings_from_rename", "Back to Assay", icon = icon("arrow-left")),
-          div(class = "stage-topbar-spacer"),
-          actionButton("run_trimming", "Start trimming", icon = icon("play"), class = "btn-primary")
-        ),
-        div(class = "stage-grid stage-grid-rename",
-          div(class = "panel-box",
-            card_title("Assignment key", "Import XLSX/CSV with old_id, isolate, locus (or gene), and direction columns. old_id matches the uploaded barcode; prefix matching is supported.", "key"),
-            fileInput("rename_key_file", NULL, multiple = FALSE, accept = c(".xlsx", ".csv"), buttonLabel = "Choose assignment key", placeholder = "XLSX or CSV"),
-            actionButton("apply_rename_key", "Apply assignment key", icon = icon("check"), class = "btn-primary"),
-            downloadButton("download_assignment_key_template", "Download key template"),
-            uiOutput("rename_key_status")
-          ),
-          div(class = "panel-box",
-            card_title("Batch assignment", "Apply isolate edits, gene and direction to checked rows. If no rows are checked, the action applies to all uploaded reads.", "edit"),
-            div(class = "form-grid-2",
-              textInput("batch_isolate_prefix", "Isolate prefix", ""),
-              textInput("batch_isolate_suffix", "Isolate suffix", "")
-            ),
-            div(class = "form-grid-2",
-              textInput("batch_isolate_find", "Find in isolate", ""),
-              textInput("batch_isolate_replace", "Replace with", "")
-            ),
-            div(class = "form-grid-2",
-              uiOutput("batch_assay_control"),
-              selectInput("batch_direction", "Set direction", c("No change" = "", "Forward" = "Forward", "Reverse" = "Reverse"), selected = "")
-            ),
-            actionButton("apply_assignment_batch", "Apply to checked / all", class = "btn-primary"),
-            actionButton("reset_assignments", "Clear checked / all")
-          )
-        ),
-        div(class = "panel-box stage-table-card",
-          card_title("Final read / FASTA names and biological identity", "The generated name is shown beside the immutable barcode. Assign Isolate, Assay and direction; the locus is inherited from the assay profile.", "list-alt"),
-          uiOutput("assignment_editor"),
-          div(class = "assignment-editor-actions",
-            actionButton("save_assignment_edits", "Apply table changes", icon = icon("check"), class = "btn-primary"),
-            div(class = "compact-hint", icon("info-circle"), span("The table stays stable while you edit; generated names update after Apply."))
-          ),
-          uiOutput("rename_validation")
-        ),
-        div(class = "panel-box stage2-assignment-card",
-          card_title("Stage 2 | Architecture preview", "Built directly from the explicit identity fields. Project mode determines whether matching Forward/Reverse reads will later be merged or remain independent.", "sitemap"),
-          uiOutput("architecture_summary")
-        ),
-        div(class = "panel-box checkpoint checkpoint-modern",
-          div(class = "checkpoint-copy", card_title("Checkpoint A | Renamed and assigned reads", "Save resolved read names and biological identity before trimming.", "save")),
-          downloadButton("download_rename_checkpoint", "Download checkpoint ZIP")
-        ),
-        pipeline_stage_footer(3)
-      ),
+              ),
       # --------------------------------------------------------
       # 5. Forward / Reverse consensus
       # --------------------------------------------------------
-      tabPanel("5 | Analysis Sequence", value = "consensus",
-        stage_heading("random", "Stage 3 | Analysis sequence", "Create the sequence used for export and BLAST according to the project read model selected at Upload.", "Step 5 of 9"),
-        stage_topbar(
-          actionButton("back_qc_from_consensus", "Back to QC", icon = icon("arrow-left")),
-          div(class = "stage-topbar-spacer"),
-          actionButton("build_consensus", "Build / rebuild", icon = icon("cogs"), class = "btn-success"),
-          actionButton("to_export", "Continue to Export", icon = icon("arrow-right"), class = "btn-primary")
-        ),
+      tabPanel("Consensus", value = "consensus",
+        stage_heading("random", "Forward/Reverse consensus", "Build the auditable analysis sequence used for BLAST according to the Paired project read model.", "PROCESS | 5"),
+
         uiOutput("consensus_mode_note"),
         div(class = "stage-grid stage-grid-2",
           div(class = "panel-box settings-card",
@@ -367,18 +363,13 @@ ui <- fluidPage(
           card_title("Per-column provenance", "Every consensus position records the Forward and Reverse calls, available basecaller quality, raw chromatogram positions, decision rule and review state.", "list-alt"),
           DTOutput("consensus_evidence_table")
         ),
-        pipeline_stage_footer(5)
-      ),
+              ),
       # --------------------------------------------------------
       # 6. Export
       # --------------------------------------------------------
-      tabPanel("6 | Export", value = "export",
-        stage_heading("download", "Export analysis sequences", "Create working FASTA files or an auditable package containing the analysis sequence and original read evidence.", "Step 6 of 9"),
-        stage_topbar(
-          actionButton("back_consensus_from_export", "Back to Consensus", icon = icon("arrow-left")),
-          div(class = "stage-topbar-spacer"),
-          actionButton("to_blast", "Continue to NCBI BLAST", icon = icon("arrow-right"), class = "btn-primary")
-        ),
+      tabPanel("Export", value = "export",
+        stage_heading("download", "Export analysis sequences", "Cross-cutting output: create FASTA/CSV/ZIP packages whenever analysis sequences are ready. Not part of the scientific Identify path.", "OUTPUT"),
+
         div(class = "panel-box export-summary-card",
           card_title("Run summary", "Final pre-export overview of the processed sequence set.", "check-circle"),
           uiOutput("export_summary")
@@ -389,19 +380,13 @@ ui <- fluidPage(
           div(class = "export-tile", div(class = "export-tile-icon", icon("table")), h4("Summary CSV"), p("Compact processing and QC summary for downstream review."), downloadButton("download_summary_csv", "Download CSV")),
           div(class = "export-tile export-tile-primary", div(class = "export-tile-icon", icon("archive")), h4("Complete results package"), p("Sequences, QC evidence, settings and curation records in one ZIP."), downloadButton("download_all_zip", "Download results ZIP"))
         ),
-        pipeline_stage_footer(6)
-      ),
+              ),
       # --------------------------------------------------------
       # 7. NCBI BLAST
       # --------------------------------------------------------
-      tabPanel("7 | NCBI BLAST", value = "blast",
-        stage_heading("search", "NCBI BLAST workspace", "Submit analysis sequences, retrieve accession-level hits, and keep each RID linked to the active sequence revision.", "Step 7 of 9"),
-        stage_topbar(
-          actionButton("back_export", "Back to Export", icon = icon("arrow-left")),
-          div(class = "stage-topbar-spacer"),
-          actionButton("to_taxonomy", "Continue to Taxonomic Summary", icon = icon("arrow-right"), class = "btn-primary"),
-          actionButton("reset_pipeline", "Start new run")
-        ),
+      tabPanel("BLAST", value = "blast",
+        stage_heading("search", "NCBI BLAST workspace", "Submit analysis sequences, retrieve accession-level hits, and keep each RID linked to the active sequence revision.", "IDENTIFY | 6"),
+
         div(class = "panel-box blast-query-card",
           card_title("Query workspace", "The sequence shown here is the current curated and renamed sequence. Changing a curated sequence after BLAST marks its previous result stale.", "file-code-o"),
           div(class = "blast-query-grid",
@@ -455,21 +440,13 @@ ui <- fluidPage(
             downloadButton("download_blast_hits", "All BLAST hits CSV")
           )
         ),
-        pipeline_stage_footer(7)
-      ),
+              ),
       # --------------------------------------------------------
       # 8. Taxonomic interpretation
       # --------------------------------------------------------
-      tabPanel("8 | Taxonomic summary", value = "taxonomy",
-        stage_heading("sitemap", "Taxonomic interpretation", "Identify the best molecular match, inspect close alternatives and report the most conservative supported taxonomic level.", "Step 8 of 9"),
-        stage_topbar(
-          actionButton("back_blast", "Back to NCBI BLAST", icon = icon("arrow-left")),
-          div(class = "stage-topbar-spacer"),
-          actionButton("run_taxonomy", "Analyze selected", icon = icon("play"), class = "btn-primary"),
-          actionButton("run_taxonomy_all", "Analyze all retrieved", icon = icon("tasks"), class = "btn-success"),
-          actionButton("to_multilocus", "Continue to Multi-locus", icon = icon("arrow-right")),
-          actionButton("reset_pipeline_tax", "Start new run")
-        ),
+      tabPanel("Taxonomy", value = "taxonomy",
+        stage_heading("sitemap", "Taxonomic interpretation", "Identify the best molecular match, inspect close alternatives and report the most conservative supported taxonomic level.", "IDENTIFY | 7"),
+
         div(class = "taxonomy-workspace",
           div(class = "taxonomy-workspace-left",
             selectInput("tax_sample", "Sequence", choices = NULL),
@@ -524,18 +501,13 @@ ui <- fluidPage(
             downloadButton("download_taxonomy_checkpoint", "Checkpoint ZIP")
           )
         ),
-        pipeline_stage_footer(8)
-      ),
+              ),
       # --------------------------------------------------------
       # 9. Multi-locus isolate profile
       # --------------------------------------------------------
-      tabPanel("9 | Multi-locus", value = "multilocus",
-        stage_heading("th", "Stage 4 | Multi-locus isolate profile", "Combine separately completed single-locus PITAX projects by explicit Isolate code while retaining every locus-specific sequence and taxonomic limitation.", "Step 9 of 9"),
-        stage_topbar(
-          actionButton("back_taxonomy_from_multilocus", "Back to Taxonomic Summary", icon = icon("arrow-left")),
-          div(class = "stage-topbar-spacer"),
-          actionButton("build_multilocus_profile", "Build / rebuild profile", icon = icon("cogs"), class = "btn-success")
-        ),
+      tabPanel("Multi-locus", value = "multilocus",
+        stage_heading("th", "Multi-locus isolate profile", "Integrate Isolate + Locus evidence from the current multi-locus project and/or imported projects, without flat voting.", "INTEGRATE | 8"),
+
         div(class = "multilocus-contract",
           strong("Scientific contract: "),
           "PITAX does not vote across loci. Concordance can strengthen a supported rank; a conflicting locus remains visible and prevents a combined call. Projects are joined only by the explicit Isolate field, never by parsing a filename."
@@ -560,11 +532,11 @@ ui <- fluidPage(
         ),
         div(class = "multilocus-grid",
           div(class = "panel-box multilocus-source-card",
-            card_title("Completed single-locus projects", "Add saved .sangerproject files from other loci. The current session can be included without saving and re-uploading it.", "folder-open"),
+            card_title("Project sources", "Include the current multi-assay / multi-locus session and/or import saved .sangerproject files. Isolate codes join the evidence.", "folder-open"),
             checkboxInput("multilocus_include_current", "Include the current PITAX project", value = TRUE),
             fileInput("multilocus_projects", NULL, multiple = TRUE, accept = c(".sangerproject", ".rds"),
-                      buttonLabel = "Add locus projects", placeholder = "Select one or more completed projects"),
-            div(class = "compact-hint", icon("info-circle"), span("Each source project must contain exactly one Gene/Locus and a current Stage 3 analysis sequence. Isolate codes must match across projects.")),
+                      buttonLabel = "Add projects", placeholder = "Optional additional completed projects"),
+            div(class = "compact-hint", icon("info-circle"), span("A source may contain one or more loci. Duplicate Isolate+Locus pairs across sources are blocked. Prefer building from the current Alpha 10 multi-locus session when all loci are already in this project.")),
             uiOutput("multilocus_gate_status")
           ),
           div(class = "panel-box stage-table-card",
@@ -589,8 +561,7 @@ ui <- fluidPage(
             downloadButton("download_multilocus_checkpoint", "Checkpoint ZIP")
           )
         ),
-        pipeline_stage_footer(9)
-      ),
+              ),
       # --------------------------------------------------------
       # Help / About (documentation, not a pipeline stage)
       # --------------------------------------------------------
@@ -600,7 +571,7 @@ ui <- fluidPage(
           p(class="about-lead",
             "Documentation for the laboratory workflow, the BLAST/taxonomy interpretation logic, and the scientific sources used to guide the application. Published evidence and application-specific heuristics are labeled separately."),
           div(class="help-flow",
-              "AB1 upload + project mode  ->  Assay settings  ->  Rename & read assignment  ->  Trim & QC  ->  Analysis sequence  ->  Export  ->  NCBI BLAST  ->  Taxonomic interpretation  ->  Multi-locus profile")
+              "SETUP: Upload -> Assay -> Assign\nPROCESS: Trim & QC -> Consensus (paired only)\nIDENTIFY: NCBI BLAST -> Taxonomy\nINTEGRATE: Multi-locus\nOUTPUT: Export (cross-cutting)\nHelp / About")
         ),
 
         div(class="about-section",
@@ -622,14 +593,14 @@ ui <- fluidPage(
                   div(class="help-card",
                     h3("Workflow"),
                     p(strong("1. Upload"), " - raw AB1 chromatograms and the project read model; source barcodes remain unchanged."),
-                    p(strong("2. Assay"), " - run-level primer defaults and trimming parameters; no trimming starts yet."),
-                    p(strong("3. Rename & Assign"), " - import a key, batch-edit or manually assign explicit identity fields and PITAX-generated <Isolate>_<Locus>_<F/R> names."),
+                    p(strong("2. Assay"), " - one or more assay profiles (controlled locus, primers, length) plus shared trimming defaults."),
+                    p(strong("3. Assign"), " - import a key, batch-edit or manually assign Isolate, Assay and Direction; PITAX generates <Isolate>_<Locus>_<F/R> names."),
                     p(strong("4. Trim & QC"), " - start trimming explicitly, then review Quality Control plots, chromatograms and processed sequences."),
-                    p(strong("5. Analysis Sequence"), " - keep independent reads in Simple mode or create an auditable F/R consensus in Paired mode; Reverse reads are oriented without changing the source."),
-                    p(strong("6. Export"), " - isolate-level FASTA plus source-read QC and consensus evidence checkpoints."),
-                    p(strong("7. NCBI BLAST"), " - submit isolate-level sequences and retrieve accession-level hits."),
-                    p(strong("8. Taxonomic summary"), " - compare competitive hits and report identification plus confidence."),
-                    p(strong("9. Multi-locus profile"), " - import separately completed locus projects, join them by explicit Isolate code and retain concordance or conflict without flat voting.")
+                    p(strong("5. Consensus"), " - Paired mode only: build an auditable Forward/Reverse analysis sequence."),
+                    p(strong("6. NCBI BLAST"), " - submit isolate-level sequences and retrieve accession-level hits."),
+                    p(strong("7. Taxonomy"), " - compare competitive hits and report identification plus confidence."),
+                    p(strong("8. Multi-locus"), " - integrate Isolate+Locus evidence from the current project and/or imports without flat voting."),
+                    p(strong("OUTPUT / Export"), " - cross-cutting FASTA/CSV/ZIP packages; not part of the scientific Identify path.")
                   )
                 ),
                 column(6,
@@ -660,7 +631,7 @@ ui <- fluidPage(
                 h3("Stage 4 multi-locus profile"),
                 p("Each Gene/Locus is processed in its own PITAX project. Stage 4 imports those completed projects and joins their evidence only when the explicit Isolate code matches."),
                 p("Every locus retains its sequence, consensus revision, BLAST RID, taxonomic result, limitation and reference context. Two concordant loci may support the same rank; a conflicting locus is never removed by a numerical majority."),
-                div(class="about-callout", strong("Current version boundary: "), paste0("v", APP_VERSION, " retains schema 6, controlled loci and explicit assay-linked reads while stabilizing cross-platform text rendering. The multi-assay editor remains the next feature slice; taxon-specific marker recommendations still require a separately reviewed literature layer."))
+                div(class="about-callout", strong("Current version boundary: "), paste0("v", APP_VERSION, " ships the gated Steps UI (SETUP / PROCESS / IDENTIFY / INTEGRATE / OUTPUT), multi-assay profiles inside one project, and same-project multi-locus integration. Literature-backed marker recommendations remain a later Stage 4 gate."))
               )
             ),
 
@@ -860,7 +831,12 @@ ui <- fluidPage(
               div(class="help-card",
                 h3("CHANGELOG"),
                 p("Every version records changes to processing, BLAST parsing, taxonomic interpretation and reporting so exported results can be traced back to the software logic used at the time."),
-                verbatimTextOutput("changelog_text")
+                tags$iframe(
+                  class = "changelog-iframe",
+                  src = "changelog_viewer.html",
+                  title = "PITAX CHANGELOG",
+                  loading = "lazy"
+                )
               )
             )
           )

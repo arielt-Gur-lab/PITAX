@@ -113,9 +113,11 @@ stage4_validate_project <- function(project, source_name = "project") {
   records <- consensus_set$records
   loci <- unique(trimws(vapply(records, function(x) stage4_scalar_text(x$locus), character(1))))
   loci <- loci[nzchar(loci)]
-  if (length(loci) != 1L) {
-    stop(paste0(source_name, " must contain exactly one Gene/Locus; found ", length(loci), "."), call. = FALSE)
+  if (!length(loci)) {
+    stop(paste0(source_name, " has no locus-labeled analysis sequences."), call. = FALSE)
   }
+  # Alpha 10: a project may contain multiple loci. Duplicate Isolate+Locus pairs
+  # across sources are still blocked when the profile is built.
   invisible(TRUE)
 }
 
@@ -334,7 +336,7 @@ stage4_profile_overview <- function(profile) {
 
 stage4_profile_gate_error <- function(profile) {
   profile <- stage4_ensure_profile(profile)
-  if (!nrow(profile$evidence)) return("Build a profile from completed single-locus PITAX projects.")
+  if (!nrow(profile$evidence)) return("Build a profile from the current multi-locus project and/or completed PITAX projects.")
   if (length(unique(tolower(trimws(profile$evidence$Locus)))) < 2L) return("A multi-locus profile requires at least two distinct loci.")
   NULL
 }

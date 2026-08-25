@@ -57,18 +57,28 @@
         $(document).on('shiny:value', function() { scheduleTableAdjust(90); });
         $(window).on('resize', function() { scheduleTableAdjust(100); });
         Shiny.addCustomMessageHandler('adjustDataTables', function() { scheduleTableAdjust(30); });
-        $(document).on('click', '#pipeline_step > li > a', function() {
+
+        Shiny.addCustomMessageHandler('setHelpActive', function(message) {
+          var btn = $('#workflow_open_help');
+          if (!btn.length) return;
+          btn.toggleClass('current', !!(message && message.active));
+          btn.toggleClass('available', !(message && message.active));
+        });
+
+        // Full workflow stepper chips (Bootstrap tab strip is hidden).
+        $(document).on('click', '.workflow-chip[data-step]', function(evt) {
+          var btn = $(this);
+          var step = btn.attr('data-step');
+          if (!step) return;
+          if (btn.is(':disabled') || btn.hasClass('locked') || btn.attr('aria-disabled') === 'true') {
+            evt.preventDefault();
+            evt.stopPropagation();
+            return;
+          }
           showStepLoader('Loading step...');
+          Shiny.setInputValue('workflow_nav_step', step, {priority: 'event'});
+        });
+        $(document).on('click', '#workflow_open_help', function() {
+          showStepLoader('Opening Help...');
         });
       })();
-
-      // The source keeps the large QC panel before Rename for maintainability,
-      // while the user-facing workflow is Rename -> QC.
-      function pitaxOrderWorkflowTabs() {
-        var nav = $('#pipeline_step');
-        var renameTab = nav.find('a[data-value="rename"]').parent();
-        var qcTab = nav.find('a[data-value="qc"]').parent();
-        if (renameTab.length && qcTab.length) renameTab.insertBefore(qcTab);
-      }
-      $(pitaxOrderWorkflowTabs);
-      $(document).on('shiny:connected', pitaxOrderWorkflowTabs);

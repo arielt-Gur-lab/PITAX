@@ -76,7 +76,8 @@
     }
     if (identical(rv$project_mode, "simple")) {
       if (isTRUE(build_analysis_sequences(notify = TRUE))) {
-        updateTabsetPanel(session, "pipeline_step", selected = "export")
+        workflow_mark_unlocked("qc", "blast", also_export = TRUE)
+        updateTabsetPanel(session, "pipeline_step", selected = "blast")
       }
       return()
     }
@@ -85,6 +86,7 @@
       showNotification(locus_error, type = "error", duration = 10)
       return()
     }
+    workflow_mark_unlocked("qc", "consensus")
     updateTabsetPanel(session, "pipeline_step", selected = "consensus")
   })
 

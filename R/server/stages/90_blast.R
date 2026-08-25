@@ -36,6 +36,8 @@
       showNotification(gate_error, type = "error", duration = 10)
       return()
     }
+    workflow_mark_unlocked("blast", also_export = TRUE)
+    if (identical(rv$project_mode, "paired_consensus")) workflow_mark_unlocked("consensus")
     updateTabsetPanel(session, "pipeline_step", selected="blast")
   })
 
@@ -284,6 +286,26 @@
       return(list(status="ERROR", contacted=FALSE, message="Processed sequence is no longer available."))
     }
     r <- records[[original_name]]
+    job_revision <- suppressWarnings(as.integer(rv$blast_jobs$consensus_revision[job_idx]))
+    current_revision <- if (is.list(r$consensus$curation)) {
+      suppressWarnings(as.integer(r$consensus$curation$revision[1]))
+    } else {
+      0L
+    }
+    if (!is.finite(job_revision)) job_revision <- 0L
+    if (!is.finite(current_revision)) current_revision <- 0L
+    if (!identical(as.integer(job_revision), as.integer(current_revision))) {
+      rv$blast_jobs$status[job_idx] <- "STALE"
+      return(list(
+        status = "STALE",
+        contacted = FALSE,
+        message = paste0(
+          "This RID belongs to consensus revision ", job_revision,
+          ", but the active analysis sequence is revision ", current_revision,
+          ". Submit the current sequence as a new BLAST job."
+        )
+      ))
+    }
     rid <- rv$blast_jobs$rid[job_idx]
 
     # Do not poll a single RID more often than once per minute.

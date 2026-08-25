@@ -124,10 +124,9 @@ blocked <- stage3_build_consensus_set(assignment_pair, no_overlap_results, min_o
 assert_true(blocked$records$consensus_001$status == "NO_RELIABLE_OVERLAP", "An unrelated pair was not blocked.")
 assert_true(blocked$records$consensus_001$sequence == "", "A blocked pair emitted a downstream sequence.")
 
-# 6. One upload/run is single-locus even though the project architecture can
-# later combine separately processed loci in Stage 4.
+# 6. Alpha 10 allows multiple loci in one project.
 mixed <- rbind(assignment_pair, data.frame(Source_ID = "F002", Isolate = "ISO2", Locus = "TEF1", Direction = "Forward", stringsAsFactors = FALSE))
-assert_true(grepl("exactly one", stage3_run_locus_error(mixed), fixed = TRUE), "A mixed-locus run was not blocked.")
+assert_true(is.null(stage3_run_locus_error(mixed)), "A mixed-locus Alpha 10 run was incorrectly blocked.")
 
 # 7. Consensus becomes stale when a curated source sequence changes.
 changed <- results

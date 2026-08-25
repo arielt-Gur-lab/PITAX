@@ -1,5 +1,6 @@
   # ---------------- Stage 4 multi-locus profile ----------------
   observeEvent(input$to_multilocus, {
+    workflow_mark_unlocked("taxonomy", "multilocus")
     updateTabsetPanel(session, "pipeline_step", selected = "multilocus")
   })
 
@@ -311,12 +312,6 @@
       write_stage4_checkpoint_zip(file, rv$multilocus_profile)
     }
   )
-
-  output$changelog_text <- renderText({
-    path <- "CHANGELOG.md"
-    if (!file.exists(path)) return("No changelog file found.")
-    paste(readLines(path, warn=FALSE), collapse="\n")
-  })
 
   output$download_taxonomy_summary <- downloadHandler(
     filename=function() paste0(clean_fasta_name(ifelse(is.null(input$tax_sample), "sample", input$tax_sample)), "_taxonomic_summary.csv"),

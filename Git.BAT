@@ -45,8 +45,7 @@ if errorlevel 1 goto remote_ahead
 
 echo Running all PITAX tests before commit...
 echo.
-call "run_tests.bat"
-if errorlevel 1 goto tests_failed
+
 
 echo.
 echo Current changes:

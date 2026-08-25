@@ -1,4 +1,4 @@
-PITAX v3.0.3 - Alpha 10 schema foundation
+PITAX v3.0.5 - Alpha 10 Steps UI, multi-assay, same-project multi-locus
 =========================================================
 
 Purpose
@@ -29,14 +29,14 @@ Stage 4 workflow
 
 Scientific contract
 -------------------
-- One source project must contain exactly one Gene/Locus.
-- Every Isolate/Locus combination must be unique across imported projects.
+- A project may contain multiple Gene/Locus assays; every Isolate/Locus combination
+  must remain unique across evidence sources.
 - Every locus retains its sequence, consensus revision, BLAST RID, taxonomic
   interpretation, reference context and source-project fingerprint.
 - Concordant loci may support the same rank.
 - A genus or species conflict is retained and no combined call is reported.
 - Missing locus-level taxonomy is shown as partial evidence.
-- Taxon-specific marker recommendations are not automated in Alpha 10.3; that
+- Taxon-specific marker recommendations are not automated in Alpha 10; that
   layer will be added only after literature review and curated scenario tests.
 
 Stage 3 retained behavior
@@ -60,15 +60,17 @@ Run `run_tests.bat` on Windows with R installed.
 
 Expected final line:
 
-  All PITAX v3.0.3 tests passed.
+  All PITAX v3.0.5 tests passed.
 
-The suite now has 15 groups. Alpha 10 tests cover controlled loci, assay-linked reads,
-schema-5 migration and multi-assay architecture. Stage 4 tests prove duplicate Isolate/Locus
-blocking, provenance retention, missing-evidence reporting, correct separation
-of multiple isolates in the visual selector and that a 2:1 locus majority
-cannot vote away a cross-genus conflict. Group 13 guards horizontal
+The suite now has 16 groups. Alpha 10 covers controlled loci, multi-assay profiles,
+schema-5 migration, gated Steps UI navigation and same-project multi-locus integration.
+Stage 4 tests prove duplicate Isolate/Locus blocking, provenance retention, missing-evidence
+reporting, correct separation of multiple isolates in the visual selector and that a 2:1
+locus majority cannot vote away a cross-genus conflict. Group 13 guards horizontal
 DataTables header/body alignment throughout the application. Group 14 protects
 the organized file/module boundaries and rejects raw non-ASCII runtime source.
+Group 16 covers reflection follow-up correctness (invalidation breadth, Assay_ID
+signature, READY-only taxonomy RID binding and BLAST revision checks).
 
 Release update workflow
 -----------------------

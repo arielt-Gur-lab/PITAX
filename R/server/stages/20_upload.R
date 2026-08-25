@@ -2,7 +2,7 @@
   assignment_state_signature <- function(assignments) {
     assignments <- stage2_coerce_assignments(assignments)
     if (!nrow(assignments)) return("")
-    cols <- c("Source_ID", "Isolate", "Locus", "Direction", "Final_Name")
+    cols <- c("Source_ID", "Isolate", "Assay_ID", "Locus", "Direction", "Final_Name")
     paste(apply(assignments[, cols, drop = FALSE], 1, paste, collapse = "\r"), collapse = "\n")
   }
 
@@ -29,8 +29,8 @@
 
   sync_project_mode_navigation <- function(mode) {
     simple <- identical(as.character(mode)[1], "simple")
-    updateActionButton(session, "to_consensus", label = if (simple) "Continue to Export" else "Continue to Consensus")
-    updateActionButton(session, "back_consensus_from_export", label = if (simple) "Back to QC" else "Back to Consensus")
+    updateActionButton(session, "to_consensus", label = if (simple) "Continue to NCBI BLAST" else "Continue to Consensus")
+    updateActionButton(session, "back_from_export", label = if (simple) "Back to Trim & QC" else "Back to Consensus")
     if (simple) {
       hideTab(inputId = "pipeline_step", target = "consensus", session = session)
     } else {
@@ -49,6 +49,9 @@
       old_ids <- names(rv$consensus_set$records)
       rv$consensus_set <- stage3_empty_consensus_set()
       for (consensus_id in old_ids) invalidate_downstream_for_sample(consensus_id, "Project read model changed")
+    }
+    if (identical(mode, "simple")) {
+      rv$workflow_unlocked <- setdiff(as.character(rv$workflow_unlocked), "consensus")
     }
     rv$project_status_text <- paste0("Unsaved project read model: ", if (mode == "simple") "simple independent reads" else "Forward/Reverse pairing", ".")
     sync_project_mode_navigation(mode)
@@ -96,14 +99,127 @@
     invisible(assignment_error)
   }
 
-  observeEvent(list(input$target, input$sequencing_primer, input$forward_primer, input$reverse_primer), {
-    if (is.null(input$ab1_files) || !nrow(input$ab1_files)) return()
-    current_id <- if (is.data.frame(rv$assay_profiles) && nrow(rv$assay_profiles)) rv$assay_profiles$Assay_ID[1] else NULL
-    current <- current_settings_from_inputs()
-    rv$assay_profiles <- assay_profile_from_legacy_settings(current, assay_id = current_id)
-    rv$project_defaults <- assay_project_defaults_from_legacy_settings(current)
-    sync_assignment_state()
+  selected_assay_id <- reactiveVal("")
+
+  sync_assay_editor_choices <- function(preferred = NULL) {
+    profiles <- assay_coerce_profiles(rv$assay_profiles)
+    if (!nrow(profiles)) {
+      profiles <- assay_default_profiles()
+      rv$assay_profiles <- profiles
+    }
+    labels <- paste0(profiles$Assay_Name, " | ", profiles$Locus_Display_Name)
+    choices <- setNames(profiles$Assay_ID, labels)
+    preferred <- if (!is.null(preferred) && preferred %in% profiles$Assay_ID) preferred else if (nzchar(selected_assay_id()) && selected_assay_id() %in% profiles$Assay_ID) selected_assay_id() else profiles$Assay_ID[1]
+    selected_assay_id(preferred)
+    updateSelectInput(session, "assay_editor_select", choices = choices, selected = preferred)
+    invisible(preferred)
+  }
+
+  load_assay_editor_inputs <- function(assay_id) {
+    profiles <- assay_coerce_profiles(rv$assay_profiles)
+    idx <- match(assay_id, profiles$Assay_ID)
+    if (is.na(idx)) return(invisible(NULL))
+    row <- profiles[idx, , drop = FALSE]
+    updateTextInput(session, "assay_name", value = row$Assay_Name[1])
+    updateSelectInput(session, "target", selected = row$Locus_ID[1])
+    updateTextInput(session, "forward_primer", value = row$Forward_Primer_Name[1])
+    updateTextInput(session, "reverse_primer", value = row$Reverse_Primer_Name[1])
+    updateTextInput(session, "forward_primer_seq", value = row$Forward_Primer_Sequence[1])
+    updateTextInput(session, "reverse_primer_seq", value = row$Reverse_Primer_Sequence[1])
+    updateNumericInput(session, "expected_amplicon_len", value = row$Expected_Amplicon_Length[1])
+    updateNumericInput(session, "absolute_max_base_index", value = row$Maximum_Sequence_Position[1])
+    invisible(NULL)
+  }
+
+  commit_active_assay_from_inputs <- function() {
+    profiles <- assay_coerce_profiles(rv$assay_profiles)
+    if (!nrow(profiles)) profiles <- assay_default_profiles()
+    assay_id <- selected_assay_id()
+    if (!nzchar(assay_id) || !assay_id %in% profiles$Assay_ID) assay_id <- profiles$Assay_ID[1]
+    idx <- match(assay_id, profiles$Assay_ID)
+    if (is.na(idx) || !length(idx)) return(invisible(NULL))
+    locus_id <- pitax_normalize_locus_id(input$target, "ITS")
+    if (!nzchar(locus_id)) locus_id <- "ITS"
+    profiles$Assay_Name[idx] <- assay_scalar_text(input$assay_name, pitax_locus_display_name(locus_id, locus_id))
+    profiles$Locus_ID[idx] <- locus_id
+    profiles$Locus_Display_Name[idx] <- pitax_locus_display_name(locus_id, locus_id)
+    profiles$Forward_Primer_Name[idx] <- assay_scalar_text(input$forward_primer)
+    profiles$Reverse_Primer_Name[idx] <- assay_scalar_text(input$reverse_primer)
+    profiles$Forward_Primer_Sequence[idx] <- assay_clean_sequence(input$forward_primer_seq)
+    profiles$Reverse_Primer_Sequence[idx] <- assay_clean_sequence(input$reverse_primer_seq)
+    profiles$Expected_Amplicon_Length[idx] <- suppressWarnings(as.integer(input$expected_amplicon_len))[1]
+    profiles$Maximum_Sequence_Position[idx] <- suppressWarnings(as.integer(input$absolute_max_base_index))[1]
+    if (is.na(profiles$Expected_Amplicon_Length[idx])) profiles$Expected_Amplicon_Length[idx] <- 650L
+    if (is.na(profiles$Maximum_Sequence_Position[idx])) profiles$Maximum_Sequence_Position[idx] <- 680L
+    rv$assay_profiles <- assay_coerce_profiles(profiles)
+    rv$project_defaults <- assay_project_defaults_from_legacy_settings(current_settings_from_inputs())
+    rv$settings <- assay_resolve_read_settings(rv$assay_profiles[idx, , drop = FALSE], rv$project_defaults, input$sequencing_primer)
+    selected_assay_id(assay_id)
+    invisible(assay_id)
+  }
+
+  observe({
+    rv$assay_profiles
+    isolate(sync_assay_editor_choices(selected_assay_id()))
+  })
+
+  observeEvent(input$assay_editor_select, {
+    req(nzchar(input$assay_editor_select))
+    if (nzchar(selected_assay_id()) && !identical(selected_assay_id(), input$assay_editor_select)) {
+      commit_active_assay_from_inputs()
+    }
+    selected_assay_id(input$assay_editor_select)
+    load_assay_editor_inputs(input$assay_editor_select)
+    sync_assay_editor_choices(input$assay_editor_select)
   }, ignoreInit = TRUE)
+
+  observeEvent(list(input$assay_name, input$target, input$forward_primer, input$reverse_primer,
+                    input$forward_primer_seq, input$reverse_primer_seq,
+                    input$expected_amplicon_len, input$absolute_max_base_index,
+                    input$window, input$min_peak_ratio, input$min_relative_signal,
+                    input$min_len_before_collapse, input$bad_run_windows, input$min_usable_len), {
+    if (!nzchar(selected_assay_id())) return()
+    if (is.null(input$target) || !nzchar(as.character(input$target)[1])) return()
+    commit_active_assay_from_inputs()
+    sync_assay_editor_choices(selected_assay_id())
+    if (!is.null(input$ab1_files) && nrow(input$ab1_files)) sync_assignment_state()
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$assay_add_profile, {
+    commit_active_assay_from_inputs()
+    profiles <- assay_coerce_profiles(rv$assay_profiles)
+    new_row <- assay_profile_from_legacy_settings(list(target = "ITS", assay_name = "New assay"), assay_id = assay_make_id("ITS", profiles$Assay_ID))
+    new_row$Assay_Name[1] <- "New assay"
+    rv$assay_profiles <- rbind(profiles, new_row)
+    selected_assay_id(new_row$Assay_ID[1])
+    sync_assay_editor_choices(new_row$Assay_ID[1])
+    load_assay_editor_inputs(new_row$Assay_ID[1])
+  })
+
+  observeEvent(input$assay_remove_profile, {
+    profiles <- assay_coerce_profiles(rv$assay_profiles)
+    if (nrow(profiles) <= 1L) {
+      showNotification("At least one assay profile is required.", type = "warning")
+      return()
+    }
+    assay_id <- selected_assay_id()
+    if (any(rv$read_assignments$Assay_ID == assay_id)) {
+      showNotification("Cannot remove an assay that is still assigned to reads.", type = "error", duration = 8)
+      return()
+    }
+    profiles <- profiles[profiles$Assay_ID != assay_id, , drop = FALSE]
+    rv$assay_profiles <- profiles
+    selected_assay_id(profiles$Assay_ID[1])
+    sync_assay_editor_choices(profiles$Assay_ID[1])
+    load_assay_editor_inputs(profiles$Assay_ID[1])
+  })
+
+  session$onFlushed(function() {
+    isolate({
+      sync_assay_editor_choices()
+      load_assay_editor_inputs(selected_assay_id())
+    })
+  }, once = TRUE)
 
   architecture_summary_ui <- function() {
     error <- stage2_identity_error(rv$read_assignments)
@@ -123,18 +239,23 @@
   output$architecture_summary <- renderUI(architecture_summary_ui())
 
   observeEvent(input$to_settings, {
-    if (is.null(input$ab1_files) || nrow(input$ab1_files)==0) {
-      showNotification("Please upload at least one AB1 file.", type="error"); return()
-    }
+    workflow_mark_unlocked("upload", "settings")
     updateTabsetPanel(session, "pipeline_step", selected="settings")
   })
   observeEvent(input$back_upload, updateTabsetPanel(session,"pipeline_step",selected="upload"))
   observeEvent(input$back_settings_from_rename, updateTabsetPanel(session,"pipeline_step",selected="settings"))
   observeEvent(input$back_rename_from_qc, updateTabsetPanel(session,"pipeline_step",selected="rename"))
   observeEvent(input$back_qc_from_consensus, updateTabsetPanel(session,"pipeline_step",selected="qc"))
-  observeEvent(input$back_consensus_from_export, updateTabsetPanel(session,"pipeline_step",selected=if (identical(rv$project_mode, "simple")) "qc" else "consensus"))
-  observeEvent(input$back_export, updateTabsetPanel(session,"pipeline_step",selected="export"))
+  observeEvent(input$back_from_export, {
+    updateTabsetPanel(session,"pipeline_step",selected=if (identical(rv$project_mode, "simple")) "qc" else "consensus")
+  })
+  observeEvent(input$back_to_process, {
+    updateTabsetPanel(session,"pipeline_step",selected=if (identical(rv$project_mode, "simple")) "qc" else "consensus")
+  })
   observeEvent(input$back_blast, updateTabsetPanel(session,"pipeline_step",selected="blast"))
+  observeEvent(input$open_export_output, {
+    workflow_goto("export")
+  })
 
   current_settings_from_inputs <- function() {
     list(
@@ -164,18 +285,13 @@
   }
 
   observeEvent(input$to_rename, {
-    if (is.null(input$ab1_files) || !nrow(input$ab1_files)) {
-      showNotification("Please upload at least one AB1 file.", type = "error")
-      return()
-    }
     source_ids <- current_upload_source_ids()
-    if (!nrow(rv$read_assignments) || !identical(sort(rv$read_assignments$Source_ID), sort(source_ids))) {
+    if (length(source_ids) && (!nrow(rv$read_assignments) || !identical(sort(rv$read_assignments$Source_ID), sort(source_ids)))) {
       rv$read_assignments <- initialize_current_read_assignments()
     }
     rv$settings <- current_settings_from_inputs()
-    current_id <- if (is.data.frame(rv$assay_profiles) && nrow(rv$assay_profiles)) rv$assay_profiles$Assay_ID[1] else NULL
-    rv$assay_profiles <- assay_profile_from_legacy_settings(rv$settings, assay_id = current_id)
-    rv$project_defaults <- assay_project_defaults_from_legacy_settings(rv$settings)
+    commit_active_assay_from_inputs()
     sync_assignment_state()
+    workflow_mark_unlocked("upload", "settings", "rename")
     updateTabsetPanel(session, "pipeline_step", selected = "rename")
   })

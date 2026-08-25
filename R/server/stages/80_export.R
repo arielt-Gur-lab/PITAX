@@ -28,6 +28,7 @@
   observeEvent(input$to_export, {
     e <- stage3_consensus_gate_error(rv$consensus_set, rv$results)
     if(!is.null(e)){showNotification(e,type="error",duration=10);return()}
+    workflow_mark_unlocked(also_export = TRUE)
     updateTabsetPanel(session,"pipeline_step",selected="export")
   })
 

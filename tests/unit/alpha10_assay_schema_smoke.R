@@ -63,4 +63,16 @@ assert_true(all(migrated$read_assignments$Assay_ID == migrated$assay_profiles$As
 assert_true(identical(migrated$results$FB120_1$evidence_marker, "preserve-me"), "Schema-5 migration changed read evidence.")
 assert_true(identical(migrated$blast_hits$accession, "NR_000001.1"), "Schema-5 migration changed BLAST evidence.")
 
+other_state <- legacy_state
+other_state$settings$target <- "Other"
+other_error <- tryCatch(assay_migrate_schema5_state(other_state), error = function(e) conditionMessage(e))
+assert_true(is.character(other_error) && grepl("controlled PITAX locus vocabulary", other_error, fixed = TRUE),
+            "Schema-5 migration must reject free-text Other instead of remapping to ITS.")
+
+unknown_state <- legacy_state
+unknown_state$settings$target <- "SomethingWeird"
+unknown_error <- tryCatch(assay_migrate_schema5_state(unknown_state), error = function(e) conditionMessage(e))
+assert_true(is.character(unknown_error) && grepl("controlled PITAX locus vocabulary", unknown_error, fixed = TRUE),
+            "Schema-5 migration must reject unknown loci instead of remapping to ITS.")
+
 cat("Assay/schema-6 foundation tests passed.\n")

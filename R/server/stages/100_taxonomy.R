@@ -2,7 +2,10 @@
   latest_blast_rid_for_sample <- function(original_name) {
     jobs <- rv$blast_jobs[rv$blast_jobs$original_name == original_name,,drop=FALSE]
     if (!nrow(jobs)) return("")
-    jobs$rid[nrow(jobs)]
+    # Prefer the latest READY job only; never bind taxonomy to STALE/WAITING RIDs.
+    ready <- jobs[as.character(jobs$status) == "READY", , drop = FALSE]
+    if (!nrow(ready)) return("")
+    as.character(ready$rid[nrow(ready)])
   }
 
   blast_hits_for_sample <- function(original_name) {
@@ -48,6 +51,7 @@
     }
     selected <- if (!is.null(input$blast_sample) && nzchar(input$blast_sample)) input$blast_sample else NULL
     update_tax_sample_choices(selected)
+    workflow_mark_unlocked("blast", "taxonomy")
     updateTabsetPanel(session, "pipeline_step", selected="taxonomy")
   })
 

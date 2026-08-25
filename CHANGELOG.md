@@ -1,5 +1,25 @@
 # Changelog
 
+## 3.0.5
+
+- Replaced the Bootstrap pipeline tab strip with a gated Steps UI organized as SETUP / PROCESS / IDENTIFY / INTEGRATE, plus unnumbered OUTPUT (Export) and Help.
+- Stepper allows return trips only to already unlocked steps; Continue/action gates unlock the next step.
+- Moved Export out of the scientific linear path; Continue after PROCESS goes to NCBI BLAST. Export remains available from the project bar / OUTPUT chip when analysis sequences are ready.
+- Removed the JS Rename-before-QC DOM reorder and the per-page bottom workflow schema footer; step numbers follow the real user flow.
+- Added a multi-assay editor on the Assay screen (add/remove/select profiles) while keeping shared project trimming defaults.
+- Allowed multiple loci inside one project (Stage 3 locus gate and Stage 4 source validation) so INTEGRATE can build from the current Alpha 10 session.
+- Expanded the server module list with `05_workflow.R` and updated workflow/structure contracts.
+
+## 3.0.4
+
+- Removed the byte-level logo MD5 regression guard. `www/logo.png` remains a required asset, but logo artwork may change without failing the structure contract.
+- Fixed asymmetric downstream invalidation after manual curation: clearing the consensus set now marks BLAST/taxonomy stale for every prior analysis ID, not only the edited read.
+- Included `Assay_ID` in the assignment identity signature so same-locus assay swaps invalidate consensus/BLAST before the multi-assay editor lands.
+- Schema 5 to schema 6 migration now rejects unknown or free-text legacy targets such as `Other` instead of silently remapping them to ITS; the load path surfaces the error.
+- Taxonomy now binds only to the latest READY BLAST RID for a sample.
+- BLAST retrieve re-checks consensus revision against the active analysis sequence and marks mismatched jobs STALE.
+- Added group 16 reflection follow-up correctness smokes; the Windows runner now has 16 groups.
+
 ## 3.0.3
 
 - Test-harness stabilization patch: fixed the undefined `app_dir` reference introduced by the 3.0.2 project-structure preflight.

@@ -189,6 +189,21 @@ assay_resolve_read_settings <- function(profile, project_defaults = NULL, direct
 assay_migrate_schema5_state <- function(state) {
   if (!is.list(state)) state <- list()
   legacy_settings <- if (is.list(state$settings)) state$settings else list()
+  raw_target <- assay_scalar_text(legacy_settings$target)
+  resolved_locus <- pitax_normalize_locus_id(raw_target, "")
+  if (!nzchar(resolved_locus)) {
+    stop(
+      paste0(
+        "Cannot migrate project schema 5 to schema 6: the legacy target '",
+        if (nzchar(raw_target)) raw_target else "<empty>",
+        "' is not in the controlled PITAX locus vocabulary. ",
+        "Open the project in Alpha 9.1, set Target/Gene to a supported locus ",
+        "(ITS, LSU, TEF1, RPB2, TUB2, CYP51, SDHB, or IGS), resave, and reload."
+      ),
+      call. = FALSE
+    )
+  }
+  legacy_settings$target <- resolved_locus
   profiles <- assay_profile_from_legacy_settings(legacy_settings)
   defaults <- assay_project_defaults_from_legacy_settings(legacy_settings)
   assignments <- if (exists("stage2_coerce_assignments", mode = "function")) stage2_coerce_assignments(state$read_assignments) else state$read_assignments

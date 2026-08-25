@@ -20,6 +20,7 @@
     taxonomy_batch_status_text = "No batch taxonomic analysis has been run yet.",
     project_status_text = "Current session has not been saved as a project.",
     project_loaded_name = "",
+    workflow_unlocked = c("upload"),
     context_peak_flag = NULL,
     pending_curation = NULL,
     auto_correct_preview_df = data.frame()

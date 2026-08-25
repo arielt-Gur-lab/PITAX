@@ -3897,16 +3897,19 @@
   },
   "files": {
     "app.R": {
-      "checksum": "d79a891ad279c0d862c5e36653196227"
+      "checksum": "67f898e6d7b2c5682b6143ac3586de0f"
     },
     "CHANGELOG.md": {
-      "checksum": "3b231d5dccd63a3231de751de4b7e9fa"
+      "checksum": "147793f90289bec9e93c61152e307fd6"
     },
     "docs/DEPLOYMENT.md": {
       "checksum": "5337b8749af3f0d03ce237ea1b8172c2"
     },
     "docs/PITAX_MASTER.md": {
-      "checksum": "49600a1bb2fb0fe8272175221ae1cd72"
+      "checksum": "ef30e9e5e241d1fd6ccae1bad38b7f59"
+    },
+    "docs/REFLECTION_AUDIT_3.0.3.md": {
+      "checksum": "a287fb78edf805fab6cbddbd5946efd4"
     },
     "docs/stages/V3_STAGE1.md": {
       "checksum": "4f3046ca732302de7f5e16b59d6ec432"
@@ -3930,19 +3933,19 @@
       "checksum": "215700915d451337b20ad216e7233331"
     },
     "R/app/bootstrap.R": {
-      "checksum": "b8a97873813c847e1fe54eec1ed5f580"
+      "checksum": "1f3503157fccdffddbf91f0bfdb5f63f"
     },
     "R/domain/assay/assay_profiles.R": {
-      "checksum": "51f42a7c6aa5a3524e5b2cbcddc56c67"
+      "checksum": "75a99acc80ba2165edbd917afbb2b460"
     },
     "R/domain/assignment/stage2_architecture.R": {
       "checksum": "d14bde829ae1fba1c080fa32413b9096"
     },
     "R/domain/consensus/stage3_consensus.R": {
-      "checksum": "2922ea78950c92cf38735b02a9dfb91d"
+      "checksum": "4c923cfa38dd4361a277ac065fa84af1"
     },
     "R/domain/multilocus/stage4_multilocus.R": {
-      "checksum": "b0c7060086f8b21b50c5594193b31126"
+      "checksum": "6fcd7a4e891f65841ca075a2d2743672"
     },
     "R/domain/sanger/ab1_evidence.R": {
       "checksum": "1485a7bda202c7d8c962d66cd98f525c"
@@ -3951,70 +3954,73 @@
       "checksum": "0bd2f692de81f5f13e2d53642ecda900"
     },
     "R/domain/sanger/sequence_tools.R": {
-      "checksum": "3baa24fb81616e62f43a0fd5977d2057"
+      "checksum": "1c2440b11cf8fb005ac68d8f965e3e0f"
     },
     "R/export/export_tools.R": {
       "checksum": "ea23390dcd5e3b3c75be6d015c3cc716"
     },
     "R/server/app_server.R": {
-      "checksum": "806aaba27f987d625ae927bb2d1e2b28"
+      "checksum": "e96978661660bd4906980c20c82bea88"
     },
     "R/server/stages/00_state.R": {
-      "checksum": "2881539e241a934757ac92f4664eb364"
+      "checksum": "30e09f3a656cf50bb3466bd29fbc3c17"
+    },
+    "R/server/stages/05_workflow.R": {
+      "checksum": "8f26b1656fd0f4f8706b4e32a97449fe"
     },
     "R/server/stages/10_project.R": {
-      "checksum": "52cba2a1c8321fdc129cc98432173e58"
+      "checksum": "acb62f5694233aeb3c2b0d04cdcfae17"
     },
     "R/server/stages/100_taxonomy.R": {
-      "checksum": "31c0e0b7f77f2c4d8d28bd25aaa9a783"
+      "checksum": "1f0be611b88daaafe2fa0e7eca210cd1"
     },
     "R/server/stages/110_multilocus.R": {
-      "checksum": "7c82fae7903d4c62417e52e2c2ff800a"
+      "checksum": "c821f0ebb935251f37651e121a365c0c"
     },
     "R/server/stages/120_reset.R": {
-      "checksum": "7a6dbbee81c5e4efb1e0082aaa8557a1"
+      "checksum": "c080dd115cc25d5fb1deba35d02a471e"
     },
     "R/server/stages/20_upload.R": {
-      "checksum": "c5c58032a53c213ffe14f486ae200cb2"
+      "checksum": "a0533c2627d82b4f8edf99d4dd812fbd"
     },
     "R/server/stages/30_trimming.R": {
-      "checksum": "c6926a05bb501e049d08bb68baa4856d"
+      "checksum": "b193ce49a81f09fc947beefe0eb70503"
     },
     "R/server/stages/40_qc_summary.R": {
       "checksum": "288d5816c8a8123e3ed4817bdd6c0d6f"
     },
     "R/server/stages/50_evidence_review.R": {
-      "checksum": "950c9a4c2cfae371e1ff9a54af2f637c"
+      "checksum": "a94a86876489527c159039217bc27939"
     },
     "R/server/stages/60_assignment.R": {
-      "checksum": "8e940ec70370e88592dafb0f54362f04"
+      "checksum": "df554834dc402405b9d7109d3fe98de5"
     },
     "R/server/stages/70_consensus.R": {
-      "checksum": "4372181d9c2f0c4fab6765f1963986e6"
+      "checksum": "cd14b8e419edfc56ce68126e48c2f8c6"
     },
     "R/server/stages/80_export.R": {
-      "checksum": "9ab34897c6a88340ad835cbc55aec6db"
+      "checksum": "fdf979cf4d3e6f7dba713a62305286d0"
     },
     "R/server/stages/90_blast.R": {
-      "checksum": "6fe75e3f1c3c48933d0a3aeba3343400"
+      "checksum": "6dead279b7e28b9f1c7002e5fba62434"
     },
     "R/services/taxonomy_tools.R": {
       "checksum": "6aa0b9f331e5eaf8c319833b9bf49bc0"
     },
     "R/ui/app_ui.R": {
-      "checksum": "f86bdcbcf7caad1e925f7936a6add4ff"
+      "checksum": "01157fe514cb08f5c186d46634163b03"
     },
     "R/ui/components.R": {
-      "checksum": "417f977ee3a1863d50627b29e404fa80"
+      "checksum": "f140a20f0b59384d10ad3f39379d042c"
     },
     "README.md": {
-      "checksum": "f7d5ebfe5afd9ac7504e8b8dc2b07a21"
+      "checksum": "e95de7b61e3f8bd90aae2c4dc8e40f53"
     },
     "run_app.bat": {
       "checksum": "e747f1c11fc42fde571e1ec7e14cd626"
     },
     "run_tests.bat": {
-      "checksum": "847b09b9eb89cc5f0691a3c8c9d04b65"
+      "checksum": "de81baabba2839f0cb75c1545536eb05"
     },
     "scripts/prepare_connect_cloud.R": {
       "checksum": "832c0a73719d2f94bdfe2fcbf72df9b6"
@@ -4026,16 +4032,16 @@
       "checksum": "563be3e842b0dacf92087122dcca0ce6"
     },
     "tests/contracts/project_structure_contract_smoke.R": {
-      "checksum": "26c2f93f05e5f63f145efb4bb1709284"
+      "checksum": "e2f71a601ca28227db1978e61ab07952"
     },
     "tests/contracts/stage2_app_contract_smoke.R": {
-      "checksum": "30975a105100345e4cb2f542a98df0b5"
+      "checksum": "c47fda4dfdfdfb7f91cff40905b232f3"
     },
     "tests/contracts/stage4_app_contract_smoke.R": {
-      "checksum": "da83296f7dc6241c0c0a5dd24a7beb1b"
+      "checksum": "901a9567340e37d84b9ebb37295f42ef"
     },
     "tests/contracts/workflow_order_smoke.R": {
-      "checksum": "df9962ccc717ae40ab656c96993d6d04"
+      "checksum": "2d2bdb8615c2003907d81d9a48cddc27"
     },
     "tests/fixtures/generate_stage3_ab1_fixture.py": {
       "checksum": "52c677cd1006e183731a4d3c8b9d8d4f"
@@ -4077,13 +4083,16 @@
       "checksum": "98efcd54416eea17cf40c7f9782f3910"
     },
     "tests/integration/stage3_app_contract_smoke.R": {
-      "checksum": "353574691081afb16c67a659e2d709e1"
+      "checksum": "94ac24b91e980e0e8ff60c97b88edacb"
+    },
+    "tests/preflight/parse_all_r_sources.R": {
+      "checksum": "e33c5a8a7b5edce65fbee05172de5a62"
     },
     "tests/unit/ab1_evidence_smoke.R": {
       "checksum": "8f80a2843a08d49600bfc7d631145d56"
     },
     "tests/unit/alpha10_assay_schema_smoke.R": {
-      "checksum": "1a661034ebed07be3af9c9b1305b6240"
+      "checksum": "9fc4cf7699a889c2c85b118e3145304a"
     },
     "tests/unit/manual_curation_smoke.R": {
       "checksum": "592834d5679188f1daff1b0c39d0f4a6"
@@ -4091,11 +4100,14 @@
     "tests/unit/qc_peak_flags_smoke.R": {
       "checksum": "f66c98c6be3b89360efe7b3bd88d4c67"
     },
+    "tests/unit/reflection_followup_smoke.R": {
+      "checksum": "e355004265b85820d8fb8157fa4d7c3d"
+    },
     "tests/unit/stage2_architecture_smoke.R": {
       "checksum": "aae40a43035dd37356bf1ab24b8da5e6"
     },
     "tests/unit/stage3_consensus_smoke.R": {
-      "checksum": "3a4b0d116b9787dee1943512ead4a574"
+      "checksum": "b16dcfbb815f892b38e5e24bf71eae07"
     },
     "tests/unit/stage4_multilocus_smoke.R": {
       "checksum": "88936ac87cded792183386d8fa8f9a26"
@@ -4104,16 +4116,16 @@
       "checksum": "0001b593b531a6626c064bb68c4915f6"
     },
     "VERSION.txt": {
-      "checksum": "5bf5055dcbd5ef106d78716d95398c63"
+      "checksum": "8ea4581d392114552d2cefcf543df9fa"
     },
     "www/logo.png": {
-      "checksum": "a14851bfff729b420f2b47743ec0f938"
+      "checksum": "cb08b40b30b1dbf3a5f322895af66592"
     },
     "www/pitax.css": {
-      "checksum": "5642211e6f450fa6fa9ac4d99de18c6f"
+      "checksum": "18f0f13e3b75de4f9916632e47991838"
     },
     "www/pitax.js": {
-      "checksum": "e095cd1876b89c3544ce42689e517ae8"
+      "checksum": "dee30604baab95ac5a5e2b1ad16d6a9e"
     }
   },
   "users": null

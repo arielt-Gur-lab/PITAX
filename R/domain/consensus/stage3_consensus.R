@@ -218,9 +218,11 @@ stage3_run_locus_error <- function(assignments) {
   }
   loci <- unique(trimws(as.character(assignments$Locus)))
   loci <- loci[nzchar(loci)]
-  if (length(loci) != 1L) {
-    return("A sequencing run must contain exactly one gene/locus. Process different loci as separate runs; Stage 4 will combine their isolate-level profiles.")
+  if (!length(loci)) {
+    return("Every read must be assigned to a locus from an assay profile.")
   }
+  # Alpha 10: multiple loci are valid inside one project. Stage 4 / INTEGRATE
+  # combines Isolate + Locus evidence without requiring separate runs.
   NULL
 }
 

@@ -146,15 +146,16 @@
       old_revision <- if (is.list(old_result$curation)) suppressWarnings(as.integer(old_result$curation$revision[1])) else NA_integer_
       new_revision <- if (is.list(new_result$curation)) suppressWarnings(as.integer(new_result$curation$revision[1])) else NA_integer_
       revision_note <- if (is.finite(old_revision) && is.finite(new_revision)) paste0(label, "; revision ", old_revision, " -> ", new_revision) else label
-      affected_consensus <- character()
-      if (is.list(rv$consensus_set) && length(rv$consensus_set$records)) {
-        affected_consensus <- names(Filter(
-          function(x) sample_name %in% as.character(x$source_read_ids),
-          rv$consensus_set$records
-        ))
+      # Clearing the whole consensus set must stale BLAST/taxonomy for every prior
+      # analysis ID, not only the edited read's isolate. Partial invalidation left
+      # READY jobs on other isolates while Stage 3 was empty.
+      prior_consensus_ids <- if (is.list(rv$consensus_set) && length(rv$consensus_set$records)) {
+        names(rv$consensus_set$records)
+      } else {
+        character()
       }
       rv$consensus_set <- stage3_empty_consensus_set()
-      for (consensus_id in affected_consensus) invalidate_downstream_for_sample(consensus_id, revision_note)
+      for (consensus_id in prior_consensus_ids) invalidate_downstream_for_sample(consensus_id, revision_note)
       invalidate_downstream_for_sample(sample_name, revision_note)
     }
     rv$project_status_text <- paste0("Unsaved curation change: ", sample_name, " | ", label, ".")
@@ -209,7 +210,16 @@
     }
 
     st <- obj$state
-    if (source_schema == 5L) st <- assay_migrate_schema5_state(st)
+    if (source_schema == 5L) {
+      st <- tryCatch(
+        assay_migrate_schema5_state(st),
+        error = function(e) structure(list(error = conditionMessage(e)), class = "schema5_migration_error")
+      )
+      if (inherits(st, "schema5_migration_error")) {
+        showNotification(st$error, type = "error", duration = 14)
+        return()
+      }
+    }
     loaded_profiles <- assay_coerce_profiles(st$assay_profiles)
     profile_error <- assay_validate_profiles(loaded_profiles)
     if (!is.null(profile_error)) {
@@ -314,7 +324,19 @@
     }
 
     active <- if (!is.null(obj$active_tab) && obj$active_tab %in% c("upload","settings","qc","rename","consensus","export","blast","taxonomy","multilocus","help")) obj$active_tab else if (nrow(rv$multilocus_profile$profiles)) "multilocus" else if (nrow(rv$taxonomy_summary)) "taxonomy" else if (nrow(rv$blast_hits)) "blast" else if (length(rv$consensus_set$records)) "consensus" else if (length(rv$results)) "qc" else "upload"
-    if (identical(rv$project_mode, "simple") && identical(active, "consensus")) active <- if (length(rv$consensus_set$records)) "export" else "qc"
+    if (identical(rv$project_mode, "simple") && identical(active, "consensus")) active <- if (length(rv$consensus_set$records)) "blast" else "qc"
+    unlocked <- c("upload")
+    if (!is.null(input$ab1_files) || length(rv$results) || nrow(rv$read_assignments)) unlocked <- c(unlocked, "settings", "rename")
+    if (length(rv$results)) unlocked <- c(unlocked, "qc")
+    if (length(rv$consensus_set$records)) {
+      unlocked <- c(unlocked, "blast", "export")
+      if (identical(rv$project_mode, "paired_consensus")) unlocked <- c(unlocked, "consensus")
+    }
+    if (nrow(rv$blast_hits)) unlocked <- c(unlocked, "blast", "taxonomy", "export")
+    if (nrow(rv$taxonomy_summary)) unlocked <- c(unlocked, "taxonomy", "multilocus")
+    if (nrow(rv$multilocus_profile$profiles) || nrow(rv$multilocus_profile$evidence)) unlocked <- c(unlocked, "multilocus")
+    unlocked <- c(unlocked, active)
+    rv$workflow_unlocked <- unique(unlocked)
     updateTabsetPanel(session, "pipeline_step", selected = active)
 
     rv$project_loaded_name <- input$load_project$name

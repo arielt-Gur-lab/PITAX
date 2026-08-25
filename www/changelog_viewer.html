@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PITAX CHANGELOG</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #ffffff;
+      color: #132238;
+    }
+    body {
+      box-sizing: border-box;
+      padding: 16px 20px 24px;
+      font-family: Aptos, "Segoe UI", Arial, sans-serif;
+      line-height: 1.55;
+    }
+    #changelog {
+      margin: 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: normal;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 13px;
+    }
+    .error { color: #b91c1c; font-family: Aptos, "Segoe UI", Arial, sans-serif; }
+  </style>
+</head>
+<body>
+  <pre id="changelog">Loading CHANGELOG…</pre>
+  <script>
+    (function () {
+      var el = document.getElementById("changelog");
+      fetch("/pitax-files/CHANGELOG.md", { cache: "no-store" })
+        .then(function (res) {
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          return res.text();
+        })
+        .then(function (text) {
+          el.textContent = text;
+          el.classList.remove("error");
+        })
+        .catch(function () {
+          el.classList.add("error");
+          el.textContent = "Could not load CHANGELOG.md.";
+        });
+    })();
+  </script>
+</body>
+</html>

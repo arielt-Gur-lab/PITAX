@@ -12,6 +12,8 @@ options(shiny.maxRequestSize = 500 * 1024^2)
 
 # Static browser assets are served automatically by Shiny from www/.
 PITAX_LOGO_AVAILABLE <- file.exists(file.path("www", "logo.png"))
+# Expose the app root so Help can iframe CHANGELOG.md via www/changelog_viewer.html.
+shiny::addResourcePath("pitax-files", normalizePath(getwd(), winslash = "/", mustWork = TRUE))
 
 pitax_source(file.path("R", "domain", "sanger", "ab1_evidence.R"), local = TRUE)
 pitax_source(file.path("R", "domain", "assay", "assay_profiles.R"), local = TRUE)
@@ -23,6 +25,6 @@ pitax_source(file.path("R", "domain", "sanger", "sequence_tools.R"), local = TRU
 pitax_source(file.path("R", "export", "export_tools.R"), local = TRUE)
 pitax_source(file.path("R", "services", "taxonomy_tools.R"), local = TRUE)
 
-APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.0.3")
-APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "3.0.3", APP_VERSION)
+APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.0.5")
+APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "3.0.5", APP_VERSION)
 PROJECT_SCHEMA_VERSION <- 6L
