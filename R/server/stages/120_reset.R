@@ -11,6 +11,7 @@
     rv$project_status_text <- "Current session has not been saved as a project."
     rv$project_loaded_name <- ""
     rv$workflow_unlocked <- c("upload")
+    rv$workflow_completed <- character(0)
     updateTabsetPanel(session,"pipeline_step",selected="upload")
   }
   observeEvent(input$reset_pipeline, reset_pipeline_state())

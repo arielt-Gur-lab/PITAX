@@ -19,6 +19,25 @@ stage_heading <- function(icon_name, title, subtitle, badge = NULL) {
   )
 }
 
+pitax_workflow_stage_heading <- function(step, project_mode = "simple") {
+  simple <- identical(as.character(project_mode)[1], "simple")
+  meta <- switch(
+    as.character(step)[1],
+    "upload" = list("upload", "Upload chromatograms", "Keep the sequencer barcode and source filename unchanged. Biological identity is assigned later in Assign.", "SETUP | 1"),
+    "settings" = list("sliders", "Assay setup", "Define one or more assay profiles and shared project trimming defaults. Trimming starts only after Assign.", "SETUP | 2"),
+    "rename" = list("tags", "Assign read identity", "Assign isolate, assay and Forward/Reverse direction here, after Upload and Assay and before trimming. The upload barcode remains unchanged.", "SETUP | 3"),
+    "qc" = list("bar-chart", "Trimming results, QC & curation", "Review the completed trim, inspect assigned chromatograms, and document manual sequence curation.", "PROCESS | 4"),
+    "consensus" = list("random", "Forward/Reverse consensus", "Build the auditable analysis sequence used for BLAST according to the Paired project read model.", "PROCESS | 5"),
+    "export" = list("download", "Export analysis sequences", "Export unlocks after PROCESS is complete: Trim & QC in Simple mode, or Consensus in Paired Forward/Reverse mode, once analysis sequences are ready.", "OUTPUT"),
+    "blast" = list("search", "NCBI BLAST workspace", "Submit analysis sequences, retrieve accession-level hits, and keep each RID linked to the active sequence revision.", if (simple) "IDENTIFY | 5" else "IDENTIFY | 6"),
+    "taxonomy" = list("sitemap", "Taxonomic interpretation", "Identify the best molecular match, inspect close alternatives and report the most conservative supported taxonomic level.", if (simple) "IDENTIFY | 6" else "IDENTIFY | 7"),
+    "multilocus" = list("th", "Multi-locus isolate profile", "Integrate Isolate + Locus evidence from the current multi-locus project and/or imported projects, without flat voting.", if (simple) "INTEGRATE | 7" else "INTEGRATE | 8"),
+    "help" = list("question-circle", "Help / About", "Documentation for the laboratory workflow, BLAST/taxonomy interpretation logic, and the scientific sources used to guide the application.", "DOCS"),
+    list("flask", "PITAX", "Taxonomic identification workspace.", NULL)
+  )
+  stage_heading(meta[[1]], meta[[2]], meta[[3]], meta[[4]])
+}
+
 card_title <- function(title, tip = NULL, icon_name = NULL) {
   div(
     class = "card-title-row",
@@ -79,8 +98,6 @@ pitax_workflow_stepper_ui <- function(current, unlocked, project_mode = "simple"
   unlocked <- unique(as.character(unlocked))
   completed <- unique(as.character(completed))
   catalog <- pitax_workflow_catalog(project_mode)
-  step_ids <- vapply(catalog, function(s) s$id, character(1))
-  cur_idx <- match(current, step_ids)
   current_category <- {
     hit <- Filter(function(s) identical(s$id, current), catalog)
     if (length(hit)) hit[[1]]$category else NA_character_
@@ -89,10 +106,8 @@ pitax_workflow_stepper_ui <- function(current, unlocked, project_mode = "simple"
   render_step_chip <- function(step) {
     is_current <- identical(step$id, current)
     is_unlocked <- isTRUE(free_nav) || step$id %in% unlocked || is_current
-    step_idx <- match(step$id, step_ids)
-    is_done <- (!is_current &&
-                  (step$id %in% completed ||
-                     (isTRUE(free_nav) && !is.na(cur_idx) && !is.na(step_idx) && step_idx < cur_idx)))
+    # Green = real completion only (caller supplies completed); never "visited earlier".
+    is_done <- !is_current && step$id %in% completed
     state <- if (is_current) {
       "current"
     } else if (is_done) {
@@ -102,16 +117,15 @@ pitax_workflow_stepper_ui <- function(current, unlocked, project_mode = "simple"
     } else {
       "locked"
     }
-    tags$button(
-      id = paste0("workflow_goto_", step$id),
+    # Shiny actionButton — no custom JS / overlay path for navigation.
+    actionButton(
+      inputId = paste0("workflow_goto_", step$id),
+      label = tagList(
+        span(class = "workflow-chip-num", as.character(step$number)),
+        span(class = "workflow-chip-label", step$label)
+      ),
       class = paste("workflow-chip", state),
-      type = "button",
-      disabled = if (!is_unlocked) TRUE else NULL,
-      `aria-disabled` = if (!is_unlocked) "true" else "false",
-      `aria-current` = if (is_current) "step" else NULL,
-      `data-step` = step$id,
-      span(class = "workflow-chip-num", as.character(step$number)),
-      span(class = "workflow-chip-label", step$label)
+      `aria-current` = if (is_current) "step" else NULL
     )
   }
 
@@ -128,24 +142,29 @@ pitax_workflow_stepper_ui <- function(current, unlocked, project_mode = "simple"
 
   export_current <- identical(current, "export")
   export_ok <- isTRUE(free_nav) || "export" %in% unlocked || export_current
+  export_done <- !export_current && "export" %in% completed
+  export_state <- if (export_current) {
+    "current"
+  } else if (export_done) {
+    "done"
+  } else if (export_ok) {
+    "available"
+  } else {
+    "locked"
+  }
 
   output_col <- div(
     class = paste("workflow-col", "workflow-col-output", if (export_current) "is-active" else NULL),
     div(class = "workflow-col-label", "OUTPUT"),
     div(
       class = "workflow-col-steps",
-      tags$button(
-        id = "workflow_goto_export",
-        class = paste(
-          "workflow-chip",
-          if (export_current) "current" else if (export_ok) "available" else "locked"
+      actionButton(
+        inputId = "workflow_goto_export",
+        label = tagList(
+          icon("download"),
+          span(class = "workflow-chip-label", "Export")
         ),
-        type = "button",
-        disabled = if (!export_ok) TRUE else NULL,
-        `aria-disabled` = if (!export_ok) "true" else "false",
-        `data-step` = "export",
-        icon("download"),
-        span(class = "workflow-chip-label", "Export")
+        class = paste("workflow-chip", export_state)
       )
     )
   )
@@ -155,7 +174,7 @@ pitax_workflow_stepper_ui <- function(current, unlocked, project_mode = "simple"
     list(output_col)
   )
 
-  # Help lives as a static actionButton beside this uiOutput (app_ui.R),
+  # Help lives as a static actionButton in the app header (under the version badge),
   # so stepper re-renders cannot break it.
   div(
     class = "workflow-nav",

@@ -337,6 +337,20 @@
     if (nrow(rv$multilocus_profile$profiles) || nrow(rv$multilocus_profile$evidence)) unlocked <- c(unlocked, "multilocus")
     unlocked <- c(unlocked, active)
     rv$workflow_unlocked <- unique(unlocked)
+    completed <- character(0)
+    if (nrow(loaded_assignments) || length(rv$results)) completed <- c(completed, "upload", "settings")
+    if (length(rv$results)) completed <- c(completed, "rename", "qc")
+    if (identical(rv$project_mode, "paired_consensus") && length(rv$consensus_set$records)) {
+      completed <- c(completed, "consensus", "export")
+    } else if (length(rv$consensus_set$records)) {
+      completed <- c(completed, "export")
+    }
+    if (nrow(rv$blast_hits)) completed <- c(completed, "blast")
+    if (nrow(rv$taxonomy_summary)) completed <- c(completed, "taxonomy")
+    if (nrow(rv$multilocus_profile$profiles) || nrow(rv$multilocus_profile$evidence)) {
+      completed <- c(completed, "multilocus")
+    }
+    rv$workflow_completed <- unique(completed)
     updateTabsetPanel(session, "pipeline_step", selected = active)
 
     rv$project_loaded_name <- input$load_project$name

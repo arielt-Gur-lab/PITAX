@@ -15,81 +15,90 @@ ui <- fluidPage(
 
   div(class = "pipeline-container",
     div(class = "app-header app-shell-header",
-      if (PITAX_LOGO_AVAILABLE)
-        tags$img(src = "logo.png", class = "app-brand-logo", alt = "PITAX - Taxonomic Identification Tool")
-      else
-        tagList(
-          div(class = "app-brand-mark", icon("flask")),
-          div(class = "app-brand-copy", h2("PITAX"), p("Taxonomic Identification Tool"))
-        ),
-      div(class = "app-brand-copy",
-        p("Sanger sequence analysis | quality review | BLAST | taxonomic interpretation")
+      div(class = "app-brand-block",
+        if (PITAX_LOGO_AVAILABLE)
+          tags$img(src = "logo.png", class = "app-brand-logo", alt = "PITAX - Taxonomic Identification Tool")
+        else
+          tagList(
+            div(class = "app-brand-mark", icon("flask")),
+            div(class = "app-brand-copy", h2("PITAX"), p("Taxonomic Identification Tool"))
+          ),
+        p(class = "app-brand-tagline", "Sanger sequence analysis | quality review | BLAST | taxonomic interpretation")
       ),
-      div(class = "app-version-badge", paste0("v", APP_VERSION))
-    ),
-
-    div(class = "project-bar project-session-card",
-      div(class = "project-bar-title", icon("folder-open"), span("Project session")),
-      downloadButton("save_project", "Save project", class = "btn-project"),
-      fileInput("load_project", NULL, multiple = FALSE, accept = c(".sangerproject", ".rds"),
-                buttonLabel = "Load project", placeholder = "No project selected"),
-      actionButton("open_export_output", "Export", icon = icon("download"), class = "btn-project"),
-      div(class = "project-status", uiOutput("project_status"))
-    ),
-
-    div(class = "workflow-chrome",
-      div(class = "workflow-nav-shell",
-        uiOutput("workflow_stepper"),
+      div(class = "project-bar project-session-card app-header-project",
+        div(class = "project-bar-title", icon("folder-open"), span("Project session")),
+        downloadButton("save_project", "Save project", class = "btn-project"),
+        div(class = "project-load-wrap",
+          fileInput("load_project", NULL, multiple = FALSE, accept = c(".sangerproject", ".rds"),
+                    buttonLabel = "Load project", placeholder = "No project selected")
+        ),
+        actionButton("open_export_output", "Export", icon = icon("download"), class = "btn-project"),
+        div(class = "project-status", uiOutput("project_status"))
+      ),
+      div(class = "app-header-aside",
+        div(class = "app-version-badge", paste0("v", APP_VERSION)),
         actionButton(
           "workflow_open_help",
           tagList(icon("question-circle"), span("Help", class = "workflow-chip-label")),
           class = "workflow-chip workflow-help-always available"
         )
-      ),
-      uiOutput("workflow_stage_actions")
+      )
     ),
 
-    # Content panels only — navigation is the category stepper above.
+    div(class = "workspace-chrome",
+      div(class = "workspace-chrome-section workspace-chrome-nav",
+        div(class = "workflow-nav-shell",
+          uiOutput("workflow_stepper")
+        )
+      ),
+      div(class = "workspace-chrome-section workspace-chrome-heading",
+        uiOutput("workflow_stage_heading")
+      ),
+      div(class = "workspace-chrome-section workspace-chrome-actions",
+        uiOutput("workflow_stage_actions")
+      )
+    ),
+
+    # Content panels only — chrome above owns nav / heading / actions.
+    # Project session lives in the app header beside the brand.
     tabsetPanel(id = "pipeline_step", type = "hidden",
 
       # --------------------------------------------------------
       # 1. Upload
       # --------------------------------------------------------
       tabPanel("Upload", value = "upload",
-        stage_heading("upload", "Upload chromatograms", "Keep the sequencer barcode and source filename unchanged. Biological identity is assigned later in Assign.", "SETUP | 1"),
 
         div(class = "stage-grid stage-grid-upload",
           div(class = "panel-box upload-drop-card",
             card_title("Raw AB1 files", "Select one or more .ab1 chromatogram files. The original files remain the immutable source for all later QC and curation.", "upload"),
             fileInput("ab1_files", NULL, multiple = TRUE,
                       accept = c(".ab1", ".AB1"), buttonLabel = "Select AB1 files", placeholder = "or drag files here"),
-            div(class = "compact-hint", icon("info-circle"), span("Multiple files can be processed in one run."))
+            div(class = "compact-hint", icon("info-circle"), span("Multiple files can be processed in one run.")),
+            div(class = "upload-read-model",
+              card_title("Project read model", "Choose whether every chromatogram is an independent sequence or whether explicit Forward/Reverse reads should be paired into one isolate-level consensus.", "sitemap"),
+              div(class = "project-mode-options project-mode-options-compact",
+                radioButtons(
+                  "project_mode", NULL,
+                  choices = c(
+                    "Simple reads - no Forward/Reverse matching" = "simple",
+                    "Paired reads - build Forward/Reverse consensus" = "paired_consensus"
+                  ),
+                  selected = "simple", inline = FALSE
+                )
+              ),
+              div(class = "compact-hint", icon("info-circle"), span("Direction is still required in both modes so Reverse reads can be oriented correctly."))
+            )
           ),
           div(class = "panel-box stage-table-card",
             card_title("Files in this run", "Review the uploaded filenames before continuing.", "list"),
             DTOutput("uploaded_files_table")
           )
-        ),
-        div(class = "panel-box",
-            card_title("Project read model", "Choose whether every chromatogram is an independent sequence or whether explicit Forward/Reverse reads should be paired into one isolate-level consensus.", "sitemap"),
-          div(class = "project-mode-options",
-            radioButtons(
-              "project_mode", NULL,
-              choices = c(
-                "Simple reads - no Forward/Reverse matching" = "simple",
-                "Paired reads - build Forward/Reverse consensus" = "paired_consensus"
-              ),
-              selected = "simple", inline = FALSE
-            )
-          ),
-          div(class = "compact-hint", icon("info-circle"), span("Direction is still required in both modes so Reverse reads can be oriented correctly. The mode can be changed before Stage 3 is built."))
         )
       ),
       # --------------------------------------------------------
       # 2. Assay and trimming settings
       # --------------------------------------------------------
       tabPanel("Assay", value = "settings",
-        stage_heading("sliders", "Assay setup", "Define one or more assay profiles and shared project trimming defaults. Trimming starts only after Assign.", "SETUP | 2"),
 
         div(class = "stage-grid stage-grid-2",
           div(class = "panel-box settings-card",
@@ -142,7 +151,6 @@ ui <- fluidPage(
       # 3. Assign
       # --------------------------------------------------------
       tabPanel("Assign", value = "rename",
-        stage_heading("tags", "Assign read identity", "Assign isolate, assay and Forward/Reverse direction here, after Upload and Assay and before trimming. The upload barcode remains unchanged.", "SETUP | 3"),
 
         div(class = "stage-grid stage-grid-rename",
           div(class = "panel-box",
@@ -192,7 +200,6 @@ ui <- fluidPage(
       # 4. Trim & QC
       # --------------------------------------------------------
       tabPanel("Trim & QC", value = "qc",
-        stage_heading("bar-chart", "Trimming results, QC & curation", "Review the completed trim, inspect assigned chromatograms, and document manual sequence curation.", "PROCESS | 4"),
 
         uiOutput("qc_summary_cards"),
         div(class = "panel-box stage-table-card",
@@ -293,7 +300,6 @@ ui <- fluidPage(
       # 5. Forward / Reverse consensus
       # --------------------------------------------------------
       tabPanel("Consensus", value = "consensus",
-        stage_heading("random", "Forward/Reverse consensus", "Build the auditable analysis sequence used for BLAST according to the Paired project read model.", "PROCESS | 5"),
 
         uiOutput("consensus_mode_note"),
         div(class = "stage-grid stage-grid-2",
@@ -368,7 +374,6 @@ ui <- fluidPage(
       # 6. Export
       # --------------------------------------------------------
       tabPanel("Export", value = "export",
-        stage_heading("download", "Export analysis sequences", "Cross-cutting output: create FASTA/CSV/ZIP packages whenever analysis sequences are ready. Not part of the scientific Identify path.", "OUTPUT"),
 
         div(class = "panel-box export-summary-card",
           card_title("Run summary", "Final pre-export overview of the processed sequence set.", "check-circle"),
@@ -385,7 +390,6 @@ ui <- fluidPage(
       # 7. NCBI BLAST
       # --------------------------------------------------------
       tabPanel("BLAST", value = "blast",
-        stage_heading("search", "NCBI BLAST workspace", "Submit analysis sequences, retrieve accession-level hits, and keep each RID linked to the active sequence revision.", "IDENTIFY | 6"),
 
         div(class = "panel-box blast-query-card",
           card_title("Query workspace", "The sequence shown here is the current curated and renamed sequence. Changing a curated sequence after BLAST marks its previous result stale.", "file-code-o"),
@@ -445,7 +449,6 @@ ui <- fluidPage(
       # 8. Taxonomic interpretation
       # --------------------------------------------------------
       tabPanel("Taxonomy", value = "taxonomy",
-        stage_heading("sitemap", "Taxonomic interpretation", "Identify the best molecular match, inspect close alternatives and report the most conservative supported taxonomic level.", "IDENTIFY | 7"),
 
         div(class = "taxonomy-workspace",
           div(class = "taxonomy-workspace-left",
@@ -506,7 +509,6 @@ ui <- fluidPage(
       # 9. Multi-locus isolate profile
       # --------------------------------------------------------
       tabPanel("Multi-locus", value = "multilocus",
-        stage_heading("th", "Multi-locus isolate profile", "Integrate Isolate + Locus evidence from the current multi-locus project and/or imported projects, without flat voting.", "INTEGRATE | 8"),
 
         div(class = "multilocus-contract",
           strong("Scientific contract: "),
@@ -600,7 +602,7 @@ ui <- fluidPage(
                     p(strong("6. NCBI BLAST"), " - submit isolate-level sequences and retrieve accession-level hits."),
                     p(strong("7. Taxonomy"), " - compare competitive hits and report identification plus confidence."),
                     p(strong("8. Multi-locus"), " - integrate Isolate+Locus evidence from the current project and/or imports without flat voting."),
-                    p(strong("OUTPUT / Export"), " - cross-cutting FASTA/CSV/ZIP packages; not part of the scientific Identify path.")
+                    p(strong("OUTPUT / Export"), " - FASTA/CSV/ZIP packages after PROCESS completes (Trim & QC in Simple mode, or Consensus in Paired mode).")
                   )
                 ),
                 column(6,

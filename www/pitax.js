@@ -8,6 +8,7 @@
       (function() {
         var loaderShownAt = 0;
         var loaderFallback = null;
+        var hideTimer = null;
         var tableAdjustTimer = null;
 
         function adjustVisibleDataTables() {
@@ -27,29 +28,43 @@
           clearTimeout(tableAdjustTimer);
           tableAdjustTimer = setTimeout(adjustVisibleDataTables, delay || 80);
         }
+        function clearLoaderTimers() {
+          clearTimeout(loaderFallback);
+          clearTimeout(hideTimer);
+          loaderFallback = null;
+          hideTimer = null;
+        }
         function showStepLoader(text) {
+          clearLoaderTimers();
           loaderShownAt = Date.now();
           $('#app_loading_text').text(text || 'Loading workspace...');
           $('#app_loading_overlay').addClass('visible').attr('aria-hidden', 'false');
-          clearTimeout(loaderFallback);
-          loaderFallback = setTimeout(hideStepLoader, 20000);
+          loaderFallback = setTimeout(function() { hideStepLoader(true); }, 12000);
         }
-        function hideStepLoader() {
+        function hideStepLoader(force) {
+          clearTimeout(loaderFallback);
+          loaderFallback = null;
+          var doHide = function() {
+            $('#app_loading_overlay').removeClass('visible').attr('aria-hidden', 'true');
+            hideTimer = null;
+          };
+          clearTimeout(hideTimer);
+          if (force) {
+            doHide();
+            return;
+          }
           var elapsed = Date.now() - loaderShownAt;
           var wait = Math.max(0, 280 - elapsed);
-          setTimeout(function() {
-            $('#app_loading_overlay').removeClass('visible').attr('aria-hidden', 'true');
-          }, wait);
-          clearTimeout(loaderFallback);
+          hideTimer = setTimeout(doHide, wait);
         }
         Shiny.addCustomMessageHandler('showLoader', function(message) {
           showStepLoader(message && message.text ? message.text : 'Loading workspace...');
         });
-        Shiny.addCustomMessageHandler('hideLoader', function() { hideStepLoader(); });
+        Shiny.addCustomMessageHandler('hideLoader', function() { hideStepLoader(true); });
         $(document).on('shiny:busy', function() { $('#shiny_activity_bar').addClass('visible'); });
         $(document).on('shiny:idle', function() {
           $('#shiny_activity_bar').removeClass('visible');
-          if ($('#app_loading_overlay').hasClass('visible')) hideStepLoader();
+          if ($('#app_loading_overlay').hasClass('visible')) hideStepLoader(true);
           scheduleTableAdjust(40);
         });
         $(document).on('shown.bs.tab', 'a[data-toggle="tab"]', function() { scheduleTableAdjust(60); });
@@ -65,20 +80,9 @@
           btn.toggleClass('available', !(message && message.active));
         });
 
-        // Full workflow stepper chips (Bootstrap tab strip is hidden).
-        $(document).on('click', '.workflow-chip[data-step]', function(evt) {
-          var btn = $(this);
-          var step = btn.attr('data-step');
-          if (!step) return;
-          if (btn.is(':disabled') || btn.hasClass('locked') || btn.attr('aria-disabled') === 'true') {
-            evt.preventDefault();
-            evt.stopPropagation();
-            return;
-          }
-          showStepLoader('Loading step...');
-          Shiny.setInputValue('workflow_nav_step', step, {priority: 'event'});
-        });
+        // Step chips are Shiny actionButtons (workflow_goto_*). Do not put a
+        // blocking overlay on chip clicks — that freezes the entire UI.
         $(document).on('click', '#workflow_open_help', function() {
-          showStepLoader('Opening Help...');
+          hideStepLoader(true);
         });
       })();

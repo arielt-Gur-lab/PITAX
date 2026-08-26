@@ -293,5 +293,8 @@
     commit_active_assay_from_inputs()
     sync_assignment_state()
     workflow_mark_unlocked("upload", "settings", "rename")
+    # Explicit Assay completion — never inferred from default ITS settings on load.
+    workflow_mark_completed("settings")
+    if (length(source_ids)) workflow_mark_completed("upload")
     updateTabsetPanel(session, "pipeline_step", selected = "rename")
   })

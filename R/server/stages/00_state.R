@@ -21,6 +21,7 @@
     project_status_text = "Current session has not been saved as a project.",
     project_loaded_name = "",
     workflow_unlocked = c("upload"),
+    workflow_completed = character(0),
     context_peak_flag = NULL,
     pending_curation = NULL,
     auto_correct_preview_df = data.frame()

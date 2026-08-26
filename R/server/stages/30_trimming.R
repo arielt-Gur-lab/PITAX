@@ -1,6 +1,22 @@
   # ---------------- Trimming ----------------
   observeEvent(input$run_trimming, {
-    req(input$ab1_files)
+    files <- input$ab1_files
+    if (is.null(files) || !is.data.frame(files) || !nrow(files)) {
+      showNotification(
+        "Upload at least one AB1 file and complete Assign before starting trimming.",
+        type = "warning",
+        duration = 8
+      )
+      return()
+    }
+    if (!is.data.frame(rv$read_assignments) || !nrow(rv$read_assignments)) {
+      showNotification(
+        "Assign isolate, assay and direction to every uploaded read before starting trimming.",
+        type = "warning",
+        duration = 8
+      )
+      return()
+    }
     rv$read_assignments <- collect_assignment_editor()
     name_error <- stage2_identity_error(rv$read_assignments)
     if (!is.null(name_error)) {
@@ -30,7 +46,7 @@
     settings <- current_settings_from_inputs()
     rv$project_defaults <- assay_project_defaults_from_legacy_settings(settings)
     rv$settings <- settings
-    all_results <- list(); summaries <- list(); files <- input$ab1_files
+    all_results <- list(); summaries <- list()
 
     withProgress(message="Processing AB1 files", value=0, {
       for (i in seq_len(nrow(files))) {
@@ -66,6 +82,7 @@
     rv$consensus_set <- stage3_empty_consensus_set()
     sync_qc_sample_choices()
     workflow_mark_unlocked("upload", "settings", "rename", "qc")
+    workflow_mark_completed("upload", "settings", "rename", "qc")
     session$sendCustomMessage("showLoader", list(text = "Opening Trim & QC workspace..."))
     updateTabsetPanel(session,"pipeline_step",selected="qc")
   })

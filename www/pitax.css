@@ -214,12 +214,59 @@
       textarea.form-control, .mono, pre, code { font-family:Consolas,'Courier New',monospace !important; }
       .pipeline-container { max-width:1580px; padding:0 18px 34px; }
       .app-shell-header { display:flex; align-items:center; gap:18px; min-height:104px; padding:16px 24px; }
+      .app-brand-block {
+        display:flex;
+        flex-direction:column;
+        align-items:flex-start;
+        justify-content:center;
+        gap:4px;
+        flex:0 1 auto;
+        min-width:0;
+      }
       .app-brand-mark { width:48px; height:48px; border-radius:14px; background:#eff6ff; color:#2563eb; display:flex; align-items:center; justify-content:center; font-size:21px; flex:0 0 auto; }
       .app-brand-logo { display:block; width:min(420px,48vw); max-height:82px; object-fit:contain; object-position:left center; }
       .app-brand-copy { flex:1 1 auto; min-width:0; }
       .app-brand-copy h2 { margin:0 0 2px; font-size:25px; }
       .app-brand-copy p { margin:2px 0 0; font-size:12.5px; color:#6b7c92; letter-spacing:.01em; }
-      .app-version-badge { padding:6px 10px; border-radius:999px; background:#f1f5f9; color:#52647a; font-size:12px; font-weight:750; }
+      .app-brand-tagline {
+        margin:0;
+        max-width:min(420px,48vw);
+        font-size:12px;
+        line-height:1.35;
+        color:#6b7c92;
+        letter-spacing:.01em;
+      }
+      .app-version-badge { padding:6px 10px; border-radius:999px; background:#f1f5f9; color:#52647a; font-size:12px; font-weight:750; flex:0 0 auto; }
+      .app-header-aside {
+        display:flex;
+        flex-direction:column;
+        align-items:stretch;
+        justify-content:center;
+        gap:8px;
+        flex:0 0 auto;
+        min-width:88px;
+      }
+      .app-header-aside .app-version-badge {
+        text-align:center;
+        width:100%;
+        box-sizing:border-box;
+      }
+      .app-header-aside #workflow_open_help.workflow-help-always {
+        align-self:stretch;
+        width:100%;
+        justify-content:center;
+        margin:0;
+      }
+      .app-header-project {
+        flex:1 1 auto;
+        min-width:0;
+        margin:0;
+        padding:8px 10px;
+        display:flex;
+        align-items:center;
+        flex-wrap:wrap;
+        gap:10px;
+      }
       .project-session-card { padding:10px 13px; gap:9px; }
       .project-bar-title { display:flex; align-items:center; gap:7px; min-width:max-content; }
       .project-session-card .shiny-input-container { width:275px; }
@@ -257,28 +304,152 @@
         box-sizing:border-box;
       }
       .workflow-chrome {
+        display:none;
+      }
+      .workspace-chrome {
         display:flex;
         flex-direction:column;
-        gap:8px;
         width:100%;
         margin:0 0 16px;
+        background:#fff;
+        border:1px solid var(--ui-border);
+        border-radius:14px;
+        box-shadow:0 2px 8px rgba(15,23,42,.03);
+        overflow:hidden;
+      }
+      .workspace-chrome-section {
+        padding:10px 14px;
+        border-top:1px solid #e8edf4;
+      }
+      .workspace-chrome-section:first-child { border-top:none; }
+      .workspace-chrome-nav { padding:10px 12px; }
+      .workspace-chrome-heading { padding:10px 14px 6px; }
+      .workspace-chrome-actions { padding:6px 14px 10px; }
+      .app-shell-header .project-bar-title {
+        flex:0 0 auto;
+        margin:0;
+      }
+      .app-shell-header .project-bar > .btn,
+      .app-shell-header .project-bar > a.btn {
+        flex:0 0 auto;
+        position:relative;
+        z-index:2;
+        margin:0 !important;
+        height:34px;
+        min-height:34px;
+        line-height:20px;
+        padding:6px 12px;
+        text-decoration:none !important;
+        box-sizing:border-box;
+      }
+      .app-shell-header .project-load-wrap {
+        flex:0 0 280px;
+        width:280px;
+        max-width:100%;
+        position:relative;
+        z-index:1;
+      }
+      .app-shell-header .project-load-wrap .shiny-input-container,
+      .app-shell-header .project-load-wrap .form-group {
+        width:100% !important;
+        max-width:100% !important;
+        margin:0 !important;
+        padding:0 !important;
+        display:block !important;
+      }
+      .app-shell-header .project-load-wrap label.control-label {
+        display:none !important;
+        height:0 !important;
+        margin:0 !important;
+        padding:0 !important;
+      }
+      .app-shell-header .project-load-wrap .input-group {
+        display:table !important;
+        width:100% !important;
+        margin:0 !important;
+        border-collapse:separate;
+      }
+      .app-shell-header .project-load-wrap .input-group-btn {
+        width:1% !important;
+        white-space:nowrap;
+        vertical-align:middle;
+      }
+      .app-shell-header .project-load-wrap .input-group .form-control {
+        width:100% !important;
+        height:34px !important;
+        min-height:34px !important;
+        margin:0 !important;
+        box-sizing:border-box;
+      }
+      .app-shell-header .project-load-wrap .input-group-btn .btn,
+      .app-shell-header .project-load-wrap .btn-file {
+        margin:0 !important;
+        height:34px !important;
+        min-height:34px !important;
+        line-height:20px;
+        padding:6px 12px;
+        box-sizing:border-box;
+      }
+      .app-shell-header .project-load-wrap .shiny-file-input-progress {
+        position:absolute;
+        left:0;
+        right:0;
+        bottom:-4px;
+        height:3px !important;
+        margin:0 !important;
+        padding:0 !important;
+        overflow:hidden;
+        z-index:3;
+      }
+      .app-shell-header .project-status {
+        flex:1 1 140px;
+        min-width:120px;
+        color:#64748b;
+        font-size:12px;
+        line-height:1.35;
+        display:flex;
+        align-items:center;
+        margin:0 !important;
+      }
+      .app-shell-header .project-load-wrap .shiny-file-input-progress .progress-bar {
+        height:3px !important;
+      }
+      .workspace-chrome .stage-heading {
+        margin:0;
+        padding:0;
+        border:none;
+        border-radius:0;
+        box-shadow:none;
+        background:transparent;
+      }
+      .workspace-chrome .stage-topbar,
+      .workspace-chrome .workflow-stage-actions {
+        margin:0;
+        padding:0;
+        border:none;
+        border-radius:0;
+        box-shadow:none;
+        background:transparent;
+        position:static;
+        min-height:0;
       }
       .workflow-nav-shell {
         display:flex;
         align-items:stretch;
         gap:10px;
         width:100%;
-        padding:10px 12px;
-        background:#fff;
-        border:1px solid var(--ui-border);
-        border-radius:14px;
-        box-shadow:0 2px 8px rgba(15,23,42,.03);
+        padding:0;
+        background:transparent;
+        border:none;
+        border-radius:0;
+        box-shadow:none;
         box-sizing:border-box;
       }
       .workflow-nav-shell .workflow-nav {
         flex:1 1 auto;
         min-width:0;
         padding:0;
+        width:100%;
       }
       .workflow-nav-grid {
         display:grid;
@@ -319,7 +490,8 @@
         gap:6px;
         min-height:30px;
       }
-      .workflow-chip {
+      .workflow-chip,
+      button.workflow-chip.btn {
         display:inline-flex;
         align-items:center;
         gap:6px;
@@ -332,6 +504,10 @@
         font-weight:700;
         cursor:pointer;
         white-space:nowrap;
+        margin:0 !important;
+        box-shadow:none;
+        text-shadow:none;
+        background-image:none;
         transition:background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
       }
       .workflow-chip .workflow-chip-num {
@@ -359,15 +535,36 @@
         background:#22c55e;
         color:#fff;
       }
-      .workflow-chip.current {
-        background:#2563eb;
-        border-color:#2563eb;
-        color:#fff;
-        box-shadow:0 3px 10px rgba(37,99,235,.22);
+      .workflow-chip.current,
+      button.workflow-chip.btn.current,
+      button.workflow-chip.btn.btn-default.current {
+        background:#2563eb !important;
+        background-image:none !important;
+        border-color:#1d4ed8 !important;
+        color:#fff !important;
+        box-shadow:0 4px 14px rgba(37,99,235,.35);
+        font-weight:800;
+      }
+      .workflow-chip.current:hover,
+      .workflow-chip.current:focus,
+      button.workflow-chip.btn.current:hover,
+      button.workflow-chip.btn.current:focus,
+      button.workflow-chip.btn.btn-default.current:hover,
+      button.workflow-chip.btn.btn-default.current:focus {
+        background:#1d4ed8 !important;
+        border-color:#1e40af !important;
+        color:#fff !important;
+      }
+      .workflow-chip.current .workflow-chip-num,
+      .workflow-chip.current .workflow-chip-label,
+      .workflow-chip.current .fa,
+      .workflow-chip.current .fas,
+      .workflow-chip.current .far {
+        color:#fff !important;
       }
       .workflow-chip.current .workflow-chip-num {
-        background:#fff;
-        color:#1d4ed8;
+        background:rgba(255,255,255,.22);
+        color:#fff !important;
       }
       .workflow-chip.locked { opacity:.42; cursor:not-allowed; }
       .workflow-chip:disabled { pointer-events:none; }
@@ -394,10 +591,18 @@
         color:#334155;
       }
       #workflow_open_help.workflow-help-always.current,
-      .workflow-help-always.current {
-        background:#2563eb;
-        border-color:#2563eb;
-        color:#fff;
+      .workflow-help-always.current,
+      #workflow_open_help.btn.workflow-help-always.current {
+        background:#2563eb !important;
+        background-image:none !important;
+        border-color:#1d4ed8 !important;
+        color:#fff !important;
+        box-shadow:0 4px 14px rgba(37,99,235,.35);
+      }
+      #workflow_open_help.workflow-help-always.current:hover,
+      #workflow_open_help.workflow-help-always.current:focus {
+        background:#1d4ed8 !important;
+        color:#fff !important;
       }
       .workflow-stage-actions {
         margin:0;
@@ -413,7 +618,6 @@
       @media (max-width:720px) {
         .workflow-nav-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
         .workflow-nav-shell { flex-direction:column; }
-        #workflow_open_help.workflow-help-always { align-self:flex-start; }
       }
       .stage-heading { display:grid; grid-template-columns:54px minmax(0,1fr) auto; align-items:center; gap:15px; padding:15px 18px; margin:0 0 12px; background:linear-gradient(135deg,#fff 0%,#fbfdff 100%); border:1px solid var(--ui-border); border-radius:14px; box-shadow:0 3px 12px rgba(15,23,42,.035); }
       .stage-heading-icon { width:48px; height:48px; border-radius:13px; background:#eff6ff; color:#2563eb; display:flex; align-items:center; justify-content:center; font-size:20px; }
@@ -435,14 +639,91 @@
       .stage-grid-2 { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
       .stage-grid-upload { grid-template-columns:minmax(300px,.72fr) minmax(0,1.55fr); }
       .stage-grid-rename { grid-template-columns:minmax(310px,.82fr) minmax(0,1.35fr); }
-      .upload-drop-card { min-height:260px; }
-      .upload-drop-card .shiny-input-container { width:100%; }
+      .upload-drop-card {
+        min-height:0;
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+      }
+      .upload-drop-card > .card-title-row { margin:0; }
+      .upload-drop-card > .shiny-input-container,
+      .upload-drop-card > .form-group {
+        margin:0 !important;
+        padding:0 !important;
+        width:100%;
+      }
+      .upload-drop-card > .compact-hint { margin:0; }
       .upload-drop-card .input-group { width:100%; }
       .upload-drop-card .btn-file { background:#eef5ff; border-color:#bdd2f5; color:#1d4ed8; font-weight:700; }
+      .upload-read-model {
+        margin:0;
+        padding-top:10px;
+        border-top:1px solid #e8edf4;
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+      }
+      .upload-read-model .card-title-row {
+        margin:0;
+        min-height:0;
+      }
+      .upload-read-model .card-title-icon { width:26px; height:26px; font-size:12px; }
+      .upload-read-model .card-title-text { font-size:14px; }
+      .upload-read-model .compact-hint { margin:0; }
+      .upload-read-model .project-mode-options,
+      .upload-read-model .project-mode-options .shiny-input-container,
+      .upload-read-model .project-mode-options .form-group {
+        margin:0 !important;
+        padding:0 !important;
+        width:100%;
+        max-width:none;
+      }
+      .upload-read-model .project-mode-options .control-label {
+        display:none !important;
+        margin:0 !important;
+        padding:0 !important;
+        height:0 !important;
+        border:0 !important;
+      }
       .stage-table-card { min-width:0; overflow:hidden; }
       .project-mode-options .shiny-options-group { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
       .project-mode-options .shiny-input-container { width:100%; max-width:none; }
       .project-mode-options .radio { margin:0; padding:12px 14px; border:1px solid #dbe4ef; border-radius:10px; background:#fbfcfe; }
+      /* Same 10px gap everywhere — override Bootstrap .radio margins that made options uneven. */
+      .upload-read-model .project-mode-options-compact .shiny-options-group {
+        display:flex !important;
+        flex-direction:column;
+        gap:10px;
+        margin:0 !important;
+        padding:0 !important;
+      }
+      .upload-read-model .project-mode-options-compact .radio,
+      .upload-read-model .project-mode-options-compact div.radio {
+        margin:0 !important;
+        margin-top:0 !important;
+        margin-bottom:0 !important;
+        padding:8px 10px !important;
+        min-height:0 !important;
+        border:1px solid #dbe4ef;
+        border-radius:8px;
+        background:#fbfcfe;
+        font-size:12px;
+        line-height:1.3;
+      }
+      .upload-read-model .project-mode-options-compact .radio label {
+        margin:0 !important;
+        padding:0 !important;
+        font-weight:600;
+        color:#334155;
+        display:flex;
+        align-items:center;
+        gap:8px;
+        min-height:0;
+      }
+      .upload-read-model .project-mode-options-compact .radio input[type="radio"] {
+        margin:0 !important;
+        position:static;
+      }
       .assignment-editor-wrap { overflow:auto; max-height:560px; border:1px solid #dbe4ef; border-radius:10px; }
       .assignment-editor { width:100%; min-width:940px; border-collapse:separate; border-spacing:0; }
       .assignment-editor th { position:sticky; top:0; z-index:2; padding:9px 8px; background:#f8fafc; color:#475569; font-size:11.5px; border-bottom:1px solid #dbe4ef; white-space:nowrap; }
@@ -601,9 +882,11 @@
         .taxonomy-workspace-status { min-width:0; }
       }
       @media (max-width:620px) {
-        .app-shell-header { min-height:88px; padding:14px 16px; gap:10px; }
+        .app-shell-header { min-height:88px; padding:14px 16px; gap:10px; flex-wrap:wrap; }
         .app-brand-logo { width:min(300px,70vw); max-height:66px; }
-        .app-version-badge { margin-left:auto; }
+        .app-brand-tagline { max-width:100%; }
+        .app-header-project { flex:1 1 100%; order:3; }
+        .app-header-aside { margin-left:auto; }
         .taxonomy-result-hero { grid-template-columns:1fr; padding:18px; }
         .taxonomy-hero-icon-wrap { min-height:0; justify-content:flex-start; background:none; }
         .taxonomy-why { grid-column:auto; margin-left:0; }

@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.0.6
+
+- Fixed workflow navigation: step chips are Shiny actionButtons (no blocking overlay on click); green markers mean real completion only, not visit order or default Assay settings.
+- Highlighted the current step chip more clearly (full blue chip).
+- Moved Project session into the app header; placed the product tagline under the logo; moved Help under the version badge.
+- Nested Project read model compactly under Raw AB1 files on Upload.
+- Trim & QC empty message now appears only when no AB1 files are present; visiting QC after a normal upload no longer floods false errors.
+
 ## 3.0.5
 
 - Replaced the Bootstrap pipeline tab strip with a gated Steps UI organized as SETUP / PROCESS / IDENTIFY / INTEGRATE, plus unnumbered OUTPUT (Export) and Help.

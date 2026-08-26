@@ -1,6 +1,14 @@
   # ---------------- PITAX 3.0 Stage 1: AB1 evidence audit ----------------
   output$ab1_evidence_run_table <- renderDT({
-    req(rv$results)
+    if (!is.list(rv$results) || !length(rv$results)) {
+      if (!qc_has_uploaded_ab1()) {
+        return(datatable(
+          data.frame(Message = qc_workspace_empty_message(), stringsAsFactors = FALSE),
+          rownames = FALSE, selection = "none", options = list(dom = "t")
+        ))
+      }
+      req(FALSE)
+    }
     df <- ab1_evidence_run_summary(rv$results)
     if (!nrow(df)) {
       return(datatable(data.frame(Message = "No AB1 evidence has been captured in this run."),

@@ -3930,10 +3930,10 @@
       "checksum": "fc7ddbe9ea0545d190ce8f6b7f87c3c1"
     },
     "Git.BAT": {
-      "checksum": "215700915d451337b20ad216e7233331"
+      "checksum": "515c33184f52bd13ab6040f327546f3e"
     },
     "R/app/bootstrap.R": {
-      "checksum": "1f3503157fccdffddbf91f0bfdb5f63f"
+      "checksum": "6e1a0cc01a05471bf0a9ea970a969fb8"
     },
     "R/domain/assay/assay_profiles.R": {
       "checksum": "75a99acc80ba2165edbd917afbb2b460"
@@ -3963,34 +3963,34 @@
       "checksum": "e96978661660bd4906980c20c82bea88"
     },
     "R/server/stages/00_state.R": {
-      "checksum": "30e09f3a656cf50bb3466bd29fbc3c17"
+      "checksum": "4c1e680db219a1a898266fac97a6dbe6"
     },
     "R/server/stages/05_workflow.R": {
-      "checksum": "8f26b1656fd0f4f8706b4e32a97449fe"
+      "checksum": "2e2bbb44a61333571ecfb01ffab8d98f"
     },
     "R/server/stages/10_project.R": {
-      "checksum": "acb62f5694233aeb3c2b0d04cdcfae17"
+      "checksum": "194ccf5c596f2d390ed2b4afbf841af5"
     },
     "R/server/stages/100_taxonomy.R": {
       "checksum": "1f0be611b88daaafe2fa0e7eca210cd1"
     },
     "R/server/stages/110_multilocus.R": {
-      "checksum": "c821f0ebb935251f37651e121a365c0c"
+      "checksum": "abff86fbcc87484b3e2dc364282a3aa5"
     },
     "R/server/stages/120_reset.R": {
-      "checksum": "c080dd115cc25d5fb1deba35d02a471e"
+      "checksum": "9ce9870789620f312946d0d45619b30b"
     },
     "R/server/stages/20_upload.R": {
-      "checksum": "a0533c2627d82b4f8edf99d4dd812fbd"
+      "checksum": "04cccad392ccc667dcac78154c687004"
     },
     "R/server/stages/30_trimming.R": {
-      "checksum": "b193ce49a81f09fc947beefe0eb70503"
+      "checksum": "5f80d4846effecf3f692d2ccc5679e5e"
     },
     "R/server/stages/40_qc_summary.R": {
-      "checksum": "288d5816c8a8123e3ed4817bdd6c0d6f"
+      "checksum": "1bcede9f1538cea587f262e0f441ac5e"
     },
     "R/server/stages/50_evidence_review.R": {
-      "checksum": "a94a86876489527c159039217bc27939"
+      "checksum": "d8c97b72cb8e4c44a2abad50e958c90e"
     },
     "R/server/stages/60_assignment.R": {
       "checksum": "df554834dc402405b9d7109d3fe98de5"
@@ -4008,10 +4008,10 @@
       "checksum": "6aa0b9f331e5eaf8c319833b9bf49bc0"
     },
     "R/ui/app_ui.R": {
-      "checksum": "01157fe514cb08f5c186d46634163b03"
+      "checksum": "9025b2d4507654717e5eb924c1a24486"
     },
     "R/ui/components.R": {
-      "checksum": "f140a20f0b59384d10ad3f39379d042c"
+      "checksum": "eee75353003b49563ebcc1edb2be7ec6"
     },
     "README.md": {
       "checksum": "e95de7b61e3f8bd90aae2c4dc8e40f53"
@@ -4041,7 +4041,7 @@
       "checksum": "901a9567340e37d84b9ebb37295f42ef"
     },
     "tests/contracts/workflow_order_smoke.R": {
-      "checksum": "2d2bdb8615c2003907d81d9a48cddc27"
+      "checksum": "c0fe0948e7acd2e288e84d6c5c7bae88"
     },
     "tests/fixtures/generate_stage3_ab1_fixture.py": {
       "checksum": "52c677cd1006e183731a4d3c8b9d8d4f"
@@ -4077,7 +4077,7 @@
       "checksum": "80b8bf468b4b03dd3c3b722baeb069d9"
     },
     "tests/helpers/test_paths.R": {
-      "checksum": "61695a3b4b893705cb6369ab6afd4ec3"
+      "checksum": "43b53c827d381a487cce7e033b6975b9"
     },
     "tests/integration/stage3_ab1_fixture_smoke.R": {
       "checksum": "98efcd54416eea17cf40c7f9782f3910"
@@ -4118,14 +4118,17 @@
     "VERSION.txt": {
       "checksum": "8ea4581d392114552d2cefcf543df9fa"
     },
+    "www/changelog_viewer.html": {
+      "checksum": "8760ffe4530d1e21df4cca0fdcf1869f"
+    },
     "www/logo.png": {
       "checksum": "cb08b40b30b1dbf3a5f322895af66592"
     },
     "www/pitax.css": {
-      "checksum": "18f0f13e3b75de4f9916632e47991838"
+      "checksum": "fc0241b6b29840346266f0b85804bd93"
     },
     "www/pitax.js": {
-      "checksum": "dee30604baab95ac5a5e2b1ad16d6a9e"
+      "checksum": "97d318bcec5e095ba0dd662accbb0e5c"
     }
   },
   "users": null

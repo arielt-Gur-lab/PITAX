@@ -23,16 +23,44 @@ must_not_contain <- function(text, value) {
 
 must_contain(app_text, 'pitax_workflow_stepper_ui')
 must_contain(app_text, 'workflow_mark_unlocked')
-must_contain(app_text, 'workflow-nav-grid')
-must_contain(app_text, 'workflow-col-label')
-must_contain(app_text, 'workflow_open_help')
+must_contain(app_text, 'workflow_mark_completed')
+must_contain(app_text, 'workspace-chrome')
+must_contain(app_text, 'workflow_stage_heading')
 must_contain(app_text, 'workflow_stage_actions')
+must_contain(app_text, 'workflow_open_help')
 must_contain(app_text, 'free_nav = TRUE')
+must_contain(app_text, 'workflow_completed_steps')
+must_contain(app_text, 'workflow_hide_loader')
+must_contain(app_text, 'inputId = paste0("workflow_goto_"')
+must_not_contain(app_text, 'step_idx < cur_idx')
+must_not_contain(app_text, "Opening Help...")
+must_not_contain(app_text, 'workflow_nav_step')
+must_not_contain(app_text, "Loading step...")
+must_not_contain(app_text, 'has_settings <- is.list(rv$settings)')
+# Default assay settings alone must never paint Assay green.
+must_not_contain(app_text, 'if (has_settings || has_results) done <- c(done, "settings")')
 app_ui_text <- pitax_read_text("R", "ui", "app_ui.R")
+if (grepl("stage_heading\\(", app_ui_text)) stop("stage_heading() must not remain inside app_ui.R tab panels")
 if (grepl("stage_topbar\\(", app_ui_text)) stop("stage_topbar() must not remain inside app_ui.R tab panels")
 must_contain(app_text, 'tabsetPanel(id = "pipeline_step", type = "hidden"')
 must_contain(app_text, 'uiOutput("workflow_stepper")')
 must_not_contain(app_text, 'tabsetPanel(id = "pipeline_step", type = "tabs"')
+# Chip path must be Shiny actionButtons, not raw tags$button + JS setInputValue.
+components_text <- pitax_read_text("R", "ui", "components.R")
+if (!grepl('inputId = paste0\\("workflow_goto_"', components_text)) {
+  stop("workflow chips must use Shiny actionButton(inputId = paste0(\"workflow_goto_\"...))")
+}
+if (grepl('tags\\$button', components_text) && grepl('workflow_goto_', components_text) &&
+    grepl('tags\\$button\\([\\s\\S]{0,200}workflow_goto_', components_text, perl = TRUE)) {
+  stop("workflow chips must not use tags$button for workflow_goto_ navigation")
+}
+js_text <- pitax_read_text("www", "pitax.js")
+if (grepl("workflow_nav_step", js_text, fixed = TRUE)) {
+  stop("pitax.js must not set workflow_nav_step for chip navigation")
+}
+if (grepl("Loading step...", js_text, fixed = TRUE)) {
+  stop("pitax.js must not show a blocking loader on step chip clicks")
+}
 must_contain(app_text, 'tabPanel("Assay", value = "settings"')
 must_contain(app_text, 'tabPanel("Assign", value = "rename"')
 must_contain(app_text, 'tabPanel("Trim & QC", value = "qc"')
