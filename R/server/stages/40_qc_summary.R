@@ -46,28 +46,20 @@
   })
 
   selected_sample_key <- reactive({
-    # Evaluate inputs carefully: nzchar(NULL) throws an S4 nchar method error.
-    # Show the upload message only when no AB1 is present; otherwise stay silent.
+    # Quiet empty states: never validate() here (that paints red errors on plots).
+    # The upload message is shown only on summary cards/tables.
     sid <- input$inspect_sample
-    if (is.null(sid) || length(sid) != 1L) {
-      if (!qc_has_uploaded_ab1()) validate(need(FALSE, qc_workspace_empty_message()))
-      req(FALSE)
-    }
+    if (is.null(sid) || length(sid) != 1L) req(FALSE)
     sid <- as.character(sid)[1]
-    if (!nzchar(sid) || !(sid %in% names(rv$results))) {
-      if (!qc_has_uploaded_ab1()) validate(need(FALSE, qc_workspace_empty_message()))
-      req(FALSE)
-    }
+    if (!nzchar(sid) || !(sid %in% names(rv$results))) req(FALSE)
     sid
   })
 
   selected_result <- reactive({
     sid <- selected_sample_key()
     r <- rv$results[[sid]]
-    if (is.null(r)) {
-      if (!qc_has_uploaded_ab1()) validate(need(FALSE, qc_workspace_empty_message()))
-      req(FALSE)
-    }
+    # Stale selection must not invent another sample; require an exact key match.
+    if (is.null(r)) req(FALSE)
     r
   })
 

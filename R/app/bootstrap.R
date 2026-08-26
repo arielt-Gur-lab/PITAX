@@ -24,7 +24,9 @@ pitax_source(file.path("R", "domain", "sanger", "core_sanger.R"), local = TRUE)
 pitax_source(file.path("R", "domain", "sanger", "sequence_tools.R"), local = TRUE)
 pitax_source(file.path("R", "export", "export_tools.R"), local = TRUE)
 pitax_source(file.path("R", "services", "taxonomy_tools.R"), local = TRUE)
+pitax_source(file.path("R", "services", "blast_polling.R"), local = TRUE)
+pitax_source(file.path("R", "services", "share_project.R"), local = TRUE)
 
-APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.0.7")
-APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "3.0.7", APP_VERSION)
+APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.2.1")
+APP_VERSION <- ifelse(is.na(APP_VERSION) || !nzchar(APP_VERSION), "3.2.1", APP_VERSION)
 PROJECT_SCHEMA_VERSION <- 6L

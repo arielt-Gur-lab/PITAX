@@ -14,6 +14,8 @@ required_files <- c(
   file.path("R", "domain", "sanger", "core_sanger.R"),
   file.path("R", "domain", "sanger", "sequence_tools.R"),
   file.path("R", "services", "taxonomy_tools.R"),
+  file.path("R", "services", "blast_polling.R"),
+  file.path("R", "services", "share_project.R"),
   file.path("R", "export", "export_tools.R"),
   file.path("www", "pitax.css"),
   file.path("www", "pitax.js"),

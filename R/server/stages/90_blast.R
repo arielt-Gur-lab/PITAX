@@ -70,8 +70,9 @@
     )
   )
 
-  # NCBI BLAST is a shared service. Keep all automated BLAST contacts at least
-  # 10 seconds apart, in addition to the per-RID one-minute polling rule.
+  # NCBI BLAST is a shared service. Keep automated BLAST contacts at least
+  # 10 seconds apart. Per-RID timing uses RTOE floor + auto next_poll_at
+  # (see R/services/blast_polling.R), not a fixed one-minute rule.
   wait_for_ncbi_contact_slot <- function(min_seconds = 10) {
     last <- rv$ncbi_last_contact
     if (!is.null(last) && length(last) && !is.na(last)) {
@@ -81,6 +82,22 @@
       }
     }
     rv$ncbi_last_contact <- Sys.time()
+  }
+
+  # Non-blocking slot check for the auto-poll observer (no Sys.sleep).
+  ncbi_contact_slot_ready <- function(min_seconds = 10) {
+    last <- rv$ncbi_last_contact
+    if (is.null(last) || !length(last) || is.na(last)) return(TRUE)
+    elapsed <- as.numeric(difftime(Sys.time(), last, units = "secs"))
+    is.finite(elapsed) && elapsed >= min_seconds
+  }
+
+  apply_blast_job_updates <- function(job_idx, updates) {
+    if (!length(updates) || is.na(job_idx)) return(invisible(NULL))
+    for (nm in names(updates)) {
+      if (nm %in% names(rv$blast_jobs)) rv$blast_jobs[[nm]][job_idx] <- updates[[nm]]
+    }
+    invisible(NULL)
   }
 
   format_elapsed_seconds <- function(secs) {
@@ -97,9 +114,7 @@
   }
 
   parse_blast_timestamp <- function(value) {
-    value <- as.character(value)[1]
-    if (!nzchar(value)) return(as.POSIXct(NA))
-    suppressWarnings(as.POSIXct(value, format = "%Y-%m-%d %H:%M:%S"))
+    blast_parse_timestamp(value)
   }
 
   blast_elapsed_since <- function(timestamp_text) {
@@ -190,6 +205,12 @@
       return(list(ok=FALSE, message="NCBI did not return a BLAST RID."))
     }
 
+    submitted_at <- Sys.time()
+    submitted_txt <- blast_format_timestamp(submitted_at)
+    rtoe_secs <- blast_parse_rtoe_seconds(parsed$rtoe)
+    earliest_txt <- blast_schedule_next_poll_at(submitted_at, blast_rtoe_floor_seconds(rtoe_secs))
+    next_auto_txt <- blast_schedule_next_poll_at(submitted_at, blast_first_auto_poll_delay_seconds(rtoe_secs))
+
     rv$blast_jobs <- rbind(rv$blast_jobs, data.frame(
       final_name=r$final_name,
       original_name=original_name,
@@ -199,12 +220,18 @@
       hitlist_size=hitlist,
       consensus_revision=if (is.list(r$consensus$curation)) as.integer(r$consensus$curation$revision) else 0L,
       status="SUBMITTED",
-      submitted_at=format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+      submitted_at=submitted_txt,
       last_checked_at="",
+      auto_poll_enabled=TRUE,
+      auto_poll_attempts=0L,
+      next_poll_at=next_auto_txt,
+      earliest_retrieve_at=earliest_txt,
+      manual_retrieval_required=FALSE,
       stringsAsFactors=FALSE
     ))
 
-    list(ok=TRUE, rid=parsed$rid, rtoe=parsed$rtoe, final_name=r$final_name)
+    list(ok=TRUE, rid=parsed$rid, rtoe=parsed$rtoe, final_name=r$final_name,
+         earliest_retrieve_at=earliest_txt, next_poll_at=next_auto_txt)
   }
 
   observeEvent(input$submit_ncbi_blast, {
@@ -229,7 +256,13 @@
       showNotification(ans$message, type="error")
       return()
     }
-    showNotification(paste("Submitted to NCBI. RID:", ans$rid), type="message")
+    showNotification(
+      paste0(
+        "Submitted to NCBI. RID: ", ans$rid,
+        " | first automatic check after RTOE (~", blast_parse_rtoe_seconds(ans$rtoe), "s)"
+      ),
+      type="message", duration=8
+    )
   })
 
   observeEvent(input$submit_all_ncbi_blast, {
@@ -322,11 +355,13 @@
     rv$blast_ids <- rbind(rv$blast_ids, top[, top_cols, drop=FALSE])
   }
 
-  retrieve_blast_job <- function(job_idx) {
+  retrieve_blast_job <- function(job_idx, mode = c("manual", "auto")) {
+    mode <- match.arg(mode)
     if (is.na(job_idx) || job_idx < 1 || job_idx > nrow(rv$blast_jobs)) {
       return(list(status="ERROR", contacted=FALSE, message="BLAST job index is invalid."))
     }
     if (identical(as.character(rv$blast_jobs$status[job_idx]), "STALE")) {
+      apply_blast_job_updates(job_idx, blast_disable_auto_poll_fields())
       return(list(status="STALE", contacted=FALSE, message="This RID belongs to a sequence version that was changed during manual curation. Submit the current curated sequence as a new BLAST job."))
     }
 
@@ -346,6 +381,7 @@
     if (!is.finite(current_revision)) current_revision <- 0L
     if (!identical(as.integer(job_revision), as.integer(current_revision))) {
       rv$blast_jobs$status[job_idx] <- "STALE"
+      apply_blast_job_updates(job_idx, blast_disable_auto_poll_fields())
       return(list(
         status = "STALE",
         contacted = FALSE,
@@ -357,28 +393,49 @@
       ))
     }
     rid <- rv$blast_jobs$rid[job_idx]
+    job <- rv$blast_jobs[job_idx, , drop = FALSE]
+    now <- Sys.time()
 
-    # Do not poll a single RID more often than once per minute.
-    reference_time <- rv$blast_jobs$last_checked_at[job_idx]
-    if (!nzchar(reference_time)) reference_time <- rv$blast_jobs$submitted_at[job_idx]
-    ref <- suppressWarnings(as.POSIXct(reference_time, format="%Y-%m-%d %H:%M:%S"))
-    if (!is.na(ref)) {
-      elapsed <- as.numeric(difftime(Sys.time(), ref, units="secs"))
-      if (is.finite(elapsed) && elapsed < 60) {
-        job <- rv$blast_jobs[job_idx, , drop = FALSE]
-        return(list(
-          status = "TOO_SOON",
-          contacted = FALSE,
-          message = blast_job_status_line(
-            job,
-            paste0("wait ", ceiling(60 - elapsed), "s more before the next poll for this RID")
-          )
-        ))
+    # RTOE floor: neither manual nor auto may contact NCBI before earliest_retrieve_at.
+    if (!blast_manual_retrieve_allowed(job, now)) {
+      remain <- blast_seconds_until(job$earliest_retrieve_at[1], now)
+      if (!is.finite(remain)) {
+        remain <- blast_rtoe_floor_seconds(job$rtoe[1]) - blast_elapsed_since(job$submitted_at[1])
       }
+      return(list(
+        status = "TOO_SOON",
+        contacted = FALSE,
+        message = blast_job_status_line(
+          job,
+          paste0(
+            "wait ", ceiling(max(0, remain)), "s more (NCBI RTOE floor) before Check now / automatic poll"
+          )
+        )
+      ))
     }
 
-    wait_for_ncbi_contact_slot(10)
-    rv$blast_jobs$last_checked_at[job_idx] <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+    # Auto path also respects next_poll_at (manual may check earlier after RTOE floor).
+    if (identical(mode, "auto") && !blast_auto_poll_due(job, now)) {
+      remain <- blast_seconds_until(job$next_poll_at[1], now)
+      return(list(
+        status = "TOO_SOON",
+        contacted = FALSE,
+        message = blast_job_status_line(
+          job,
+          paste0("next automatic check in ~", ceiling(max(0, remain)), "s")
+        )
+      ))
+    }
+
+    if (identical(mode, "auto")) {
+      if (!ncbi_contact_slot_ready(10)) {
+        return(list(status = "TOO_SOON", contacted = FALSE, message = "NCBI contact slot busy; will retry shortly."))
+      }
+      rv$ncbi_last_contact <- Sys.time()
+    } else {
+      wait_for_ncbi_contact_slot(10)
+    }
+    rv$blast_jobs$last_checked_at[job_idx] <- blast_format_timestamp(Sys.time())
 
     req_obj <- httr2::request("https://blast.ncbi.nlm.nih.gov/Blast.cgi") |>
       httr2::req_url_query(CMD="Get", RID=rid, FORMAT_TYPE="XML2") |>
@@ -403,11 +460,13 @@
     }
     if (grepl("Status=FAILED|Status=UNKNOWN", txt)) {
       rv$blast_jobs$status[job_idx] <- "FAILED/UNKNOWN"
+      apply_blast_job_updates(job_idx, blast_disable_auto_poll_fields())
       job <- rv$blast_jobs[job_idx, , drop = FALSE]
+      fail_kind <- if (grepl("Status=UNKNOWN", txt)) "UNKNOWN" else "FAILED"
       return(list(
-        status = "FAILED",
+        status = fail_kind,
         contacted = TRUE,
-        message = blast_job_status_line(job, "NCBI reports failed or unknown job")
+        message = blast_job_status_line(job, paste0("NCBI reports ", tolower(fail_kind), " job"))
       ))
     }
 
@@ -522,17 +581,35 @@
         already_stored <- nrow(rv$blast_hits) && "rid" %in% names(rv$blast_hits) && rid %in% rv$blast_hits$rid
         if (identical(as.character(rv$blast_jobs$status[idx]), "READY") && already_stored) {
           ans <- list(status="READY", message="Already retrieved.")
+          apply_blast_job_updates(idx, blast_disable_auto_poll_fields())
         } else {
           incProgress(0, detail = paste0(k, "/", n_jobs, " | checking ", final_name))
-          ans <- retrieve_blast_job(idx)
+          ans <- retrieve_blast_job(idx, mode = "manual")
+          # Manual Check now never restarts auto-poll; terminal outcomes stop auto.
+          if (ans$status %in% c("READY", "FAILED", "UNKNOWN", "NO_HITS", "STALE")) {
+            apply_blast_job_updates(idx, blast_disable_auto_poll_fields())
+          }
         }
 
         if (ans$status == "READY") ready <- ready + 1L
-        else if (ans$status == "WAITING") {
+        else if (ans$status %in% c("WAITING")) {
           waiting <- waiting + 1L
+          if (isTRUE(rv$blast_jobs$manual_retrieval_required[idx])) {
+            detail_notes <- c(
+              detail_notes,
+              paste0(
+                "NCBI status: SEARCHING | Result is not ready yet. | Last checked: ",
+                rv$blast_jobs$last_checked_at[idx], " | RID: ", rid
+              )
+            )
+          } else {
+            detail_notes <- c(detail_notes, ans$message)
+          }
+        }
+        else if (ans$status == "TOO_SOON") {
+          too_soon <- too_soon + 1L
           detail_notes <- c(detail_notes, ans$message)
         }
-        else if (ans$status == "TOO_SOON") too_soon <- too_soon + 1L
         else if (ans$status == "NO_HITS") no_hits <- no_hits + 1L
         else if (ans$status == "STALE") stale <- stale + 1L
         else failed <- failed + 1L
@@ -586,6 +663,7 @@
         # A READY RID that is already present in the hit store does not need another server request.
         already_stored <- nrow(rv$blast_hits) && "rid" %in% names(rv$blast_hits) && rid %in% rv$blast_hits$rid
         if (identical(rv$blast_jobs$status[idx], "READY") && already_stored) {
+          apply_blast_job_updates(idx, blast_disable_auto_poll_fields())
           ready <- ready + 1L
           incProgress(
             1/n_jobs,
@@ -595,7 +673,10 @@
         }
 
         incProgress(0, detail = paste0(k, "/", n_jobs, " | checking ", final_name))
-        ans <- retrieve_blast_job(idx)
+        ans <- retrieve_blast_job(idx, mode = "manual")
+        if (ans$status %in% c("READY", "FAILED", "UNKNOWN", "NO_HITS", "STALE")) {
+          apply_blast_job_updates(idx, blast_disable_auto_poll_fields())
+        }
         if (ans$status == "READY") ready <- ready + 1L
         else if (ans$status == "WAITING") {
           waiting <- waiting + 1L
@@ -630,50 +711,226 @@
     div(class="tax-note", strong("Batch status: "), rv$blast_batch_status_text)
   })
 
+  # PITAX auto-poll observer (NCBI): separate from status-card UI invalidateLater.
+  # UI timers must not call retrieve_blast_job; only this observer contacts NCBI.
+  # Two-phase tick: (1) publish "in progress" so the status card can paint,
+  # (2) perform the NCBI Get on the next invalidateLater without a busy loop.
+  observe({
+    jobs <- rv$blast_jobs
+    if (!is.data.frame(jobs) || !nrow(jobs)) {
+      rv$blast_auto_activity_text <- ""
+      rv$blast_auto_pending_idx <- NA_integer_
+      return()
+    }
+    auto_pending <- isTRUE(any(
+      jobs$auto_poll_enabled %in% TRUE &
+        jobs$status %in% c("SUBMITTED", "WAITING")
+    ))
+    if (!auto_pending) {
+      rv$blast_auto_activity_text <- ""
+      rv$blast_auto_pending_idx <- NA_integer_
+      return()
+    }
+    invalidateLater(2000, session)
+
+    pending_idx <- suppressWarnings(as.integer(rv$blast_auto_pending_idx)[1])
+    if (is.finite(pending_idx) && pending_idx >= 1L && pending_idx <= nrow(rv$blast_jobs)) {
+      idx <- pending_idx
+      rv$blast_auto_pending_idx <- NA_integer_
+      withProgress(
+        message = paste0("Automatic NCBI BLAST check: ", rv$blast_jobs$final_name[idx]),
+        detail = paste0("RID ", rv$blast_jobs$rid[idx]),
+        value = 0.4,
+        {
+          ans <- retrieve_blast_job(idx, mode = "auto")
+          updates <- blast_job_after_auto_poll(rv$blast_jobs[idx, , drop = FALSE], ans$status, now = Sys.time())
+          apply_blast_job_updates(idx, updates)
+        }
+      )
+      rv$blast_auto_activity_text <- ""
+      removeNotification(id = "blast_auto_check")
+
+      if (identical(ans$status, "READY")) {
+        rv$blast_batch_status_text <- paste0(
+          "Automatic check complete | READY | ", rv$blast_jobs$final_name[idx],
+          " | RID ", rv$blast_jobs$rid[idx]
+        )
+        showNotification(
+          paste0("Automatic BLAST retrieval ready for ", rv$blast_jobs$final_name[idx],
+                 " (RID ", rv$blast_jobs$rid[idx], ")."),
+          type = "message", duration = 8
+        )
+      } else if (identical(ans$status, "WAITING") && isTRUE(rv$blast_jobs$manual_retrieval_required[idx])) {
+        rv$blast_batch_status_text <- paste0(
+          "Automatic checks stopped after 3 attempts | still SEARCHING at NCBI | RID ",
+          rv$blast_jobs$rid[idx], " | use Check now"
+        )
+        showNotification(
+          paste0(
+            "NCBI has not returned the BLAST result after 3 automatic checks. ",
+            "The request may still be running at NCBI. ",
+            "Automatic checking has stopped. Use Check now to retrieve manually. ",
+            "(RID ", rv$blast_jobs$rid[idx], ")"
+          ),
+          type = "warning", duration = 12
+        )
+      } else if (identical(ans$status, "WAITING")) {
+        attempts_now <- suppressWarnings(as.integer(rv$blast_jobs$auto_poll_attempts[idx]))
+        rv$blast_batch_status_text <- paste0(
+          "Automatic check ", attempts_now, " of 3 | NCBI still SEARCHING | RID ",
+          rv$blast_jobs$rid[idx]
+        )
+        showNotification(
+          paste0(
+            "Automatic NCBI check ", attempts_now, " of 3: still searching (RID ",
+            rv$blast_jobs$rid[idx], ")."
+          ),
+          type = "message", duration = 6
+        )
+      } else if (ans$status %in% c("FAILED", "UNKNOWN")) {
+        rv$blast_batch_status_text <- paste0("Automatic check | ", ans$status, " | RID ", rv$blast_jobs$rid[idx])
+        showNotification(ans$message, type = "error", duration = 10)
+      } else if (identical(ans$status, "ERROR")) {
+        rv$blast_batch_status_text <- paste0(
+          "Automatic check network error (RID kept) | RID ", rv$blast_jobs$rid[idx]
+        )
+        showNotification(
+          paste0("Network error during automatic BLAST check (RID kept): ", ans$message),
+          type = "warning", duration = 10
+        )
+      } else if (identical(ans$status, "TOO_SOON")) {
+        rv$blast_batch_status_text <- paste0("Automatic check deferred | ", ans$message)
+      }
+      return()
+    }
+
+    if (!ncbi_contact_slot_ready(10)) return()
+    now <- Sys.time()
+    due_idx <- which(vapply(seq_len(nrow(jobs)), function(i) {
+      blast_auto_poll_due(jobs[i, , drop = FALSE], now)
+    }, logical(1)))
+    if (!length(due_idx)) return()
+
+    idx <- due_idx[[1]]
+    rid_busy <- as.character(rv$blast_jobs$rid[idx])
+    name_busy <- as.character(rv$blast_jobs$final_name[idx])
+    attempt_next <- suppressWarnings(as.integer(rv$blast_jobs$auto_poll_attempts[idx]))
+    if (!is.finite(attempt_next)) attempt_next <- 0L
+    msg <- paste0(
+      "Automatic NCBI check in progress: ", name_busy,
+      " | RID ", rid_busy,
+      " | check ", attempt_next + 1L, " of 3"
+    )
+    rv$blast_auto_activity_text <- msg
+    rv$blast_batch_status_text <- msg
+    # Sticky toast so the user sees activity even while the session is busy.
+    showNotification(msg, id = "blast_auto_check", type = "message", duration = NULL)
+    rv$blast_auto_pending_idx <- idx
+    # Give the browser time to paint the notification/status before the blocking Get.
+    invalidateLater(450, session)
+  })
+
   output$blast_job_status <- renderUI({
-    # Refresh elapsed time while jobs are still running.
+    # UI refresh timer only - does not call retrieve_blast_job / NCBI.
+    # do not invalidate the jobs DataTable; that desyncs scrollX header/body.
     if (is.data.frame(rv$blast_jobs) && nrow(rv$blast_jobs) &&
         any(rv$blast_jobs$status %in% c("SUBMITTED", "WAITING"))) {
-      invalidateLater(5000, session)
+      invalidateLater(2000, session)
     }
     req(input$blast_sample)
     jobs <- rv$blast_jobs[rv$blast_jobs$original_name == input$blast_sample, , drop=FALSE]
     if (!nrow(jobs)) return(p(class="settings-note", "No NCBI submission yet for this sequence."))
     j <- jobs[nrow(jobs), , drop = FALSE]
-    line <- blast_job_status_line(
-      j,
-      paste0(
-        "hits requested ", j$hitlist_size[1],
-        if (identical(as.character(j$status[1]), "WAITING")) " | NCBI is still computing"
-        else if (identical(as.character(j$status[1]), "SUBMITTED")) " | submitted, awaiting first poll"
-        else if (identical(as.character(j$status[1]), "READY")) " | results available"
-        else NULL
+    banner <- blast_status_banner_parts(j, now = Sys.time(), format_elapsed = format_elapsed_seconds)
+    activity <- as.character(rv$blast_auto_activity_text)[1]
+    # Show in-progress activity for this RID, or any active auto-check message.
+    show_activity <- !is.null(activity) && nzchar(activity)
+    activity_line <- if (show_activity) {
+      tags$div(
+        class = "status-warning",
+        style = "font-weight:700; margin-top:8px; padding:8px 10px; border:1px solid #f3d7a0; border-radius:8px; background:#fff7ed;",
+        activity
       )
-    )
+    } else {
+      NULL
+    }
     div(
-      class = if (identical(as.character(j$status[1]), "READY")) "status-ok" else "status-warning",
-      paste0("Selected sequence | ", line)
+      class = banner$class,
+      strong("Selected sequence"),
+      tags$br(),
+      HTML(paste(banner$lines, collapse = "<br/>")),
+      activity_line
     )
   })
 
-  output$blast_jobs_table <- renderDT({
-    if (is.data.frame(rv$blast_jobs) && nrow(rv$blast_jobs) &&
-        any(rv$blast_jobs$status %in% c("SUBMITTED", "WAITING"))) {
-      invalidateLater(5000, session)
-    }
+  blast_jobs_display_df <- function() {
     df <- rv$blast_jobs
-    if (!nrow(df)) return(datatable(data.frame(Message="No BLAST jobs submitted yet."), rownames=FALSE, options=list(dom="t")))
-    keep <- c("final_name","original_name","rid","database","hitlist_size","consensus_revision","rtoe","status","submitted_at","last_checked_at")
-    df <- df[, intersect(keep, names(df)), drop=FALSE]
-    df$elapsed <- vapply(df$submitted_at, function(ts) format_elapsed_seconds(blast_elapsed_since(ts)), character(1))
-    df <- df[, c(setdiff(names(df), "elapsed"), "elapsed"), drop = FALSE]
-    friendly <- c(
-      final_name="Sample", original_name="Original sample", rid="RID", database="Database", hitlist_size="Hits requested",
-      consensus_revision="Consensus revision", rtoe="Estimated wait (s)", status="Status",
-      submitted_at="Submitted at", last_checked_at="Last checked at", elapsed="Elapsed"
+    if (!is.data.frame(df) || !nrow(df)) {
+      return(data.frame(Message = "No BLAST jobs submitted yet.", stringsAsFactors = FALSE))
+    }
+    keep <- c(
+      "final_name", "original_name", "rid", "database", "hitlist_size",
+      "consensus_revision", "rtoe", "status", "submitted_at", "last_checked_at"
     )
-    names(df) <- unname(friendly[names(df)])
-    datatable(df, rownames=FALSE, selection=list(mode="multiple", target="row"), options=list(pageLength=25, scrollX=TRUE, autoWidth=TRUE))
+    df <- df[, intersect(keep, names(df)), drop = FALSE]
+    df$elapsed <- vapply(
+      df$submitted_at,
+      function(ts) format_elapsed_seconds(blast_elapsed_since(ts)),
+      character(1)
+    )
+    # Stable column order - never rely on setdiff reordering.
+    col_order <- c(
+      "final_name", "original_name", "rid", "database", "hitlist_size",
+      "consensus_revision", "rtoe", "status", "submitted_at", "last_checked_at", "elapsed"
+    )
+    df <- df[, col_order, drop = FALSE]
+    names(df) <- c(
+      "Sample", "Original sample", "RID", "Database", "Hits requested",
+      "Consensus revision", "Estimated wait (s)", "Status",
+      "Submitted at", "Last checked at", "Elapsed"
+    )
+    df
+  }
+
+  output$blast_jobs_table <- renderDT({
+    df <- blast_jobs_display_df()
+    if (identical(names(df), "Message")) {
+      return(datatable(
+        df, rownames = FALSE, selection = "none",
+        options = list(dom = "t", scrollX = TRUE, autoWidth = FALSE)
+      ))
+    }
+    # autoWidth=FALSE + CSS sync below: scrollX+autoWidth was shifting body
+    # columns one slot right of the header. Live elapsed stays on the status
+    # card (invalidateLater there); do not recreate this table on a timer.
+    datatable(
+      df,
+      rownames = FALSE,
+      selection = list(mode = "multiple", target = "row"),
+      class = "display nowrap",
+      options = list(
+        pageLength = 25,
+        scrollX = TRUE,
+        autoWidth = FALSE,
+        deferRender = TRUE,
+        initComplete = htmlwidgets::JS(
+          "function(settings, json) {",
+          "  var api = this.api();",
+          "  setTimeout(function() { api.columns.adjust(); }, 0);",
+          "}"
+        ),
+        drawCallback = htmlwidgets::JS(
+          "function(settings) {",
+          "  var api = this.api();",
+          "  api.columns.adjust();",
+          "  var root = $(api.table().container());",
+          "  var body = root.find('.dataTables_scrollBody');",
+          "  var head = root.find('.dataTables_scrollHead');",
+          "  if (body.length && head.length) head.scrollLeft(body.scrollLeft());",
+          "}"
+        )
+      )
+    )
   })
 
   output$blast_identification_table <- renderDT({

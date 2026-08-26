@@ -81,7 +81,7 @@
         });
 
         // Step chips are Shiny actionButtons (workflow_goto_*). Do not put a
-        // blocking overlay on chip clicks — that freezes the entire UI.
+        // blocking overlay on chip clicks - that freezes the entire UI.
         $(document).on('click', '#workflow_open_help', function() {
           hideStepLoader(true);
         });

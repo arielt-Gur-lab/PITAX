@@ -317,16 +317,39 @@ draw_chromatogram <- function(result, settings, start_base=1L, visible_bases=50L
 }
 
 # Overview connects read length, trimming and biologically constrained primer matches.
+draw_amplicon_overview_empty <- function(message = NULL) {
+  plot.new()
+  if (!is.null(message) && nzchar(as.character(message)[1])) {
+    title(main = as.character(message)[1], cex.main = 0.95, col.main = "#92400e")
+  }
+  invisible(NULL)
+}
+
 draw_amplicon_overview <- function(result, settings) {
-  n <- nchar(result$raw_seq)
-  plot(c(1,n), c(0,1), type="n", xlab="Base position", ylab="", yaxt="n", ylim=c(0,1),
-       main=paste0(result$sample_id, " - read / trim overview"))
-  segments(1,0.78,n,0.78,lwd=5,col="grey70")
-  text(1,0.88,"RAW READ",adj=0,cex=0.8)
+  if (!is.list(result)) {
+    draw_amplicon_overview_empty("No read overview available")
+    return(invisible(NULL))
+  }
+  raw <- result$raw_seq
+  if (is.null(raw)) {
+    draw_amplicon_overview_empty("No read overview available")
+    return(invisible(NULL))
+  }
+  # Base::nchar only; avoid S4 methods on unexpected types.
+  n <- tryCatch(base::nchar(as.character(raw)[1], type = "chars", allowNA = TRUE), error = function(e) NA_integer_)
+  n <- suppressWarnings(as.integer(n)[1])
+  if (!is.finite(n) || is.na(n) || n < 1L) {
+    draw_amplicon_overview_empty("No read overview available")
+    return(invisible(NULL))
+  }
+  plot(c(1, n), c(0, 1), type = "n", xlab = "Base position", ylab = "", yaxt = "n", ylim = c(0, 1),
+       main = paste0(result$sample_id, " - read / trim overview"))
+  segments(1, 0.78, n, 0.78, lwd = 5, col = "grey70")
+  text(1, 0.88, "RAW READ", adj = 0, cex = 0.8)
   sm <- result$summary
-  if (!is.na(sm$trim_start) && !is.na(sm$trim_end)) {
-    segments(sm$trim_start,0.50,sm$trim_end,0.50,lwd=8,col="steelblue")
-    text(sm$trim_start,0.61,"TRIMMED",adj=0,cex=0.8,col="steelblue4")
+  if (is.data.frame(sm) && nrow(sm) && !is.na(sm$trim_start[1]) && !is.na(sm$trim_end[1])) {
+    segments(sm$trim_start[1], 0.50, sm$trim_end[1], 0.50, lwd = 8, col = "steelblue")
+    text(sm$trim_start[1], 0.61, "TRIMMED", adj = 0, cex = 0.8, col = "steelblue4")
   }
 
   if (isTRUE(settings$enable_primer_mapping)) {
@@ -334,14 +357,14 @@ draw_amplicon_overview <- function(result, settings) {
     if (nrow(pm)) {
       for (i in seq_len(nrow(pm))) {
         if (is.na(pm$Start[i])) next
-        y <- if (pm$Primer[i]=="Forward") 0.28 else 0.15
-        col <- if (pm$Primer[i]=="Forward") "darkorange" else "purple"
-        segments(pm$Start[i], y, pm$End[i], y, lwd=8, col=col)
-        text(pm$Start[i], y+0.065, paste0(pm$Primer[i], " (", pm$Identity_percent[i], "%)"), adj=0, cex=0.70, col=col)
+        y <- if (pm$Primer[i] == "Forward") 0.28 else 0.15
+        col <- if (pm$Primer[i] == "Forward") "darkorange" else "purple"
+        segments(pm$Start[i], y, pm$End[i], y, lwd = 8, col = col)
+        text(pm$Start[i], y + 0.065, paste0(pm$Primer[i], " (", pm$Identity_percent[i], "%)"), adj = 0, cex = 0.70, col = col)
       }
     }
   }
-
+  invisible(NULL)
 }
 
 make_sequence_preview <- function(result) {
@@ -832,6 +855,23 @@ collect_ambiguous_peak_flags <- function(results, scope = "trimmed", settings = 
 # Interactive chromatogram (client-side Plotly)
 # ============================================================
 
+# Explicit empty placeholder: bare plot_ly() triggers "No trace type/mode" warnings.
+pitax_empty_plotly <- function(title = "") {
+  plotly::plot_ly(
+    x = numeric(0),
+    y = numeric(0),
+    type = "scatter",
+    mode = "markers",
+    showlegend = FALSE,
+    hoverinfo = "skip"
+  ) |>
+    plotly::layout(
+      title = if (is.list(title)) title else list(text = as.character(title)[1], x = 0),
+      xaxis = list(visible = FALSE),
+      yaxis = list(visible = FALSE)
+    )
+}
+
 # Build the complete chromatogram once and let Plotly perform zoom/pan/range-slider
 # interactions in the browser. This avoids a Shiny server round-trip for every
 # horizontal movement and keeps the X axis in called-base coordinates.
@@ -842,12 +882,12 @@ make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags 
   n <- length(peak_pos)
 
   if (is.null(trace) || !nrow(trace) || n < 2) {
-    return(plotly::plot_ly() |> plotly::layout(title = "No chromatogram data available"))
+    return(pitax_empty_plotly("No chromatogram data available"))
   }
 
   valid_peaks <- which(is.finite(peak_pos) & peak_pos >= 1 & peak_pos <= nrow(trace))
   if (length(valid_peaks) < 2) {
-    return(plotly::plot_ly() |> plotly::layout(title = "Insufficient peak-position data"))
+    return(pitax_empty_plotly("Insufficient peak-position data"))
   }
 
   trace_idx <- seq.int(min(peak_pos[valid_peaks]), max(peak_pos[valid_peaks]))
@@ -1025,7 +1065,7 @@ make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags 
 make_chromatogram_focus_plot <- function(result, settings, raw_position, title, window = 12L) {
   position <- suppressWarnings(as.integer(raw_position[1]))
   if (!is.list(result) || !length(position) || !is.finite(position[1])) {
-    return(plotly::plot_ly() |> plotly::layout(title = list(text = paste0(title, " | no linked raw position"), x = 0)))
+    return(pitax_empty_plotly(list(text = paste0(title, " | no linked raw position"), x = 0)))
   }
   focused <- result
   focused$display_name <- title

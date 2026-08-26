@@ -148,7 +148,23 @@
     primer_alignment_text(selected_result(), selected_processing_settings())
   })
   output$amplicon_overview <- renderPlot({
-    draw_amplicon_overview(selected_result(), selected_processing_settings())
+    sid <- input$inspect_sample
+    if (is.null(sid) || length(sid) != 1L) {
+      draw_amplicon_overview_empty(if (!qc_has_uploaded_ab1()) qc_workspace_empty_message() else NULL)
+      return(invisible(NULL))
+    }
+    sid <- as.character(sid)[1]
+    if (!nzchar(sid) || !(sid %in% names(rv$results))) {
+      # Missing/stale selection: quiet empty plot; do not fall back to another sample.
+      draw_amplicon_overview_empty(if (!qc_has_uploaded_ab1()) qc_workspace_empty_message() else NULL)
+      return(invisible(NULL))
+    }
+    r <- rv$results[[sid]]
+    if (is.null(r)) {
+      draw_amplicon_overview_empty(NULL)
+      return(invisible(NULL))
+    }
+    draw_amplicon_overview(r, settings_for_result(r))
   })
   output$expected_amplicon_note <- renderUI({
     settings <- selected_processing_settings()

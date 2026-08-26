@@ -1,5 +1,36 @@
 # Changelog
 
+## 3.2.1
+
+- Fixed Share Project open (`?share=`): load now runs inside a reactive `observe` so restoring `rv` no longer crashes with "Can't access reactive value outside of reactive consumer" (local and Connect).
+- Share open keeps a short session status line; verbose snapshot/version/BLAST-normalization load copy is no longer shown.
+
+## 3.2.0
+
+- Share Project creates an immutable server-side snapshot and a possession-based `?share=<TOKEN>` link (1/3/7 day expiry, default 3 days). Each open starts a new independent session from the snapshot; changes are not synchronized.
+- Snapshots reuse the existing `.sangerproject` bundle format wrapped with share metadata under `data/shared/`; expired/unknown tokens fail safely with cleanup on create/open/startup.
+- Removed the internal consensus success toast ("Stage 3 sequence gate is green" / ready-for-BLAST notification). Errors from the Stage 3 gate still notify.
+
+## 3.1.2
+
+- BLAST auto-check now shows a sticky notification, Batch status line, progress bar, and status-card highlight while the NCBI request runs (not only a busy/disabled table).
+- Simplified auto-wait copy to "Waiting for the first automatic NCBI check (after RTOE)." (removed "armed").
+- Consensus ready notification now says sequences are ready for NCBI BLAST instead of "Stage 3 sequence gate is green."
+
+## 3.1.1
+
+- BLAST status shows clearer automatic-retrieval state (armed / active / in progress / stopped) and elapsed time only; removed next-check countdown copy. Auto-poll paints an in-progress line before the NCBI request.
+- Trim & QC empty states no longer surface as red `nchar` / plot errors on `amplicon_overview`; missing or stale sample selection stays quiet and does not pick another sample.
+- Empty Plotly placeholders now set `type = "scatter"` and `mode = "markers"` to silence "No trace type/mode" warnings.
+
+## 3.1.0
+
+- BLAST now schedules automatic NCBI status checks from RTOE (first check at max(RTOE, 30s) + small buffer; then up to 3 automatic attempts total with 60s / 90s waits).
+- RTOE is also the minimum wait before manual Check now; after three unsuccessful automatic checks, auto-poll stops and the user must retrieve manually (still the same RID — not a FAILED/TIMEOUT state).
+- Job status banner separates UI elapsed refresh from actual NCBI checks and shows automatic check progress / stopped messaging.
+- Pending BLAST jobs loaded from a saved project do not resume aggressive auto-poll; use Check now.
+- Fixed BLAST jobs DataTable header/body column alignment (scrollX desync).
+
 ## 3.0.7
 
 - BLAST job status now emphasizes elapsed time since submission, with clearer WAITING/poll messages (RID, RTOE, last checked) instead of a bare "still running" line.

@@ -1,6 +1,9 @@
   # ---------------- Project Save / Load ----------------
   output$project_status <- renderUI({
-    span(rv$project_status_text)
+    tagList(
+      span(rv$project_status_text),
+      uiOutput("share_session_banner")
+    )
   })
 
   make_project_bundle <- function() {
@@ -92,6 +95,11 @@
         had_blast <- TRUE
         stale_rids <- unique(as.character(rv$blast_jobs$rid[idx]))
         rv$blast_jobs$status[idx] <- "STALE"
+        if ("auto_poll_enabled" %in% names(rv$blast_jobs)) {
+          rv$blast_jobs$auto_poll_enabled[idx] <- FALSE
+          rv$blast_jobs$next_poll_at[idx] <- ""
+          rv$blast_jobs$manual_retrieval_required[idx] <- FALSE
+        }
       }
     }
     if (is.data.frame(rv$blast_hits) && nrow(rv$blast_hits)) {
@@ -181,32 +189,29 @@
     if (!is.null(settings$min_usable_len)) updateNumericInput(session, "min_usable_len", value = settings$min_usable_len)
   }
 
-  observeEvent(input$load_project, {
-    req(input$load_project$datapath)
-    obj <- tryCatch(readRDS(input$load_project$datapath), error = function(e) structure(list(error = conditionMessage(e)), class = "project_load_error"))
-    if (inherits(obj, "project_load_error")) {
-      showNotification(paste("Could not load project:", obj$error), type = "error", duration = 10)
-      return()
-    }
+  # Restore a deserialized SangerSequencePipelineProject into this session.
+  # Used by Load project and by Share Project (?share=TOKEN) so both stay identical.
+  apply_loaded_project_object <- function(obj, source_label = "project", notify = TRUE) {
     if (!is.list(obj) || !identical(obj$format, "SangerSequencePipelineProject") || is.null(obj$state)) {
-      showNotification("This file is not a valid Sanger Sequence Pipeline project.", type = "error", duration = 10)
-      return()
+      msg <- "This file is not a valid Sanger Sequence Pipeline project."
+      if (notify) showNotification(msg, type = "error", duration = 10)
+      return(list(ok = FALSE, message = msg))
     }
     source_schema <- if (is.null(obj$schema_version)) 1L else suppressWarnings(as.integer(obj$schema_version))
     if (length(source_schema) != 1L || is.na(source_schema) || source_schema < 1L) {
-      showNotification("This project has an invalid schema version.", type = "error", duration = 10)
-      return()
+      msg <- "This project has an invalid schema version."
+      if (notify) showNotification(msg, type = "error", duration = 10)
+      return(list(ok = FALSE, message = msg))
     }
     if (source_schema > PROJECT_SCHEMA_VERSION) {
-      showNotification("This project was created by a newer project schema and cannot be loaded safely.", type = "error", duration = 10)
-      return()
+      msg <- "This project was created by a newer project schema and cannot be loaded safely."
+      if (notify) showNotification(msg, type = "error", duration = 10)
+      return(list(ok = FALSE, message = msg))
     }
     if (source_schema < 5L) {
-      showNotification(
-        "This project predates schema 5 and cannot be migrated safely in Alpha 10. Open it with PITAX Alpha 9.1 and resave it first.",
-        type = "error", duration = 12
-      )
-      return()
+      msg <- "This project predates schema 5 and cannot be migrated safely in Alpha 10. Open it with PITAX Alpha 9.1 and resave it first."
+      if (notify) showNotification(msg, type = "error", duration = 12)
+      return(list(ok = FALSE, message = msg))
     }
 
     st <- obj$state
@@ -216,21 +221,23 @@
         error = function(e) structure(list(error = conditionMessage(e)), class = "schema5_migration_error")
       )
       if (inherits(st, "schema5_migration_error")) {
-        showNotification(st$error, type = "error", duration = 14)
-        return()
+        if (notify) showNotification(st$error, type = "error", duration = 14)
+        return(list(ok = FALSE, message = st$error))
       }
     }
     loaded_profiles <- assay_coerce_profiles(st$assay_profiles)
     profile_error <- assay_validate_profiles(loaded_profiles)
     if (!is.null(profile_error)) {
-      showNotification(paste("Project assay profiles are invalid:", profile_error), type = "error", duration = 10)
-      return()
+      msg <- paste("Project assay profiles are invalid:", profile_error)
+      if (notify) showNotification(msg, type = "error", duration = 10)
+      return(list(ok = FALSE, message = msg))
     }
     loaded_assignments <- stage2_coerce_assignments(st$read_assignments)
     assignment_error <- stage2_validate_assignments(loaded_assignments, assay_profiles = loaded_profiles)
     if (length(st$results) && !is.null(assignment_error)) {
-      showNotification(paste("Project read architecture is invalid:", assignment_error), type = "error", duration = 10)
-      return()
+      msg <- paste("Project read architecture is invalid:", assignment_error)
+      if (notify) showNotification(msg, type = "error", duration = 10)
+      return(list(ok = FALSE, message = msg))
     }
     loaded_architecture <- if (nrow(loaded_assignments) && is.null(assignment_error)) tryCatch(
       stage2_build_architecture(
@@ -241,8 +248,9 @@
       error = function(e) NULL
     ) else NULL
     if (length(st$results) && nrow(loaded_assignments) && is.null(loaded_architecture)) {
-      showNotification("Project read architecture could not be rebuilt safely.", type = "error", duration = 10)
-      return()
+      msg <- "Project read architecture could not be rebuilt safely."
+      if (notify) showNotification(msg, type = "error", duration = 10)
+      return(list(ok = FALSE, message = msg))
     }
     rv$results <- if (!is.null(st$results)) st$results else list()
     if (length(rv$results)) {
@@ -265,6 +273,15 @@
     rv$multilocus_profile <- stage4_ensure_profile(if (is.list(st$multilocus_profile)) st$multilocus_profile else stage4_empty_profile())
     rv$project_migration_log <- stage2_scalar_text(st$migration_log)
     rv$blast_jobs <- ensure_blast_jobs_schema(if (is.data.frame(st$blast_jobs)) st$blast_jobs else NULL)
+    # Safe reload: do not resume aggressive automatic NCBI polling for pending RIDs.
+    if (nrow(rv$blast_jobs)) {
+      pending <- rv$blast_jobs$status %in% c("SUBMITTED", "WAITING")
+      if (any(pending)) {
+        rv$blast_jobs$auto_poll_enabled[pending] <- FALSE
+        rv$blast_jobs$manual_retrieval_required[pending] <- TRUE
+        rv$blast_jobs$next_poll_at[pending] <- ""
+      }
+    }
     rv$blast_raw <- if (is.list(st$blast_raw)) st$blast_raw else list()
     rv$blast_hits <- if (is.data.frame(st$blast_hits)) normalize_blast_hits_unique_accession(st$blast_hits) else data.frame()
     rv$blast_batch_status_text <- if (!is.null(st$blast_batch_status_text)) st$blast_batch_status_text else "Loaded project."
@@ -353,16 +370,160 @@
     rv$workflow_completed <- unique(completed)
     updateTabsetPanel(session, "pipeline_step", selected = active)
 
-    rv$project_loaded_name <- input$load_project$name
+    rv$project_loaded_name <- as.character(source_label)[1]
     rv$project_status_text <- paste0(
-      "Loaded ", input$load_project$name,
+      "Loaded ", source_label,
       " | saved with app v", ifelse(is.null(obj$app_version), "unknown", obj$app_version),
       if (!is.null(obj$saved_at)) paste0(" | saved ", obj$saved_at) else "",
       if (source_schema < PROJECT_SCHEMA_VERSION) paste0(" | migrated project schema ", source_schema, " -> ", PROJECT_SCHEMA_VERSION, " in memory") else "",
-      ". BLAST hits were normalized to one row per accession."
+      "."
+    )
+    if (notify) {
+      showNotification(
+        if (source_schema < PROJECT_SCHEMA_VERSION) {
+          paste0("Older project loaded and migrated to schema ", PROJECT_SCHEMA_VERSION, ". Save it to persist the migration.")
+        } else {
+          "Project loaded successfully."
+        },
+        type = "message", duration = 8
+      )
+    }
+    list(ok = TRUE, message = rv$project_status_text, source_schema = source_schema)
+  }
+
+  observeEvent(input$load_project, {
+    req(input$load_project$datapath)
+    obj <- tryCatch(readRDS(input$load_project$datapath), error = function(e) structure(list(error = conditionMessage(e)), class = "project_load_error"))
+    if (inherits(obj, "project_load_error")) {
+      showNotification(paste("Could not load project:", obj$error), type = "error", duration = 10)
+      return()
+    }
+    rv$share_banner_text <- ""
+    apply_loaded_project_object(obj, source_label = input$load_project$name, notify = TRUE)
+  })
+
+  # ---------------- Share Project (immutable snapshot + tokenized URL) ----------------
+  pitax_share_cleanup_expired()
+
+  observeEvent(input$share_project, {
+    if (!length(rv$results) && (!is.data.frame(rv$summary) || !nrow(rv$summary)) &&
+        (!is.list(rv$consensus_set) || !length(rv$consensus_set$records))) {
+      showNotification("Nothing to share yet. Process or load a project first.", type = "warning", duration = 8)
+      return()
+    }
+    showModal(modalDialog(
+      title = "Share Project",
+      easyClose = TRUE,
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("share_project_confirm", "Create share link", class = "btn-primary", icon = icon("link"))
+      ),
+      p("Anyone with this link can open an independent copy of this PITAX project. Changes are not synchronized."),
+      radioButtons(
+        "share_expiry_days",
+        "Link expires after",
+        choices = c("1 day" = "1", "3 days" = "3", "7 days" = "7"),
+        selected = "3",
+        inline = TRUE
+      )
+    ))
+  })
+
+  observeEvent(input$share_project_confirm, {
+    removeModal()
+    days <- pitax_share_parse_expiry_days(input$share_expiry_days)
+    created <- tryCatch({
+      pitax_share_create(
+        make_project_bundle(),
+        expiry_days = days,
+        app_version = APP_VERSION,
+        schema_version = PROJECT_SCHEMA_VERSION
+      )
+    }, error = function(e) structure(list(error = conditionMessage(e)), class = "share_create_error"))
+    if (inherits(created, "share_create_error")) {
+      showNotification(paste("Could not create share link:", created$error), type = "error", duration = 10)
+      return()
+    }
+    url <- pitax_share_public_url(created$token, session = session)
+    rv$last_share_url <- url
+    showModal(modalDialog(
+      title = "Share link created",
+      easyClose = TRUE,
+      footer = modalButton("Close"),
+      p(strong("Expires: "), created$snapshot$expires_at),
+      tags$pre(
+        id = "share_project_url_text",
+        style = "white-space:pre-wrap; word-break:break-all; background:#f8fafc; border:1px solid #e2e8f0; padding:10px; border-radius:8px;",
+        url
+      ),
+      actionButton("share_project_copy", "Copy link", icon = icon("copy"), class = "btn-primary"),
+      p(class = "compact-hint", style = "margin-top:12px;",
+        "Anyone with this link can open an independent copy of this PITAX project. Changes are not synchronized.")
+    ))
+    rv$project_status_text <- paste0("Share link created (expires ", created$snapshot$expires_at, ").")
+  })
+
+  observeEvent(input$share_project_copy, {
+    url <- as.character(rv$last_share_url)[1]
+    if (!length(url) || is.na(url) || !nzchar(url)) return()
+    session$sendCustomMessage("copyText", list(text = url))
+    showNotification("Share link copied.", type = "message", duration = 4)
+  })
+
+  output$share_session_banner <- renderUI({
+    txt <- as.character(rv$share_banner_text)[1]
+    if (!length(txt) || is.na(txt) || !nzchar(txt)) return(NULL)
+    div(
+      class = "tax-note",
+      style = "margin:10px 0 0; padding:10px 12px; border:1px solid #bfdbfe; border-radius:10px; background:#eff6ff;",
+      HTML(gsub("\n", "<br/>", txt, fixed = TRUE))
+    )
+  })
+
+  # Open ?share=TOKEN into a fresh independent session (immutable snapshot copy).
+  # Must run inside a reactive consumer (observe), not session$onFlushed:
+  # apply_loaded_project_object reads/writes rv$* and would abort outside a consumer.
+  share_query_handled <- FALSE
+  observe({
+    search <- session$clientData$url_search
+    if (isTRUE(share_query_handled)) return()
+    # NULL means clientData not ready yet; "" means ready with no query.
+    if (is.null(search)) return()
+    share_query_handled <<- TRUE
+
+    qs <- tryCatch(shiny::parseQueryString(search), error = function(e) list())
+    token <- as.character(qs$share)[1]
+    if (!length(token) || is.na(token) || !nzchar(token)) return()
+
+    opened <- pitax_share_open(token, current_schema = PROJECT_SCHEMA_VERSION)
+    if (!isTRUE(opened$ok)) {
+      msg <- if (!is.null(opened$message)) opened$message else "Could not open the shared project."
+      showNotification(msg, type = "error", duration = 14)
+      rv$share_banner_text <- msg
+      rv$project_status_text <- "Shared project link could not be loaded."
+      session$sendCustomMessage("hideLoader", list())
+      return()
+    }
+    ans <- apply_loaded_project_object(
+      opened$project,
+      source_label = paste0("shared snapshot ", substr(token, 1, 8), "..."),
+      notify = FALSE
+    )
+    if (!isTRUE(ans$ok)) {
+      rv$share_banner_text <- ans$message
+      session$sendCustomMessage("hideLoader", list())
+      return()
+    }
+    # Prefer the share banner; keep project status short.
+    rv$project_status_text <- "Shared project session (independent copy)."
+    rv$share_banner_text <- paste0(
+      "Shared project loaded\n",
+      "Created: ", opened$snapshot$created_at, "\n",
+      "Changes in this session do not affect the original project."
     )
     showNotification(
-      if (source_schema < PROJECT_SCHEMA_VERSION) paste0("Older project loaded and migrated to schema ", PROJECT_SCHEMA_VERSION, ". Save it to persist the migration.") else "Project loaded successfully.",
-      type = "message", duration = 8
+      "Shared project loaded. Changes in this session do not affect the original project.",
+      type = "message", duration = 10
     )
+    session$sendCustomMessage("hideLoader", list())
   })

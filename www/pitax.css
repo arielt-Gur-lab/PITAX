@@ -689,7 +689,7 @@
       .project-mode-options .shiny-options-group { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
       .project-mode-options .shiny-input-container { width:100%; max-width:none; }
       .project-mode-options .radio { margin:0; padding:12px 14px; border:1px solid #dbe4ef; border-radius:10px; background:#fbfcfe; }
-      /* Same 10px gap everywhere — override Bootstrap .radio margins that made options uneven. */
+      /* Same 10px gap everywhere - override Bootstrap .radio margins that made options uneven. */
       .upload-read-model .project-mode-options-compact .shiny-options-group {
         display:flex !important;
         flex-direction:column;
@@ -790,6 +790,22 @@
       table.dataTable { width:100%; }
       .dataTables_scrollHeadInner, .dataTables_scrollHeadInner table.dataTable,
       .dataTables_scrollBody table.dataTable { box-sizing:border-box; }
+      /* BLAST jobs: kill phantom scrollbar gutter that desyncs scrollX header/body */
+      #blast_jobs_table .dataTables_scrollHeadInner {
+        width:100% !important;
+        padding-right:0 !important;
+      }
+      #blast_jobs_table .dataTables_scrollHead table.dataTable,
+      #blast_jobs_table .dataTables_scrollBody table.dataTable {
+        width:100% !important;
+        table-layout:fixed !important;
+      }
+      #blast_jobs_table table.dataTable th,
+      #blast_jobs_table table.dataTable td {
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+      }
       table.dataTable thead th { padding-top:10px !important; padding-bottom:10px !important; }
       table.dataTable tbody td { padding-top:9px !important; padding-bottom:9px !important; }
       .dataTables_wrapper .dataTables_filter input, .dataTables_wrapper .dataTables_length select { border:1px solid #cfd9e6; border-radius:7px; background:#fff; }

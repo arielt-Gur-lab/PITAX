@@ -188,17 +188,13 @@
   output$multilocus_evidence_plot <- plotly::renderPlotly({
     evidence <- selected_multilocus_evidence()
     if (!nrow(evidence)) {
-      return(plotly::plot_ly() |>
-        plotly::layout(xaxis = list(visible = FALSE), yaxis = list(visible = FALSE),
-                       annotations = list(list(text = "Choose an isolate with locus evidence.", showarrow = FALSE))))
+      return(pitax_empty_plotly("Choose an isolate with locus evidence."))
     }
     evidence$Identity <- suppressWarnings(as.numeric(evidence$Best_Match_Identity))
     evidence$Coverage <- suppressWarnings(as.numeric(evidence$Best_Match_Coverage))
     plotted <- evidence[is.finite(evidence$Identity) & is.finite(evidence$Coverage), , drop = FALSE]
     if (!nrow(plotted)) {
-      return(plotly::plot_ly() |>
-        plotly::layout(xaxis = list(visible = FALSE), yaxis = list(visible = FALSE),
-                       annotations = list(list(text = "No completed BLAST and taxonomy metrics for this isolate.", showarrow = FALSE))))
+      return(pitax_empty_plotly("No completed BLAST and taxonomy metrics for this isolate."))
     }
     plotted$Hover <- paste0(
       "<b>", plotted$Locus, "</b>",

@@ -50,7 +50,14 @@
     old_signature <- if (length(old_records)) vapply(old_records, function(x) paste0(x$final_name, "\r", x$seq), character(1)) else character()
     new_signature <- if (length(new_records)) vapply(new_records, function(x) paste0(x$final_name, "\r", x$seq), character(1)) else character()
     if (!identical(old_signature, new_signature) && (nrow(rv$blast_jobs) || nrow(rv$blast_hits) || nrow(rv$taxonomy_summary))) {
-      if (nrow(rv$blast_jobs)) rv$blast_jobs$status <- "STALE"
+      if (nrow(rv$blast_jobs)) {
+        rv$blast_jobs$status <- "STALE"
+        if ("auto_poll_enabled" %in% names(rv$blast_jobs)) {
+          rv$blast_jobs$auto_poll_enabled <- FALSE
+          rv$blast_jobs$next_poll_at <- ""
+          rv$blast_jobs$manual_retrieval_required <- FALSE
+        }
+      }
       rv$blast_raw <- list(); rv$blast_hits <- data.frame(); rv$blast_ids <- data.frame()
       rv$taxonomy_summary <- data.frame(); rv$taxonomy_hits <- data.frame(); rv$taxonomy_counts <- data.frame()
       rv$blast_batch_status_text <- "Stage 3 analysis sequences changed; previous BLAST evidence is stale and must be rerun."
@@ -60,11 +67,8 @@
     sync_consensus_choices()
     rv$project_status_text <- paste0("Unsaved Stage 3 build: ", nrow(built$summary), " analysis sequence(s).")
     gate_error <- stage3_consensus_gate_error(rv$consensus_set, rv$results)
-    if (notify) {
-      showNotification(
-        if (is.null(gate_error)) "Stage 3 sequence gate is green." else gate_error,
-        type = if (is.null(gate_error)) "message" else "warning", duration = 10
-      )
+    if (notify && !is.null(gate_error)) {
+      showNotification(gate_error, type = "warning", duration = 10)
     }
     is.null(gate_error)
   }

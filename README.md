@@ -1,4 +1,4 @@
-PITAX v3.0.7 - Alpha 10 Steps UI, multi-assay, same-project multi-locus
+PITAX v3.2.1 - Share Project by link, Alpha 10 Steps UI, multi-assay, multi-locus
 =========================================================
 
 Purpose
@@ -60,7 +60,7 @@ Run `run_tests.bat` on Windows with R installed.
 
 Expected final line:
 
-  All PITAX v3.0.7 tests passed.
+  All PITAX v3.2.1 tests passed.
 
 The suite now has 16 groups. Alpha 10 covers controlled loci, multi-assay profiles,
 schema-5 migration, gated Steps UI navigation and same-project multi-locus integration.

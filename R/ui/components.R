@@ -117,7 +117,7 @@ pitax_workflow_stepper_ui <- function(current, unlocked, project_mode = "simple"
     } else {
       "locked"
     }
-    # Shiny actionButton — no custom JS / overlay path for navigation.
+    # Shiny actionButton - no custom JS / overlay path for navigation.
     actionButton(
       inputId = paste0("workflow_goto_", step$id),
       label = tagList(

@@ -32,6 +32,7 @@ ui <- fluidPage(
           fileInput("load_project", NULL, multiple = FALSE, accept = c(".sangerproject", ".rds"),
                     buttonLabel = "Load project", placeholder = "No project selected")
         ),
+        actionButton("share_project", "Share Project", icon = icon("link"), class = "btn-project"),
         actionButton("open_export_output", "Export", icon = icon("download"), class = "btn-project"),
         div(class = "project-status", uiOutput("project_status"))
       ),
@@ -59,7 +60,7 @@ ui <- fluidPage(
       )
     ),
 
-    # Content panels only — chrome above owns nav / heading / actions.
+    # Content panels only - chrome above owns nav / heading / actions.
     # Project session lives in the app header beside the brand.
     tabsetPanel(id = "pipeline_step", type = "hidden",
 
@@ -418,7 +419,7 @@ ui <- fluidPage(
           div(class = "blast-action-row blast-primary-actions",
             actionButton("submit_ncbi_blast", "Submit selected", icon = icon("paper-plane"), class = "btn-primary"),
             actionButton("submit_all_ncbi_blast", "Submit all", icon = icon("paper-plane"), class = "btn-success"),
-            actionButton("retrieve_ncbi_blast", "Retrieve selected", icon = icon("refresh")),
+            actionButton("retrieve_ncbi_blast", "Check now", icon = icon("refresh")),
             actionButton("retrieve_all_ncbi_blast", "Retrieve all", icon = icon("download"))
           ),
           div(class = "blast-status-strip", uiOutput("blast_batch_status"), uiOutput("blast_job_status")),

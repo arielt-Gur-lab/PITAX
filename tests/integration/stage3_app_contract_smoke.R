@@ -12,7 +12,8 @@ must_contain <- function(text, marker) {
 must_contain(app_text, 'pitax_source(file.path("R", "domain", "consensus", "stage3_consensus.R"), local = TRUE)')
 must_contain(app_text, "PROJECT_SCHEMA_VERSION <- 6L")
 must_contain(app_text, 'tabPanel("Consensus", value = "consensus"')
-must_contain(app_text, 'actionButton("to_consensus", "Continue to Consensus"')
+must_contain(app_text, 'actionButton("to_consensus", to_consensus_label')
+must_contain(app_text, 'to_consensus_label <- if (simple) "Continue to NCBI BLAST" else "Continue to Consensus"')
 must_contain(app_text, 'stage3_build_consensus_set(')
 must_contain(app_text, 'stage3_consensus_gate_error(rv$consensus_set, rv$results)')
 must_contain(app_text, 'rv$consensus_set <- stage3_empty_consensus_set()')
@@ -39,7 +40,7 @@ must_contain(app_text, 'plotly::plotlyOutput("consensus_reverse_conflict_plot"')
 if (grepl("(?<!:)plotlyOutput\\(", app_text, perl = TRUE)) stop("An unqualified plotlyOutput() call can prevent application startup.", call. = FALSE)
 if (grepl("sync_project_mode_navigation\\(\\)", app_text, perl = TRUE)) stop("Project-mode navigation was called without an explicit or isolated mode.", call. = FALSE)
 nav_start <- regexpr("sync_project_mode_navigation <- function(mode)", app_text, fixed = TRUE)[1]
-nav_end <- regexpr("session$onFlushed", app_text, fixed = TRUE)[1]
+nav_end <- regexpr('session$onFlushed(function() sync_project_mode_navigation(isolate(rv$project_mode)), once = TRUE)', app_text, fixed = TRUE)[1]
 if (nav_start < 1L || nav_end <= nav_start) stop("Could not inspect project-mode navigation helper.", call. = FALSE)
 nav_helper <- substr(app_text, nav_start, nav_end - 1L)
 if (grepl("rv$", nav_helper, fixed = TRUE) || grepl("input$", nav_helper, fixed = TRUE)) stop("Navigation helper must remain reactive-free and receive mode explicitly.", call. = FALSE)

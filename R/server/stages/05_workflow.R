@@ -42,7 +42,7 @@
     step %in% workflow_all_step_ids()
   }
 
-  # Green chip markers: real success only — never default assay settings / visit order.
+  # Green chip markers: real success only - never default assay settings / visit order.
   workflow_completed_steps <- function() {
     done <- as.character(rv$workflow_completed)
     if (!length(done) || all(!nzchar(done))) done <- character(0)
@@ -161,7 +161,7 @@
     })
   })
 
-  # Static Help button (not inside renderUI) — always works.
+  # Static Help button (not inside renderUI) - always works.
   observeEvent(input$workflow_open_help, {
     updateTabsetPanel(session, "pipeline_step", selected = "help")
     workflow_hide_loader()

@@ -448,7 +448,7 @@
 
   output$taxonomy_score_plot <- plotly::renderPlotly({
     df <- selected_tax_hits()
-    if (!nrow(df)) return(plotly::plot_ly() |> plotly::layout(title="Run taxonomic analysis to display the BLAST score landscape."))
+    if (!nrow(df)) return(pitax_empty_plotly("Run taxonomic analysis to display the BLAST score landscape."))
 
     df$analysis_rank <- if ("analysis_rank" %in% names(df)) suppressWarnings(as.numeric(df$analysis_rank)) else seq_len(nrow(df))
     df$bit_score_num <- suppressWarnings(as.numeric(df$bit_score))

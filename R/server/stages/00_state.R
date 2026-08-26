@@ -10,10 +10,19 @@
     project_migration_log = "",
     blast_jobs = data.frame(
       final_name=character(), original_name=character(), rid=character(), rtoe=character(),
-      database=character(), hitlist_size=integer(), consensus_revision=integer(), status=character(), submitted_at=character(), last_checked_at=character(), stringsAsFactors=FALSE
+      database=character(), hitlist_size=integer(), consensus_revision=integer(), status=character(),
+      submitted_at=character(), last_checked_at=character(),
+      auto_poll_enabled=logical(), auto_poll_attempts=integer(),
+      next_poll_at=character(), earliest_retrieve_at=character(),
+      manual_retrieval_required=logical(),
+      stringsAsFactors=FALSE
     ),
     ncbi_last_contact = as.POSIXct(NA),
     blast_batch_status_text = "No batch operation has been run yet.",
+    blast_auto_activity_text = "",
+    blast_auto_pending_idx = NA_integer_,
+    share_banner_text = "",
+    last_share_url = "",
     blast_raw = list(), blast_ids = data.frame(), blast_hits = data.frame(),
     taxonomy_summary = data.frame(), taxonomy_hits = data.frame(), taxonomy_counts = data.frame(),
     taxonomy_status_text = "No taxonomic analysis has been run yet.",
@@ -30,17 +39,46 @@
   ensure_blast_jobs_schema <- function(df) {
     template <- data.frame(
       final_name=character(), original_name=character(), rid=character(), rtoe=character(),
-      database=character(), hitlist_size=integer(), consensus_revision=integer(), status=character(), submitted_at=character(),
-      last_checked_at=character(), stringsAsFactors=FALSE
+      database=character(), hitlist_size=integer(), consensus_revision=integer(), status=character(),
+      submitted_at=character(), last_checked_at=character(),
+      auto_poll_enabled=logical(), auto_poll_attempts=integer(),
+      next_poll_at=character(), earliest_retrieve_at=character(),
+      manual_retrieval_required=logical(),
+      stringsAsFactors=FALSE
     )
     if (!is.data.frame(df) || !nrow(df)) return(template)
     if (!"database" %in% names(df)) df$database <- ""
     if (!"hitlist_size" %in% names(df)) df$hitlist_size <- NA_integer_
+    if (!"auto_poll_enabled" %in% names(df)) df$auto_poll_enabled <- FALSE
+    if (!"auto_poll_attempts" %in% names(df)) df$auto_poll_attempts <- 0L
+    if (!"next_poll_at" %in% names(df)) df$next_poll_at <- ""
+    if (!"earliest_retrieve_at" %in% names(df)) df$earliest_retrieve_at <- ""
+    if (!"manual_retrieval_required" %in% names(df)) df$manual_retrieval_required <- FALSE
     for (nm in setdiff(names(template), names(df))) df[[nm]] <- template[[nm]][NA_integer_]
     df <- df[, names(template), drop=FALSE]
     df$database <- as.character(df$database)
     df$hitlist_size <- suppressWarnings(as.integer(df$hitlist_size))
     df$consensus_revision <- suppressWarnings(as.integer(df$consensus_revision))
+    df$auto_poll_enabled <- as.logical(df$auto_poll_enabled)
+    df$auto_poll_enabled[is.na(df$auto_poll_enabled)] <- FALSE
+    df$auto_poll_attempts <- suppressWarnings(as.integer(df$auto_poll_attempts))
+    df$auto_poll_attempts[is.na(df$auto_poll_attempts)] <- 0L
+    df$next_poll_at <- as.character(df$next_poll_at)
+    df$next_poll_at[is.na(df$next_poll_at)] <- ""
+    df$earliest_retrieve_at <- as.character(df$earliest_retrieve_at)
+    df$earliest_retrieve_at[is.na(df$earliest_retrieve_at)] <- ""
+    df$manual_retrieval_required <- as.logical(df$manual_retrieval_required)
+    df$manual_retrieval_required[is.na(df$manual_retrieval_required)] <- FALSE
+    # Backfill earliest_retrieve_at for legacy rows from submitted_at + RTOE floor.
+    missing_earliest <- !nzchar(df$earliest_retrieve_at) & nzchar(as.character(df$submitted_at))
+    if (any(missing_earliest)) {
+      for (i in which(missing_earliest)) {
+        df$earliest_retrieve_at[i] <- blast_schedule_next_poll_at(
+          df$submitted_at[i],
+          blast_rtoe_floor_seconds(df$rtoe[i])
+        )
+      }
+    }
     df
   }
 
