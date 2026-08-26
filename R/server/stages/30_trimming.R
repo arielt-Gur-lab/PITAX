@@ -48,7 +48,7 @@
     rv$settings <- settings
     all_results <- list(); summaries <- list()
 
-    withProgress(message="Processing AB1 files", value=0, {
+    withProgress(message = paste0("Trimming ", nrow(files), " AB1 file(s)"), value = 0, {
       for (i in seq_len(nrow(files))) {
         sample_id <- sub("\\.ab1$", "", files$name[i], ignore.case=TRUE)
         assignment_idx <- match(sample_id, rv$read_assignments$Source_ID)
@@ -59,7 +59,10 @@
           rv$project_defaults,
           assignment$Direction[1]
         )
-        incProgress(1/nrow(files), detail=paste("Processing", files$name[i]))
+        incProgress(
+          1/nrow(files),
+          detail = paste0(i, "/", nrow(files), " | ", files$name[i])
+        )
         result <- tryCatch(
           trim_one_ab1(files$datapath[i], sample_id, read_settings),
           error=function(e) structure(list(error=conditionMessage(e)), class="ab1_error")

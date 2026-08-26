@@ -123,15 +123,17 @@
 
   observeEvent(input$run_taxonomy, {
     req(input$tax_sample)
+    started <- Sys.time()
     rv$taxonomy_status_text <- paste0("Resolving NCBI taxonomy for ", input$tax_sample, "...")
     ans <- NULL
-    withProgress(message="Taxonomic interpretation", value=0, {
-      incProgress(0.2, detail="Resolving NCBI taxonomy and lineages")
+    withProgress(message = "Taxonomic interpretation", value = 0, {
+      incProgress(0.2, detail = paste0("Looking up lineages for ", input$tax_sample))
       ans <- analyze_taxonomy_sample(input$tax_sample)
-      incProgress(0.8, detail="Preparing consensus")
+      incProgress(0.8, detail = paste0("Preparing consensus | elapsed ", round(as.numeric(difftime(Sys.time(), started, units = "secs")), 1), "s"))
     })
-    rv$taxonomy_status_text <- ans$message
-    if (isTRUE(ans$ok)) showNotification("Taxonomic consensus completed.", type="message") else showNotification(ans$message, type="error")
+    elapsed_s <- round(as.numeric(difftime(Sys.time(), started, units = "secs")), 1)
+    rv$taxonomy_status_text <- paste0(ans$message, " | elapsed ", elapsed_s, "s")
+    if (isTRUE(ans$ok)) showNotification(paste0("Taxonomic consensus completed (", elapsed_s, "s)."), type="message") else showNotification(rv$taxonomy_status_text, type="error")
   })
 
   observeEvent(input$run_taxonomy_all, {
@@ -145,15 +147,27 @@
     if (!length(samples)) return()
 
     ok_n <- 0L; fail_n <- 0L; failures <- character()
-    withProgress(message="Analyzing all retrieved sequences", value=0, {
+    batch_started <- Sys.time()
+    n_samples <- length(samples)
+    rv$taxonomy_batch_status_text <- paste0("Analyzing ", n_samples, " retrieved sequence(s)...")
+    withProgress(message = paste0("Analyzing ", n_samples, " retrieved sequence(s)"), value = 0, {
       for (i in seq_along(samples)) {
-        incProgress(1/length(samples), detail=paste0(i, "/", length(samples), " | ", pairs$final_name[match(samples[i], pairs$original_name)]))
+        label <- pairs$final_name[match(samples[i], pairs$original_name)]
+        incProgress(
+          1/n_samples,
+          detail = paste0(i, "/", n_samples, " | ", label, " | elapsed ",
+                          round(as.numeric(difftime(Sys.time(), batch_started, units = "secs")), 1), "s")
+        )
         ans <- analyze_taxonomy_sample(samples[i], quiet=TRUE)
         if (isTRUE(ans$ok)) ok_n <- ok_n + 1L else { fail_n <- fail_n + 1L; failures <- c(failures, paste0(samples[i], ": ", ans$message)) }
         if (i < length(samples)) Sys.sleep(0.35)
       }
     })
-    rv$taxonomy_batch_status_text <- paste0("Batch taxonomy complete: ", ok_n, " analyzed, ", fail_n, " failed.")
+    elapsed_s <- round(as.numeric(difftime(Sys.time(), batch_started, units = "secs")), 1)
+    rv$taxonomy_batch_status_text <- paste0(
+      "Batch taxonomy complete: ", ok_n, " analyzed, ", fail_n, " failed | elapsed ", elapsed_s, "s",
+      if (length(failures)) paste0(" | ", paste(failures, collapse = " | ")) else ""
+    )
     rv$taxonomy_status_text <- rv$taxonomy_batch_status_text
     if (fail_n) showNotification(paste0(rv$taxonomy_batch_status_text, " Review failed samples individually."), type="warning") else showNotification(rv$taxonomy_batch_status_text, type="message")
     update_tax_sample_choices(isolate(input$tax_sample))

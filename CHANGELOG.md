@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.0.7
+
+- BLAST job status now emphasizes elapsed time since submission, with clearer WAITING/poll messages (RID, RTOE, last checked) instead of a bare "still running" line.
+- BLAST jobs table adds a live Elapsed column for in-flight jobs; batch submit/retrieve status includes elapsed and step counts.
+- Progress bars for trimming, BLAST batches and taxonomy batches show i/n detail and elapsed time where useful.
+- Product note: marker limits remain user-assigned (assays/settings); a global multi-session NCBI scheduler remains a later Stage 5 item.
+
 ## 3.0.6
 
 - Fixed workflow navigation: step chips are Shiny actionButtons (no blocking overlay on click); green markers mean real completion only, not visit order or default Assay settings.

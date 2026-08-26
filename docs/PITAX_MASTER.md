@@ -1,9 +1,9 @@
 # PITAX — מסמך מאסטר להמשך הפיתוח
 
 גרסת מסמך: 1.0
-בסיס קוד נוכחי: `3.0.6`
+בסיס קוד נוכחי: `3.0.7`
 סכמת פרויקט נוכחית: `6`
-השלב הפעיל: `Alpha 10` — Schema 6, עורך מספר Assays, Steps UI ואותו פרויקט רב־לוקוסי; הצעד הבא לפי roadmap הוא לאחר Alpha 10 (Alignment / markers / production)
+השלב הפעיל: `Alpha 10` — Schema 6, עורך מספר Assays, Steps UI ואותו פרויקט רב־לוקוסי; מגבלות marker נקבעות על ידי המשתמש (לא corpus ספרותי אוטומטי). scheduler NCBI גלובלי בין sessions נשאר לחובת Stage 5 לפני stable.
 
 ## 1. תפקיד המסמך
 

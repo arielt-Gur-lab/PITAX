@@ -83,6 +83,51 @@
     rv$ncbi_last_contact <- Sys.time()
   }
 
+  format_elapsed_seconds <- function(secs) {
+    secs <- suppressWarnings(as.integer(round(secs)))
+    if (!length(secs) || !is.finite(secs[1]) || secs[1] < 0) return("unknown")
+    secs <- secs[1]
+    if (secs < 60L) return(paste0(secs, "s"))
+    mins <- secs %/% 60L
+    rem <- secs %% 60L
+    if (mins < 60L) return(sprintf("%dm %ds", mins, rem))
+    hours <- mins %/% 60L
+    mins <- mins %% 60L
+    sprintf("%dh %dm", hours, mins)
+  }
+
+  parse_blast_timestamp <- function(value) {
+    value <- as.character(value)[1]
+    if (!nzchar(value)) return(as.POSIXct(NA))
+    suppressWarnings(as.POSIXct(value, format = "%Y-%m-%d %H:%M:%S"))
+  }
+
+  blast_elapsed_since <- function(timestamp_text) {
+    t0 <- parse_blast_timestamp(timestamp_text)
+    if (is.na(t0)) return(NA_real_)
+    as.numeric(difftime(Sys.time(), t0, units = "secs"))
+  }
+
+  blast_job_status_line <- function(job_row, extra = NULL) {
+    job_row <- job_row[1, , drop = FALSE]
+    status <- as.character(job_row$status[1])
+    rid <- as.character(job_row$rid[1])
+    elapsed <- blast_elapsed_since(job_row$submitted_at[1])
+    rtoe <- as.character(job_row$rtoe[1])
+    checked <- as.character(job_row$last_checked_at[1])
+    db <- as.character(job_row$database[1])
+    parts <- c(
+      paste0("Status ", status),
+      paste0("RID ", rid),
+      paste0("elapsed ", format_elapsed_seconds(elapsed))
+    )
+    if (nzchar(rtoe) && !identical(rtoe, "NA")) parts <- c(parts, paste0("NCBI RTOE ~", rtoe, "s"))
+    if (nzchar(db) && !identical(db, "NA")) parts <- c(parts, paste0("DB ", db))
+    if (nzchar(checked)) parts <- c(parts, paste0("last checked ", checked))
+    if (!is.null(extra) && nzchar(as.character(extra)[1])) parts <- c(parts, as.character(extra)[1])
+    paste(parts, collapse = " | ")
+  }
+
   parse_submit_response <- function(txt) {
     rid_match <- regmatches(txt, regexpr("RID = [A-Z0-9-]+", txt))
     rtoe_match <- regmatches(txt, regexpr("RTOE = [0-9]+", txt))
@@ -199,9 +244,13 @@
     skipped <- 0L
     failed <- 0L
     failures <- character()
-    rv$blast_batch_status_text <- paste0("Submitting ", length(sample_names), " processed sequence(s) to NCBI...")
+    batch_started <- Sys.time()
+    n_jobs <- length(sample_names)
+    rv$blast_batch_status_text <- paste0(
+      "Submitting ", n_jobs, " sequence(s) to NCBI... | elapsed ", format_elapsed_seconds(0)
+    )
 
-    withProgress(message="Submitting all sequences to NCBI BLAST", value=0, {
+    withProgress(message = paste0("Submitting ", n_jobs, " sequence(s) to NCBI BLAST"), value = 0, {
       for (i in seq_along(sample_names)) {
         nm <- sample_names[i]
         requested_hitlist <- min(100L, max(1L, as.integer(input$blast_hitlist)))
@@ -210,14 +259,13 @@
         if (!is.na(idx)) {
           skipped <- skipped + 1L
           incProgress(
-            1/length(sample_names),
-            detail=paste("Skipping matching active job:", records[[nm]]$final_name,
-                         paste0("(", input$blast_database, ", ", requested_hitlist, " hits)"))
+            1/n_jobs,
+            detail = paste0(i, "/", n_jobs, " | skip active job: ", records[[nm]]$final_name)
           )
           next
         }
 
-        incProgress(0, detail=paste("Submitting", records[[nm]]$final_name))
+        incProgress(0, detail = paste0(i, "/", n_jobs, " | submitting ", records[[nm]]$final_name))
         ans <- submit_one_blast(nm)
         if (isTRUE(ans$ok)) {
           submitted <- submitted + 1L
@@ -225,14 +273,16 @@
           failed <- failed + 1L
           failures <- c(failures, paste0(records[[nm]]$final_name, ": ", ans$message))
         }
-        incProgress(1/length(sample_names))
+        incProgress(1/n_jobs, detail = paste0(i, "/", n_jobs, " | elapsed ", format_elapsed_seconds(difftime(Sys.time(), batch_started, units = "secs"))))
       }
     })
 
+    elapsed_txt <- format_elapsed_seconds(difftime(Sys.time(), batch_started, units = "secs"))
     rv$blast_batch_status_text <- paste0(
       "Batch submission complete | submitted: ", submitted,
       " | skipped matching active jobs: ", skipped,
       " | failed: ", failed,
+      " | elapsed ", elapsed_txt,
       if (length(failures)) paste0(" | ", paste(failures, collapse=" | ")) else ""
     )
     showNotification(rv$blast_batch_status_text, type=if(failed) "warning" else "message", duration=10)
@@ -315,9 +365,14 @@
     if (!is.na(ref)) {
       elapsed <- as.numeric(difftime(Sys.time(), ref, units="secs"))
       if (is.finite(elapsed) && elapsed < 60) {
+        job <- rv$blast_jobs[job_idx, , drop = FALSE]
         return(list(
-          status="TOO_SOON", contacted=FALSE,
-          message=paste0("Wait ", ceiling(60-elapsed), " more seconds before checking RID ", rid, ".")
+          status = "TOO_SOON",
+          contacted = FALSE,
+          message = blast_job_status_line(
+            job,
+            paste0("wait ", ceiling(60 - elapsed), "s more before the next poll for this RID")
+          )
         ))
       }
     }
@@ -339,11 +394,21 @@
 
     if (grepl("Status=WAITING", txt)) {
       rv$blast_jobs$status[job_idx] <- "WAITING"
-      return(list(status="WAITING", contacted=TRUE, message="NCBI BLAST is still running."))
+      job <- rv$blast_jobs[job_idx, , drop = FALSE]
+      return(list(
+        status = "WAITING",
+        contacted = TRUE,
+        message = blast_job_status_line(job, "NCBI is still computing this BLAST job")
+      ))
     }
     if (grepl("Status=FAILED|Status=UNKNOWN", txt)) {
       rv$blast_jobs$status[job_idx] <- "FAILED/UNKNOWN"
-      return(list(status="FAILED", contacted=TRUE, message="NCBI reports failed or unknown job."))
+      job <- rv$blast_jobs[job_idx, , drop = FALSE]
+      return(list(
+        status = "FAILED",
+        contacted = TRUE,
+        message = blast_job_status_line(job, "NCBI reports failed or unknown job")
+      ))
     }
 
     rv$blast_jobs$status[job_idx] <- "READY"
@@ -445,8 +510,11 @@
     # reports duplicate row selections.
     selected_rows <- unique(selected_rows)
     ready <- 0L; waiting <- 0L; too_soon <- 0L; failed <- 0L; no_hits <- 0L; stale <- 0L
+    batch_started <- Sys.time()
+    n_jobs <- length(selected_rows)
+    detail_notes <- character()
 
-    withProgress(message="Retrieving selected NCBI BLAST jobs", value=0, {
+    withProgress(message = paste0("Retrieving ", n_jobs, " selected NCBI BLAST job(s)"), value = 0, {
       for (k in seq_along(selected_rows)) {
         idx <- selected_rows[k]
         rid <- rv$blast_jobs$rid[idx]
@@ -455,28 +523,37 @@
         if (identical(as.character(rv$blast_jobs$status[idx]), "READY") && already_stored) {
           ans <- list(status="READY", message="Already retrieved.")
         } else {
-          incProgress(0, detail=paste("Checking", final_name))
+          incProgress(0, detail = paste0(k, "/", n_jobs, " | checking ", final_name))
           ans <- retrieve_blast_job(idx)
         }
 
         if (ans$status == "READY") ready <- ready + 1L
-        else if (ans$status == "WAITING") waiting <- waiting + 1L
+        else if (ans$status == "WAITING") {
+          waiting <- waiting + 1L
+          detail_notes <- c(detail_notes, ans$message)
+        }
         else if (ans$status == "TOO_SOON") too_soon <- too_soon + 1L
         else if (ans$status == "NO_HITS") no_hits <- no_hits + 1L
         else if (ans$status == "STALE") stale <- stale + 1L
         else failed <- failed + 1L
-        incProgress(1/length(selected_rows))
+        incProgress(
+          1/n_jobs,
+          detail = paste0(k, "/", n_jobs, " | elapsed ", format_elapsed_seconds(difftime(Sys.time(), batch_started, units = "secs")))
+        )
       }
     })
 
+    elapsed_txt <- format_elapsed_seconds(difftime(Sys.time(), batch_started, units = "secs"))
     rv$blast_batch_status_text <- paste0(
-      "Selected retrieval | jobs: ", length(selected_rows),
+      "Selected retrieval | jobs: ", n_jobs,
       " | ready: ", ready,
       " | still running: ", waiting,
       " | too soon to poll: ", too_soon,
       " | no parsed hits: ", no_hits,
       " | stale: ", stale,
-      " | failed: ", failed
+      " | failed: ", failed,
+      " | elapsed ", elapsed_txt,
+      if (length(detail_notes)) paste0(" | ", paste(unique(detail_notes), collapse = " || ")) else ""
     )
     showNotification(rv$blast_batch_status_text, type=if(failed) "warning" else "message", duration=10)
   })
@@ -493,9 +570,14 @@
     if (!length(latest_indices)) return()
 
     ready <- 0L; waiting <- 0L; too_soon <- 0L; failed <- 0L; no_hits <- 0L; stale <- 0L
-    rv$blast_batch_status_text <- paste0("Checking ", length(latest_indices), " BLAST job(s)...")
+    batch_started <- Sys.time()
+    n_jobs <- length(latest_indices)
+    detail_notes <- character()
+    rv$blast_batch_status_text <- paste0(
+      "Checking ", n_jobs, " BLAST job(s)... | elapsed ", format_elapsed_seconds(0)
+    )
 
-    withProgress(message="Retrieving submitted NCBI BLAST jobs", value=0, {
+    withProgress(message = paste0("Retrieving ", n_jobs, " NCBI BLAST job(s)"), value = 0, {
       for (k in seq_along(latest_indices)) {
         idx <- latest_indices[k]
         final_name <- rv$blast_jobs$final_name[idx]
@@ -505,29 +587,41 @@
         already_stored <- nrow(rv$blast_hits) && "rid" %in% names(rv$blast_hits) && rid %in% rv$blast_hits$rid
         if (identical(rv$blast_jobs$status[idx], "READY") && already_stored) {
           ready <- ready + 1L
-          incProgress(1/length(latest_indices), detail=paste(final_name, "already retrieved"))
+          incProgress(
+            1/n_jobs,
+            detail = paste0(k, "/", n_jobs, " | ", final_name, " already retrieved")
+          )
           next
         }
 
-        incProgress(0, detail=paste("Checking", final_name))
+        incProgress(0, detail = paste0(k, "/", n_jobs, " | checking ", final_name))
         ans <- retrieve_blast_job(idx)
         if (ans$status == "READY") ready <- ready + 1L
-        else if (ans$status == "WAITING") waiting <- waiting + 1L
+        else if (ans$status == "WAITING") {
+          waiting <- waiting + 1L
+          detail_notes <- c(detail_notes, ans$message)
+        }
         else if (ans$status == "TOO_SOON") too_soon <- too_soon + 1L
         else if (ans$status == "NO_HITS") no_hits <- no_hits + 1L
         else if (ans$status == "STALE") stale <- stale + 1L
         else failed <- failed + 1L
-        incProgress(1/length(latest_indices))
+        incProgress(
+          1/n_jobs,
+          detail = paste0(k, "/", n_jobs, " | elapsed ", format_elapsed_seconds(difftime(Sys.time(), batch_started, units = "secs")))
+        )
       }
     })
 
+    elapsed_txt <- format_elapsed_seconds(difftime(Sys.time(), batch_started, units = "secs"))
     rv$blast_batch_status_text <- paste0(
       "Batch retrieval | ready: ", ready,
       " | still running: ", waiting,
       " | too soon to poll: ", too_soon,
       " | no parsed hits: ", no_hits,
       " | stale: ", stale,
-      " | failed: ", failed
+      " | failed: ", failed,
+      " | elapsed ", elapsed_txt,
+      if (length(detail_notes)) paste0(" | ", paste(unique(detail_notes), collapse = " || ")) else ""
     )
     showNotification(rv$blast_batch_status_text, type=if(failed) "warning" else "message", duration=10)
   })
@@ -537,27 +631,46 @@
   })
 
   output$blast_job_status <- renderUI({
+    # Refresh elapsed time while jobs are still running.
+    if (is.data.frame(rv$blast_jobs) && nrow(rv$blast_jobs) &&
+        any(rv$blast_jobs$status %in% c("SUBMITTED", "WAITING"))) {
+      invalidateLater(5000, session)
+    }
     req(input$blast_sample)
     jobs <- rv$blast_jobs[rv$blast_jobs$original_name == input$blast_sample, , drop=FALSE]
     if (!nrow(jobs)) return(p(class="settings-note", "No NCBI submission yet for this sequence."))
-    j <- jobs[nrow(jobs), ]
+    j <- jobs[nrow(jobs), , drop = FALSE]
+    line <- blast_job_status_line(
+      j,
+      paste0(
+        "hits requested ", j$hitlist_size[1],
+        if (identical(as.character(j$status[1]), "WAITING")) " | NCBI is still computing"
+        else if (identical(as.character(j$status[1]), "SUBMITTED")) " | submitted, awaiting first poll"
+        else if (identical(as.character(j$status[1]), "READY")) " | results available"
+        else NULL
+      )
+    )
     div(
-      class=if(j$status == "READY") "status-ok" else "status-warning",
-      paste("Selected sequence | RID:", j$rid, "| Status:", j$status,
-            "| Database:", if (nzchar(as.character(j$database))) j$database else "legacy/unknown",
-            "| Requested hits:", j$hitlist_size,
-            "| Estimated wait (RTOE):", j$rtoe, "seconds")
+      class = if (identical(as.character(j$status[1]), "READY")) "status-ok" else "status-warning",
+      paste0("Selected sequence | ", line)
     )
   })
 
   output$blast_jobs_table <- renderDT({
+    if (is.data.frame(rv$blast_jobs) && nrow(rv$blast_jobs) &&
+        any(rv$blast_jobs$status %in% c("SUBMITTED", "WAITING"))) {
+      invalidateLater(5000, session)
+    }
     df <- rv$blast_jobs
     if (!nrow(df)) return(datatable(data.frame(Message="No BLAST jobs submitted yet."), rownames=FALSE, options=list(dom="t")))
     keep <- c("final_name","original_name","rid","database","hitlist_size","consensus_revision","rtoe","status","submitted_at","last_checked_at")
     df <- df[, intersect(keep, names(df)), drop=FALSE]
+    df$elapsed <- vapply(df$submitted_at, function(ts) format_elapsed_seconds(blast_elapsed_since(ts)), character(1))
+    df <- df[, c(setdiff(names(df), "elapsed"), "elapsed"), drop = FALSE]
     friendly <- c(
       final_name="Sample", original_name="Original sample", rid="RID", database="Database", hitlist_size="Hits requested",
-      consensus_revision="Consensus revision", rtoe="Estimated wait (s)", status="Status", submitted_at="Submitted at", last_checked_at="Last checked at"
+      consensus_revision="Consensus revision", rtoe="Estimated wait (s)", status="Status",
+      submitted_at="Submitted at", last_checked_at="Last checked at", elapsed="Elapsed"
     )
     names(df) <- unname(friendly[names(df)])
     datatable(df, rownames=FALSE, selection=list(mode="multiple", target="row"), options=list(pageLength=25, scrollX=TRUE, autoWidth=TRUE))
