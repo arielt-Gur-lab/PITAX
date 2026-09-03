@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.3.0
+
+- INTEGRATE accumulates imported `.sangerproject` files across Add clicks (`rv$multilocus_imports`) instead of replacing the previous selection, so 3+ loci can be queued without picking every file in one dialog.
+- Queued imports show a removable list; Build uses current session (optional) plus the accumulated queue. Duplicate fingerprints are skipped.
+- Stage 4 continues to require at least two distinct loci (minimum, not a ceiling). Concordance/conflict logic is unchanged and already N-locus aware.
+- Help and Stage 3/4 docs no longer describe a hard one-locus-per-run / two-source ceiling for Alpha 10 multi-locus work.
+
 ## 3.2.1
 
 - Fixed Share Project open (`?share=`): load now runs inside a reactive `observe` so restoring `rv` no longer crashes with "Can't access reactive value outside of reactive consumer" (local and Connect).

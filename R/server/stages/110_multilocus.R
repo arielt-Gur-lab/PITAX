@@ -42,6 +42,93 @@
     paste0(max(0, min(100, value)), "%")
   }
 
+  # Shiny fileInput replaces its value on each Add click. Accumulate imported
+  # projects in rv$multilocus_imports so N loci can be queued across clicks.
+  observeEvent(input$multilocus_projects, {
+    uploads <- input$multilocus_projects
+    if (is.null(uploads) || !nrow(uploads)) return()
+    imports <- rv$multilocus_imports
+    if (!is.list(imports)) imports <- list()
+    existing_md5 <- vapply(imports, function(x) stage4_scalar_text(x$md5), character(1))
+    added <- 0L
+    skipped <- 0L
+    for (i in seq_len(nrow(uploads))) {
+      path <- as.character(uploads$datapath[i])
+      name <- as.character(uploads$name[i])
+      md5 <- unname(tools::md5sum(path))
+      if (!nzchar(md5)) md5 <- ""
+      if (nzchar(md5) && md5 %in% existing_md5) {
+        skipped <- skipped + 1L
+        next
+      }
+      loaded <- tryCatch(readRDS(path), error = function(e) e)
+      if (inherits(loaded, "error")) {
+        showNotification(paste0("Could not read ", name, ": ", conditionMessage(loaded)), type = "error", duration = 12)
+        next
+      }
+      validation <- tryCatch({
+        stage4_validate_project(loaded, name)
+        NULL
+      }, error = function(e) conditionMessage(e))
+      if (!is.null(validation)) {
+        showNotification(paste0(name, ": ", validation), type = "error", duration = 12)
+        next
+      }
+      imports[[length(imports) + 1L]] <- list(name = name, md5 = md5, project = loaded)
+      existing_md5 <- c(existing_md5, md5)
+      added <- added + 1L
+    }
+    rv$multilocus_imports <- imports
+    if (added > 0L) {
+      showNotification(
+        paste0("Queued ", added, " project(s) for multi-locus build", if (skipped) paste0(" (", skipped, " duplicate fingerprint(s) skipped)") else "", "."),
+        type = "message", duration = 6
+      )
+    } else if (skipped > 0L) {
+      showNotification("Those project file(s) were already queued.", type = "warning", duration = 6)
+    }
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$multilocus_remove_import_idx, {
+    idx <- suppressWarnings(as.integer(input$multilocus_remove_import_idx)[1])
+    imports <- rv$multilocus_imports
+    if (!is.list(imports) || !length(imports)) return()
+    if (!is.finite(idx) || idx < 1L || idx > length(imports)) return()
+    rv$multilocus_imports <- imports[-idx]
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$multilocus_clear_imports, {
+    rv$multilocus_imports <- list()
+  }, ignoreInit = TRUE)
+
+  output$multilocus_import_queue <- renderUI({
+    imports <- rv$multilocus_imports
+    if (!is.list(imports) || !length(imports)) {
+      return(div(class = "compact-hint", "No additional projects queued yet. Use Add projects to accumulate one or more locus sources."))
+    }
+    rows <- lapply(seq_along(imports), function(i) {
+      imp <- imports[[i]]
+      fingerprint <- stage4_scalar_text(imp$md5)
+      if (nzchar(fingerprint)) fingerprint <- substr(fingerprint, 1, 12)
+      div(
+        class = "button-row multilocus-import-row",
+        span(strong(stage4_scalar_text(imp$name, paste0("project_", i)))),
+        span(class = "compact-hint", if (nzchar(fingerprint)) paste0("fingerprint ", fingerprint) else "no fingerprint"),
+        tags$button(
+          type = "button",
+          class = "btn btn-default btn-sm action-button",
+          onclick = sprintf("Shiny.setInputValue('multilocus_remove_import_idx', %d, {priority: 'event'})", i),
+          icon("trash"), " Remove"
+        )
+      )
+    })
+    tagList(
+      div(class = "subsection-title", paste0("Queued imports (", length(imports), ")")),
+      rows,
+      actionButton("multilocus_clear_imports", "Clear queued imports", icon = icon("eraser"), class = "btn-sm")
+    )
+  })
+
   observeEvent(input$build_multilocus_profile, {
     projects <- list()
     source_names <- character()
@@ -53,17 +140,13 @@
       source_md5 <- c(source_md5, "")
     }
 
-    uploads <- input$multilocus_projects
-    if (!is.null(uploads) && nrow(uploads)) {
-      for (i in seq_len(nrow(uploads))) {
-        loaded <- tryCatch(readRDS(uploads$datapath[i]), error = function(e) e)
-        if (inherits(loaded, "error")) {
-          showNotification(paste0("Could not read ", uploads$name[i], ": ", conditionMessage(loaded)), type = "error", duration = 12)
-          return()
-        }
-        projects[[length(projects) + 1L]] <- loaded
-        source_names <- c(source_names, as.character(uploads$name[i]))
-        source_md5 <- c(source_md5, unname(tools::md5sum(uploads$datapath[i])))
+    imports <- rv$multilocus_imports
+    if (is.list(imports) && length(imports)) {
+      for (i in seq_along(imports)) {
+        imp <- imports[[i]]
+        projects[[length(projects) + 1L]] <- imp$project
+        source_names <- c(source_names, stage4_scalar_text(imp$name, paste0("import_", i)))
+        source_md5 <- c(source_md5, stage4_scalar_text(imp$md5))
       }
     }
 
@@ -148,7 +231,7 @@
     cards <- lapply(seq_len(nrow(evidence)), function(i) {
       row <- evidence[i, , drop = FALSE]
       analyzed <- identical(stage4_scalar_text(row$Taxonomy_Status), "Analyzed")
-      call <- stage4_scalar_text(row$Recommended_Identification, "Not analyzed")
+      call <- stage4_display_call(row$Taxonomy_Status, row$Recommended_Identification)
       rank <- stage4_scalar_text(row$Recommended_Level, "unresolved")
       confidence <- stage4_scalar_text(row$Confidence, "not assigned")
       best_match <- stage4_scalar_text(row$Best_Molecular_Match, "No molecular match recorded")
@@ -198,7 +281,9 @@
     }
     plotted$Hover <- paste0(
       "<b>", plotted$Locus, "</b>",
-      "<br>Call: ", ifelse(nzchar(plotted$Recommended_Identification), plotted$Recommended_Identification, "Unresolved"),
+      "<br>Call: ", vapply(seq_len(nrow(plotted)), function(i) {
+        stage4_display_call(plotted$Taxonomy_Status[i], plotted$Recommended_Identification[i])
+      }, character(1)),
       "<br>Confidence: ", ifelse(nzchar(plotted$Confidence), plotted$Confidence, "Not assigned"),
       "<br>Identity: ", round(plotted$Identity, 2), "%",
       "<br>Coverage: ", round(plotted$Coverage, 2), "%",
@@ -206,7 +291,7 @@
     )
     lower <- max(0, floor(min(c(plotted$Identity, plotted$Coverage), na.rm = TRUE) - 3))
     plotly::plot_ly(
-      plotted, x = ~Coverage, y = ~Identity, color = ~Locus, text = ~Hover,
+      plotted, x = ~Coverage, y = ~Identity, color = ~Locus, text = ~Locus, hovertext = ~Hover,
       type = "scatter", mode = "markers+text", textposition = "top center",
       marker = list(size = 12, line = list(color = "#ffffff", width = 1.5)),
       hoverinfo = "text"

@@ -45,6 +45,8 @@ must_contain(export_text, 'write_assignment_checkpoint_zip <- function')
 must_contain(architecture_text, 'assignments$Final_Name[i] <- stage2_compose_read_name(assignments$Isolate[i], assignments$Locus[i], assignments$Direction[i])')
 must_contain(app_text, 'uiOutput("batch_assay_control")')
 must_contain(app_text, 'assignment_input_id("assign_assay", read_id)')
+must_contain(app_text, 'selected = if (isTRUE(assay_missing)) NA')
+must_contain(app_text, 'selected = if (identical(assay_id, as.character(rv$assay_profiles$Assay_ID[j]))) NA')
 
 blast_observer_pos <- regexpr('# Keep the BLAST sequence selector synchronized', app_text, fixed = TRUE)[1]
 blast_guard_pos <- regexpr('if (!length(rv$results) || is.null(rv$rename)) {', app_text, fixed = TRUE)[1]

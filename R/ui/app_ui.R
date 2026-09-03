@@ -539,7 +539,8 @@ ui <- fluidPage(
             checkboxInput("multilocus_include_current", "Include the current PITAX project", value = TRUE),
             fileInput("multilocus_projects", NULL, multiple = TRUE, accept = c(".sangerproject", ".rds"),
                       buttonLabel = "Add projects", placeholder = "Optional additional completed projects"),
-            div(class = "compact-hint", icon("info-circle"), span("A source may contain one or more loci. Duplicate Isolate+Locus pairs across sources are blocked. Prefer building from the current Alpha 10 multi-locus session when all loci are already in this project.")),
+            uiOutput("multilocus_import_queue"),
+            div(class = "compact-hint", icon("info-circle"), span("A source may contain one or more loci. Added projects accumulate across Add clicks (not replaced). Duplicate Isolate+Locus pairs across sources are blocked. Prefer building from the current multi-locus session when all loci are already in this project.")),
             uiOutput("multilocus_gate_status")
           ),
           div(class = "panel-box stage-table-card",
@@ -626,15 +627,15 @@ ui <- fluidPage(
               ),
               div(class="help-card",
                 h3("Stage 3 isolate-level sequence"),
-                p("A sequencing run must contain one Gene/Locus. PITAX reverse-complements Reverse reads in a derived view, aligns each explicit pair and records every call with source positions and available basecaller quality."),
+                p("A project may contain one or more Gene/Locus values. PITAX reverse-complements Reverse reads in a derived view, aligns each explicit pair and records every call with source positions and available basecaller quality."),
                 p("Single reads remain valid representatives. Weak pair overlaps and unresolved contradictions block downstream analysis; they are not hidden by concatenation or majority voting."),
                 div(class="about-callout", strong("Accepted validation boundary: "), "The linked conflict-review mechanics, revisions and controlled AB1 fixtures are accepted for continued development. An independently sequenced paired-AB1 set remains a deferred biological validation item.")
               ),
               div(class="help-card",
                 h3("Stage 4 multi-locus profile"),
-                p("Each Gene/Locus is processed in its own PITAX project. Stage 4 imports those completed projects and joins their evidence only when the explicit Isolate code matches."),
-                p("Every locus retains its sequence, consensus revision, BLAST RID, taxonomic result, limitation and reference context. Two concordant loci may support the same rank; a conflicting locus is never removed by a numerical majority."),
-                div(class="about-callout", strong("Current version boundary: "), paste0("v", APP_VERSION, " ships the gated Steps UI (SETUP / PROCESS / IDENTIFY / INTEGRATE / OUTPUT), multi-assay profiles inside one project, and same-project multi-locus integration. Literature-backed marker recommendations remain a later Stage 4 gate."))
+                p("A source may be the current multi-locus session and/or one or more saved PITAX projects. Stage 4 joins their evidence only when the explicit Isolate code matches. There is no two-locus ceiling."),
+                p("Every locus retains its sequence, consensus revision, BLAST RID, taxonomic result, limitation and reference context. Concordant loci may support the same rank; a conflicting locus is never removed by a numerical majority."),
+                div(class="about-callout", strong("Current version boundary: "), paste0("v", APP_VERSION, " ships the gated Steps UI (SETUP / PROCESS / IDENTIFY / INTEGRATE / OUTPUT), multi-assay profiles inside one project, and N-locus INTEGRATE from the current session and/or accumulated imports. Literature-backed marker recommendations remain a later Stage 4 gate."))
               )
             ),
 

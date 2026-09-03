@@ -271,6 +271,7 @@
     rv$architecture <- loaded_architecture
     rv$consensus_set <- stage3_ensure_consensus_set(if (is.list(st$consensus_set)) st$consensus_set else stage3_empty_consensus_set())
     rv$multilocus_profile <- stage4_ensure_profile(if (is.list(st$multilocus_profile)) st$multilocus_profile else stage4_empty_profile())
+    rv$multilocus_imports <- list()
     rv$project_migration_log <- stage2_scalar_text(st$migration_log)
     rv$blast_jobs <- ensure_blast_jobs_schema(if (is.data.frame(st$blast_jobs)) st$blast_jobs else NULL)
     # Safe reload: do not resume aggressive automatic NCBI polling for pending RIDs.

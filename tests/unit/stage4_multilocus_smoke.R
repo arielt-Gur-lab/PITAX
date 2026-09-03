@@ -155,6 +155,133 @@ assert_true(isTRUE(abs(blast_ev$Best_Match_Identity[1] - 99.1) < 0.01),
 assert_true(identical(blast_ev$RID[1], "RIDBLAST1"),
             "BLAST-only TEF1 RID was not displayed on the locus card.")
 
+# An unresolved taxonomic call is still analyzed. The card must not say "Not analyzed".
+fb50_tef <- make_project("TEF1", isolate = "FB50", identification = "Pleurotus", level = "genus", genus = "Pleurotus", accession = "OZ415662.1")
+fb50_lsu <- make_project("LSU", isolate = "FB50", identification = "Unresolved", level = "unresolved", genus = "Pleurotus", accession = "PQ652238.1")
+fb50_lsu$state$taxonomy_summary$confidence <- "Low / review"
+fb50_lsu$state$taxonomy_summary$locus_discrimination <- "Poor at genus and species level"
+fb50_lsu$state$taxonomy_summary$best_molecular_match <- "Pleurotus pulmonarius"
+fb50_unresolved <- stage4_build_profile(
+  list(fb50_tef, fb50_lsu),
+  c("Current session", "LSU-2.9.26.sangerproject"),
+  c("", "md5-fb50-lsu")
+)
+fb50_ev <- stage4_isolate_evidence(fb50_unresolved, "FB50")
+lsu_row <- fb50_ev[fb50_ev$Locus == "LSU", , drop = FALSE]
+tef_row <- fb50_ev[fb50_ev$Locus == "TEF1", , drop = FALSE]
+assert_true(identical(lsu_row$Taxonomy_Status[1], "Analyzed"), "Unresolved LSU must remain taxonomically analyzed.")
+assert_true(identical(lsu_row$Recommended_Identification[1], "Unresolved"),
+            "Unresolved LSU identification was blanked instead of being retained.")
+assert_true(identical(stage4_display_call(lsu_row$Taxonomy_Status[1], lsu_row$Recommended_Identification[1]), "Unresolved"),
+            "Analyzed + Unresolved must display Unresolved, not Not analyzed.")
+assert_true(identical(stage4_display_call(tef_row$Taxonomy_Status[1], tef_row$Recommended_Identification[1]), "Pleurotus"),
+            "A supported genus call must still display the taxon name.")
+assert_true(!nzchar(lsu_row$Supported_Genus[1]),
+            "An unresolved LSU call must not donate a supported genus from the BLAST best match.")
+fb50_prof <- stage4_isolate_profile(fb50_unresolved, "FB50")
+assert_true(identical(fb50_prof$Taxonomy_Complete[1], "2/2"), "Unresolved LSU must still count as interpreted.")
+assert_true(identical(fb50_prof$Profile_Status[1], "PARTIAL_EVIDENCE"),
+            "Genus + unresolved LSU must not be treated as a combined call.")
+assert_true(!grepl("Complete missing locus-level BLAST", fb50_prof$Next_Action[1], fixed = TRUE),
+            "2/2 interpreted profiles must not ask the user to complete missing BLAST/taxonomy.")
+assert_true(grepl("unresolved", fb50_prof$Next_Action[1], ignore.case = TRUE),
+            "The next action must tell the user to review the unresolved locus.")
+assert_true(identical(stage4_display_call("Not analyzed", ""), "Not analyzed"),
+            "A locus with no taxonomy row must still display Not analyzed.")
+
+# --- N loci (3+): no two-source ceiling ---------------------------------
+lsu3 <- make_project("LSU", identification = "Fusarium oxysporum", level = "species", genus = "Fusarium", accession = "LSU_001")
+three_sources <- stage4_build_profile(
+  list(its, tef1, lsu3),
+  c("ITS project", "TEF1 project", "LSU project"),
+  c("md5-n1", "md5-n2", "md5-n3")
+)
+assert_true(is.null(stage4_profile_gate_error(three_sources)), "A three-locus profile must pass the structural gate.")
+assert_true(nrow(three_sources$evidence) == 3L && nrow(three_sources$profiles) == 1L,
+            "Three imported locus sources must become three evidence rows and one isolate profile.")
+assert_true(all(c("ITS", "TEF1", "LSU") %in% three_sources$evidence$Locus),
+            "ITS, TEF1 and LSU must all be retained in a three-source profile.")
+assert_true(identical(three_sources$profiles$Profile_Status[1], "CONCORDANT_SPECIES"),
+            "Three concordant species loci must still report CONCORDANT_SPECIES.")
+three_overview <- stage4_profile_overview(three_sources)
+assert_true(identical(as.integer(three_overview$Loci[1]), 3L), "Overview must count three distinct loci.")
+
+make_multi_locus_session <- function(isolate, locus_specs) {
+  assignments <- do.call(rbind, lapply(locus_specs, function(spec) {
+    source_id <- paste0(isolate, "_", spec$locus, "_F")
+    data.frame(
+      Source_ID = source_id, Final_Name = source_id, Isolate = isolate,
+      Locus = spec$locus, Direction = "Forward", stringsAsFactors = FALSE
+    )
+  }))
+  results <- list()
+  taxonomy_rows <- list()
+  for (spec in locus_specs) {
+    source_id <- paste0(isolate, "_", spec$locus, "_F")
+    results[[source_id]] <- make_result("ACGTACGTACGT")
+    if (!is.null(spec$identification) && nzchar(spec$identification)) {
+      taxonomy_rows[[length(taxonomy_rows) + 1L]] <- data.frame(
+        original_name = NA_character_, final_name = paste(isolate, spec$locus, sep = "_"),
+        recommended_identification = spec$identification,
+        recommended_level = if (!is.null(spec$level)) spec$level else "species",
+        confidence = if (!is.null(spec$confidence)) spec$confidence else "High",
+        best_match_genus = if (!is.null(spec$genus)) spec$genus else "",
+        best_molecular_match = spec$identification,
+        best_match_accession = if (!is.null(spec$accession)) spec$accession else "ACC",
+        best_match_identity_percent = 99.5, best_match_query_coverage_percent = 100,
+        reference_support = "Curated reference context", locus_discrimination = "Good",
+        rid = paste0("RID_", spec$locus), analyzed_at = "2026-08-20 10:00:00",
+        target = spec$locus, stringsAsFactors = FALSE
+      )
+    }
+  }
+  consensus <- stage3_build_consensus_set(assignments, results, min_overlap = 4)
+  taxonomy <- if (length(taxonomy_rows)) do.call(rbind, taxonomy_rows) else data.frame()
+  if (nrow(taxonomy)) {
+    for (i in seq_len(nrow(taxonomy))) {
+      match_id <- names(consensus$records)[
+        vapply(consensus$records, function(r) identical(stage3_scalar_text(r$locus), taxonomy$target[i]), logical(1))
+      ]
+      if (length(match_id)) taxonomy$original_name[i] <- match_id[1]
+    }
+  }
+  list(
+    format = "SangerSequencePipelineProject", schema_version = 6L,
+    app_version = "3.3.0", saved_at = "2026-09-03 15:00:00",
+    state = list(results = results, consensus_set = consensus, taxonomy_summary = taxonomy)
+  )
+}
+
+session3 <- make_multi_locus_session("ISO1", list(
+  list(locus = "ITS", identification = "Fusarium oxysporum", level = "species", genus = "Fusarium", accession = "S_ITS"),
+  list(locus = "TEF1", identification = "Fusarium oxysporum", level = "species", genus = "Fusarium", accession = "S_TEF"),
+  list(locus = "LSU", identification = "Fusarium oxysporum", level = "species", genus = "Fusarium", accession = "S_LSU")
+))
+session_profile <- stage4_build_profile(list(session3), "Current session", "")
+assert_true(is.null(stage4_profile_gate_error(session_profile)), "A single session with three loci must pass the gate.")
+assert_true(nrow(session_profile$evidence) == 3L,
+            "A single multi-locus session must emit one evidence row per locus without imports.")
+assert_true(identical(session_profile$profiles$Profile_Status[1], "CONCORDANT_SPECIES"),
+            "Three same-species loci in one session must be concordant at species.")
+
+single_only <- stage4_build_profile(list(its), "ITS only", "md5-one")
+assert_true(identical(single_only$profiles$Profile_Status[1], "SINGLE_LOCUS"), "One locus remains SINGLE_LOCUS.")
+assert_true(grepl("another locus", single_only$profiles$Next_Action[1], fixed = TRUE),
+            "SINGLE_LOCUS next action must ask for another locus, not imply a two-locus ceiling.")
+
+mixed3 <- make_multi_locus_session("FB50", list(
+  list(locus = "TEF1", identification = "Pleurotus", level = "genus", genus = "Pleurotus", accession = "M_TEF"),
+  list(locus = "ITS", identification = "Pleurotus", level = "genus", genus = "Pleurotus", accession = "M_ITS"),
+  list(locus = "LSU", identification = "Unresolved", level = "unresolved", genus = "Pleurotus", accession = "M_LSU", confidence = "Low / review")
+))
+mixed_profile <- stage4_build_profile(list(mixed3), "Current session", "")
+mixed_row <- stage4_isolate_profile(mixed_profile, "FB50")
+assert_true(identical(mixed_row$Taxonomy_Complete[1], "3/3"), "Two genus + one unresolved must still count 3/3 interpreted.")
+assert_true(identical(mixed_row$Profile_Status[1], "CONCORDANT_GENUS"),
+            "Two supported genus calls plus unresolved LSU must remain concordant at genus (unresolved does not donate a genus).")
+assert_true(!grepl("Complete missing locus-level BLAST", mixed_row$Next_Action[1], fixed = TRUE),
+            "Fully interpreted 3-locus profiles must not ask to complete missing BLAST.")
+
 legacy <- list(results = list(keep = TRUE), migration_log = "Stage 3 retained.")
 migrated <- stage4_migrate_v4_state(legacy)
 assert_true(isTRUE(migrated$results$keep), "Stage 4 migration changed existing project evidence.")

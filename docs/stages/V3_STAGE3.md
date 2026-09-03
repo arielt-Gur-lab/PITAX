@@ -11,7 +11,7 @@ Stage 3 creates one downstream sequence per Isolate–Locus without destroying o
 - The Forward curated sequence stays in sequencing orientation.
 - The Reverse curated sequence is reverse-complemented only in a derived alignment view.
 - Pairing comes only from the explicit Isolate, Locus and Direction fields accepted in Stage 2.
-- A run contains exactly one locus. Stage 4 will combine separately processed locus results at isolate level.
+- A project may contain one or more loci. Stage 4 combines Isolate+Locus evidence from the current session and/or imported projects.
 - A single read is valid but is explicitly reported as a single-read representative.
 - A pair must pass minimum overlap and overlap-identity rules.
 - Agreement is accepted; a canonical base resolves an `N`; a quality-asymmetric mismatch may be resolved automatically.

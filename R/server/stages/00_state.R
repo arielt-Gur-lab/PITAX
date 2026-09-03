@@ -5,6 +5,7 @@
     read_assignments = stage2_empty_assignments(), architecture = NULL,
     consensus_set = stage3_empty_consensus_set(),
     multilocus_profile = stage4_empty_profile(),
+    multilocus_imports = list(),
     project_mode = "simple",
     assignment_signature = "",
     project_migration_log = "",

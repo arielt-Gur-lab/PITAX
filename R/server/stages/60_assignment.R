@@ -89,6 +89,8 @@
     body_rows <- lapply(seq_len(nrow(assignments)), function(i) {
       read_id <- assignments$Read_ID[i]
       direction <- stage2_normalize_direction(assignments$Direction[i])
+      assay_id <- stage2_scalar_text(assignments$Assay_ID[i])
+      assay_missing <- !nzchar(assay_id) || !assay_id %in% as.character(rv$assay_profiles$Assay_ID)
       tags$tr(
         tags$td(tags$input(id = assignment_input_id("assign_select", read_id), type = "checkbox", class = "shiny-input-checkbox")),
         tags$td(class = "assignment-source", assignments$Source_ID[i]),
@@ -96,19 +98,19 @@
         tags$td(tags$input(id = assignment_input_id("assign_isolate", read_id), type = "text", class = "form-control", value = assignments$Isolate[i], autocomplete = "off")),
         tags$td(tags$select(
           id = assignment_input_id("assign_assay", read_id), class = "form-control assignment-assay",
-          tags$option(value = "", disabled = NA, selected = if (!assignments$Assay_ID[i] %in% rv$assay_profiles$Assay_ID) NA, "Select..."),
+          tags$option(value = "", disabled = NA, selected = if (isTRUE(assay_missing)) NA, "Select..."),
           lapply(seq_len(nrow(rv$assay_profiles)), function(j) tags$option(
             value = rv$assay_profiles$Assay_ID[j],
-            selected = if (assignments$Assay_ID[i] == rv$assay_profiles$Assay_ID[j]) NA,
+            selected = if (identical(assay_id, as.character(rv$assay_profiles$Assay_ID[j]))) NA,
             paste0(rv$assay_profiles$Assay_Name[j], " | ", rv$assay_profiles$Locus_Display_Name[j])
           ))
         )),
         tags$td(class = "assignment-locus", if (nzchar(assignments$Locus[i])) pitax_locus_display_name(assignments$Locus[i], assignments$Locus[i]) else "-"),
         tags$td(tags$select(
           id = assignment_input_id("assign_direction", read_id), class = "form-control assignment-direction",
-          tags$option(value = "", disabled = NA, selected = if (!direction %in% c("Forward", "Reverse")) NA, "Select..."),
-          tags$option(value = "Forward", selected = if (direction == "Forward") NA, "Forward"),
-          tags$option(value = "Reverse", selected = if (direction == "Reverse") NA, "Reverse")
+          tags$option(value = "", disabled = NA, selected = if (!identical(direction, "Forward") && !identical(direction, "Reverse")) NA, "Select..."),
+          tags$option(value = "Forward", selected = if (identical(direction, "Forward")) NA, "Forward"),
+          tags$option(value = "Reverse", selected = if (identical(direction, "Reverse")) NA, "Reverse")
         ))
       )
     })

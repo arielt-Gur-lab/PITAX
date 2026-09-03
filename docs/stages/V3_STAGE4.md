@@ -1,19 +1,20 @@
 # PITAX 3.0 — Stage 4 multi-locus isolate profile
 
-Version: `3.0.0-alpha.9.1`
+Version: `3.3.0`
 
 ## Purpose
 
-Stage 4 combines separately completed single-locus PITAX projects at isolate level while preserving every locus as independent evidence. It does not concatenate genes and it does not treat loci as votes.
+Stage 4 combines locus evidence at isolate level while preserving every locus as independent evidence. Sources may be the current multi-assay / multi-locus session and/or separately completed PITAX projects. It does not concatenate genes and it does not treat loci as votes.
 
 ## Input contract
 
 - Input files are PITAX `.sangerproject` files using project schema 4 or newer.
-- Each source project must contain exactly one Gene/Locus.
+- Each source project may contain one or more Gene/Locus values.
 - Its Stage 3 analysis sequences must be current and review-complete.
 - Isolate identity comes only from the explicit `Isolate` field.
 - The same Isolate/Locus combination may occur only once across all sources.
-- The current session may be included directly; other loci are added as saved projects.
+- The current session may be included directly; additional loci may be added as saved projects. Queued imports accumulate across Add clicks (they are not replaced by the next file picker selection).
+- A multi-locus profile requires at least two distinct loci. There is no upper ceiling on the number of loci.
 
 ## Stored profile
 
@@ -69,7 +70,7 @@ Imported source projects are immutable snapshots identified by their stored prov
 
 ## Current alpha boundary
 
-Alpha.9.1 implements the Stage 4 data architecture, conservative concordance/conflict behavior and visual multi-isolate review. It does not yet automate taxon-specific marker recommendations. That next increment requires a provenance-bearing literature layer and curated Fusarium, Trichoderma, Aspergillus, Penicillium, Pleurotus and general-fungi scenarios.
+Version `3.3.0` keeps the Stage 4 evidence-preserving concordance/conflict algorithm and adds accumulated N-locus imports in INTEGRATE (session and/or queued projects). It does not yet automate taxon-specific marker recommendations. That next increment requires a provenance-bearing literature layer and curated Fusarium, Trichoderma, Aspergillus, Penicillium, Pleurotus and general-fungi scenarios.
 
 ## Automated tests
 

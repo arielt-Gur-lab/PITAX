@@ -67,18 +67,41 @@ stage4_df_number <- function(df, column) {
   if (length(out) != 1L || !is.finite(out)) NA_real_ else out
 }
 
+stage4_non_call_labels <- function() {
+  c("Not analyzed", "Unresolved", "Insufficient evidence")
+}
+
+stage4_has_supported_call <- function(identification, rank = "") {
+  identification <- stage4_scalar_text(identification)
+  rank <- tolower(stage4_scalar_text(rank))
+  nzchar(identification) &&
+    !identification %in% stage4_non_call_labels() &&
+    rank %in% c("genus", "species")
+}
+
+stage4_display_call <- function(taxonomy_status, identification) {
+  status <- stage4_scalar_text(taxonomy_status)
+  call <- stage4_scalar_text(identification)
+  if (!identical(status, "Analyzed")) {
+    if (!nzchar(call) || call %in% stage4_non_call_labels()) return("Not analyzed")
+    call
+  } else if (!nzchar(call) || identical(call, "Not analyzed")) {
+    "Unresolved"
+  } else {
+    call
+  }
+}
+
 stage4_taxon_parts <- function(taxonomy_row) {
   rank <- tolower(stage4_df_value(taxonomy_row, "recommended_level"))
   identification <- stage4_df_value(taxonomy_row, "recommended_identification")
-  if (identification %in% c("Not analyzed", "Unresolved", "Insufficient evidence")) identification <- ""
-
   genus <- ""
   species <- ""
-  if (rank == "species" && nzchar(identification)) {
+  if (stage4_has_supported_call(identification, rank) && rank == "species") {
     species <- identification
     genus <- stage4_df_value(taxonomy_row, "best_match_genus")
     if (!nzchar(genus)) genus <- strsplit(identification, "\\s+")[[1]][1]
-  } else if (rank == "genus" && nzchar(identification)) {
+  } else if (stage4_has_supported_call(identification, rank) && rank == "genus") {
     genus <- identification
   }
   list(rank = rank, identification = identification, genus = genus, species = species)
@@ -264,7 +287,9 @@ stage4_extract_project_evidence <- function(project, source_name, source_md5 = "
 stage4_profile_row <- function(evidence) {
   loci <- sort(unique(as.character(evidence$Locus)))
   analyzed <- evidence$Taxonomy_Status == "Analyzed"
-  supported <- analyzed & nzchar(as.character(evidence$Supported_Genus))
+  supported <- analyzed & vapply(seq_len(nrow(evidence)), function(i) {
+    stage4_has_supported_call(evidence$Recommended_Identification[i], evidence$Recommended_Level[i])
+  }, logical(1))
   genera <- unique(as.character(evidence$Supported_Genus[supported]))
   genera <- genera[nzchar(genera)]
   species <- unique(as.character(evidence$Supported_Species[nzchar(as.character(evidence$Supported_Species))]))
@@ -276,12 +301,12 @@ stage4_profile_row <- function(evidence) {
 
   status <- "PARTIAL_EVIDENCE"
   conclusion <- "Available loci do not yet support a combined taxonomic conclusion."
-  next_action <- "Complete missing locus-level BLAST and taxonomic interpretation; retain every locus as separate evidence."
+  next_action <- "Review per-locus calls; PITAX does not infer a combined identification from a single supported genus."
 
   if (length(loci) < 2L) {
     status <- "SINGLE_LOCUS"
     conclusion <- "Only one locus is present; this is not a multi-locus profile."
-    next_action <- "Add a separately processed second locus for the same isolate."
+    next_action <- "Add another locus for the same isolate (current session or imported project)."
   } else if (!any(analyzed)) {
     status <- "NO_TAXONOMY"
     conclusion <- "Sequences are present, but no locus has a completed taxonomic interpretation."
@@ -304,6 +329,10 @@ stage4_profile_row <- function(evidence) {
     next_action <- "Add or review a taxon-informed secondary marker; PITAX does not infer a species by flat locus voting."
   } else if (sum(analyzed) < nrow(evidence)) {
     conclusion <- "Some loci have taxonomic interpretation and others are still missing; no combined call is made."
+    next_action <- "Complete missing locus-level BLAST and taxonomic interpretation; retain every locus as separate evidence."
+  } else if (any(!supported)) {
+    conclusion <- "Every locus was interpreted, but at least one remains unresolved at genus/species; no combined call is made."
+    next_action <- "Review the unresolved locus. A BLAST best match is not a taxonomic call when discrimination is poor."
   }
 
   data.frame(
