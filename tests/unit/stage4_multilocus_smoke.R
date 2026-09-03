@@ -106,6 +106,55 @@ assert_true(!stage4_current_project_matches(profile, changed, "ITS project"), "A
 fasta <- stage4_make_fasta(profile)
 assert_true(length(gregexpr(">", fasta, fixed = TRUE)[[1]]) == 2L, "The multi-locus FASTA did not contain one record per locus.")
 
+# Current-session TEF1 must still join when taxonomy was stored under the source read id
+# or final name instead of consensus_001. This is the FB83 / Current session miss.
+fb83_lsu <- make_project("LSU", isolate = "FB83", identification = "Pleurotus", level = "genus", genus = "Pleurotus", accession = "KX787096.1")
+fb83_tef <- make_project("TEF1", isolate = "FB83", identification = "Pleurotus eryngii", level = "species", genus = "Pleurotus", accession = "TEF_001")
+source_id <- names(fb83_tef$state$results)[1]
+fb83_tef_by_read <- fb83_tef
+fb83_tef_by_read$state$taxonomy_summary$original_name <- source_id
+fb83_tef_by_read$state$taxonomy_summary$final_name <- paste0("FB83_TEF1_F")
+joined_by_read <- stage4_extract_project_evidence(fb83_tef_by_read, "Current session")
+assert_true(identical(joined_by_read$Taxonomy_Status[1], "Analyzed"),
+            "TEF1 taxonomy keyed by source read id was not attached to the current-session locus card.")
+assert_true(identical(joined_by_read$Recommended_Identification[1], "Pleurotus eryngii"),
+            "TEF1 identification was not displayed after joining by source read id.")
+
+fb83_tef_by_name <- fb83_tef
+fb83_tef_by_name$state$taxonomy_summary$original_name <- "stale_consensus_999"
+fb83_tef_by_name$state$taxonomy_summary$final_name <- "FB83_TEF1_Forward"
+fb83_tef_by_name$state$taxonomy_summary$target <- "TEF1"
+joined_by_isolate <- stage4_extract_project_evidence(fb83_tef_by_name, "Current session")
+assert_true(identical(joined_by_isolate$Taxonomy_Status[1], "Analyzed"),
+            "TEF1 taxonomy keyed by isolate+locus was not attached to the current-session locus card.")
+
+fb83_profile <- stage4_build_profile(
+  list(fb83_tef_by_read, fb83_lsu),
+  c("Current session", "LSU-2.9.26.sangerproject"),
+  c("", "md5-lsu")
+)
+fb83_evidence <- stage4_isolate_evidence(fb83_profile, "FB83")
+assert_true(nrow(fb83_evidence) == 2L && all(c("TEF1", "LSU") %in% fb83_evidence$Locus),
+            "FB83 did not keep both current-session TEF1 and imported LSU evidence.")
+assert_true(identical(as.character(fb83_evidence$Taxonomy_Status[fb83_evidence$Locus == "TEF1"])[1], "Analyzed"),
+            "FB83 TEF1 from the current session was shown as not analyzed despite taxonomy evidence.")
+
+# BLAST-only TEF1 should still plot identity/coverage even before taxonomy is run.
+blast_only <- make_project("TEF1", isolate = "FB83")
+blast_only$state$blast_hits <- data.frame(
+  original_name = source_id, final_name = "FB83_TEF1", rid = "RIDBLAST1",
+  organism = "Pleurotus ostreatus", accession = "BLASTACC", rank = 1,
+  identity_percent = 99.1, query_coverage_percent = 98.4,
+  stringsAsFactors = FALSE
+)
+blast_ev <- stage4_extract_project_evidence(blast_only, "Current session")
+assert_true(identical(blast_ev$Taxonomy_Status[1], "Not analyzed"),
+            "BLAST-only TEF1 must not be marked as taxonomically analyzed.")
+assert_true(isTRUE(abs(blast_ev$Best_Match_Identity[1] - 99.1) < 0.01),
+            "BLAST-only TEF1 identity was not displayed on the locus card.")
+assert_true(identical(blast_ev$RID[1], "RIDBLAST1"),
+            "BLAST-only TEF1 RID was not displayed on the locus card.")
+
 legacy <- list(results = list(keep = TRUE), migration_log = "Stage 3 retained.")
 migrated <- stage4_migrate_v4_state(legacy)
 assert_true(isTRUE(migrated$results$keep), "Stage 4 migration changed existing project evidence.")

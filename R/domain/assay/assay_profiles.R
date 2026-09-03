@@ -145,6 +145,63 @@ assay_validate_profiles <- function(df) {
   NULL
 }
 
+# Shiny numericInput can emit NULL/NA/empty while the user is typing or while
+# updateNumericInput() is flushing. Those drafts are not real committed integers.
+assay_editor_integer_is_ready <- function(x) {
+  if (is.null(x) || !length(x)) return(FALSE)
+  value <- x[1]
+  if (is.null(value) || !length(value)) return(FALSE)
+  if (is.character(value)) {
+    value <- trimws(value)
+    if (!nzchar(value) || identical(toupper(value), "NA")) return(FALSE)
+  }
+  if (length(value) < 1L || is.na(value[1])) return(FALSE)
+  parsed <- suppressWarnings(as.integer(value[1]))
+  if (!length(parsed) || is.na(parsed[1])) return(FALSE)
+  TRUE
+}
+
+assay_editor_parse_integer <- function(x) {
+  as.integer(suppressWarnings(as.integer(x[1]))[1])
+}
+
+# Apply Assay editor fields only when numeric drafts are complete.
+# Incomplete values are skipped; invalid complete values are rejected without throwing.
+assay_try_apply_editor_inputs <- function(profiles, assay_id = "", editor = list()) {
+  original <- assay_coerce_profiles(profiles)
+  if (!nrow(original)) original <- assay_default_profiles()
+  assay_id <- assay_scalar_text(assay_id)
+  if (!nzchar(assay_id) || !assay_id %in% original$Assay_ID) assay_id <- original$Assay_ID[1]
+  idx <- match(assay_id, original$Assay_ID)
+  if (is.na(idx) || !length(idx)) {
+    return(list(committed = FALSE, reason = "missing_assay", profiles = original, error = NULL, assay_id = assay_id))
+  }
+  editor <- if (is.list(editor)) editor else list()
+  amplicon <- editor$expected_amplicon_len
+  max_pos <- editor$absolute_max_base_index
+  if (!assay_editor_integer_is_ready(amplicon) || !assay_editor_integer_is_ready(max_pos)) {
+    return(list(committed = FALSE, reason = "incomplete", profiles = original, error = NULL, assay_id = assay_id))
+  }
+  candidate <- original
+  locus_id <- pitax_normalize_locus_id(editor$target, "ITS")
+  if (!nzchar(locus_id)) locus_id <- "ITS"
+  candidate$Assay_Name[idx] <- assay_scalar_text(editor$assay_name, pitax_locus_display_name(locus_id, locus_id))
+  candidate$Locus_ID[idx] <- locus_id
+  candidate$Locus_Display_Name[idx] <- pitax_locus_display_name(locus_id, locus_id)
+  candidate$Forward_Primer_Name[idx] <- assay_scalar_text(editor$forward_primer)
+  candidate$Reverse_Primer_Name[idx] <- assay_scalar_text(editor$reverse_primer)
+  candidate$Forward_Primer_Sequence[idx] <- assay_clean_sequence(editor$forward_primer_seq)
+  candidate$Reverse_Primer_Sequence[idx] <- assay_clean_sequence(editor$reverse_primer_seq)
+  candidate$Expected_Amplicon_Length[idx] <- assay_editor_parse_integer(amplicon)
+  candidate$Maximum_Sequence_Position[idx] <- assay_editor_parse_integer(max_pos)
+  candidate <- assay_coerce_profiles(candidate)
+  validation_error <- assay_validate_profiles(candidate[idx, , drop = FALSE])
+  if (!is.null(validation_error)) {
+    return(list(committed = FALSE, reason = "invalid", profiles = original, error = validation_error, assay_id = assay_id))
+  }
+  list(committed = TRUE, reason = "ok", profiles = candidate, error = NULL, assay_id = assay_id)
+}
+
 assay_project_defaults_from_legacy_settings <- function(settings = NULL) {
   settings <- if (is.list(settings)) settings else list()
   defaults <- list(

@@ -84,17 +84,92 @@ stage4_taxon_parts <- function(taxonomy_row) {
   list(rank = rank, identification = identification, genus = genus, species = species)
 }
 
-stage4_project_taxonomy_row <- function(taxonomy_summary, consensus_id, final_name) {
-  if (!is.data.frame(taxonomy_summary) || !nrow(taxonomy_summary)) return(data.frame())
+stage4_match_key <- function(x) {
+  tolower(trimws(as.character(x)))
+}
+
+stage4_normalize_locus_key <- function(x) {
+  value <- toupper(trimws(stage4_scalar_text(x)))
+  if (exists("pitax_normalize_locus_id", mode = "function")) {
+    normalized <- pitax_normalize_locus_id(value, "")
+    if (nzchar(normalized)) return(normalized)
+  }
+  value
+}
+
+stage4_record_match_keys <- function(consensus_id, final_name, source_read_ids = character()) {
+  keys <- stage4_match_key(c(consensus_id, final_name, source_read_ids))
+  unique(keys[nzchar(keys) & keys != "na"])
+}
+
+stage4_row_index_by_keys <- function(df, keys, columns) {
+  if (!is.data.frame(df) || !nrow(df) || !length(keys) || !length(columns)) return(integer())
+  columns <- intersect(columns, names(df))
+  if (!length(columns)) return(integer())
   idx <- integer()
-  if ("original_name" %in% names(taxonomy_summary)) {
-    idx <- which(as.character(taxonomy_summary$original_name) == consensus_id)
+  for (column in columns) {
+    values <- stage4_match_key(df[[column]])
+    idx <- c(idx, which(values %in% keys))
   }
-  if (!length(idx) && "final_name" %in% names(taxonomy_summary)) {
-    idx <- which(as.character(taxonomy_summary$final_name) == final_name)
+  unique(idx)
+}
+
+stage4_row_index_by_isolate_locus <- function(df, isolate, locus) {
+  isolate_key <- stage4_match_key(isolate)
+  locus_key <- stage4_normalize_locus_key(locus)
+  if (!nzchar(isolate_key) || !nzchar(locus_key) || !is.data.frame(df) || !nrow(df)) return(integer())
+  prefix <- paste0(isolate_key, "_")
+  name_cols <- intersect(c("final_name", "original_name"), names(df))
+  if (!length(name_cols)) return(integer())
+  name_hit <- FALSE
+  for (column in name_cols) {
+    values <- stage4_match_key(df[[column]])
+    name_hit <- name_hit | startsWith(values, prefix) | values == isolate_key
   }
+  locus_hit <- rep(TRUE, nrow(df))
+  if ("target" %in% names(df)) {
+    locus_hit <- vapply(df$target, stage4_normalize_locus_key, character(1)) == locus_key
+  } else {
+    locus_token <- paste0("_", tolower(locus_key), "_")
+    name_locus <- FALSE
+    for (column in name_cols) {
+      padded <- paste0("_", stage4_match_key(df[[column]]), "_")
+      name_locus <- name_locus | grepl(locus_token, padded, fixed = TRUE)
+    }
+    locus_hit <- name_locus
+  }
+  which(name_hit & locus_hit)
+}
+
+# Taxonomy / BLAST rows may be keyed by consensus_id, final name, or the source
+# read id from an earlier step. Isolate+locus is the stable biological key.
+stage4_project_lookup_row <- function(df, consensus_id, final_name, source_read_ids = character(),
+                                      isolate = "", locus = "") {
+  if (!is.data.frame(df) || !nrow(df)) return(data.frame())
+  keys <- stage4_record_match_keys(consensus_id, final_name, source_read_ids)
+  idx <- stage4_row_index_by_keys(df, keys, c("original_name", "final_name", "sample_id"))
+  if (!length(idx)) idx <- stage4_row_index_by_isolate_locus(df, isolate, locus)
   if (!length(idx)) return(data.frame())
-  taxonomy_summary[idx[length(idx)], , drop = FALSE]
+  df[idx[length(idx)], , drop = FALSE]
+}
+
+stage4_project_taxonomy_row <- function(taxonomy_summary, consensus_id, final_name,
+                                        source_read_ids = character(), isolate = "", locus = "") {
+  stage4_project_lookup_row(
+    taxonomy_summary, consensus_id, final_name, source_read_ids, isolate, locus
+  )
+}
+
+stage4_project_blast_row <- function(blast_hits, consensus_id, final_name,
+                                     source_read_ids = character(), isolate = "", locus = "") {
+  hits <- stage4_project_lookup_row(
+    blast_hits, consensus_id, final_name, source_read_ids, isolate, locus
+  )
+  if (!nrow(hits)) return(data.frame())
+  if ("rank" %in% names(hits)) {
+    hits <- hits[order(suppressWarnings(as.numeric(hits$rank)), na.last = TRUE), , drop = FALSE]
+  }
+  hits[1, , drop = FALSE]
 }
 
 stage4_validate_project <- function(project, source_name = "project") {
@@ -126,6 +201,7 @@ stage4_extract_project_evidence <- function(project, source_name, source_md5 = "
   st <- project$state
   records <- st$consensus_set$records
   taxonomy_summary <- if (is.data.frame(st$taxonomy_summary)) st$taxonomy_summary else data.frame()
+  blast_hits <- if (is.data.frame(st$blast_hits)) st$blast_hits else data.frame()
   rows <- vector("list", length(records))
   ids <- names(records)
 
@@ -133,9 +209,22 @@ stage4_extract_project_evidence <- function(project, source_name, source_md5 = "
     record <- stage3_ensure_record_curation(records[[i]])
     consensus_id <- stage4_scalar_text(record$consensus_id, ids[i])
     final_name <- stage4_scalar_text(record$final_name, consensus_id)
-    tax <- stage4_project_taxonomy_row(taxonomy_summary, consensus_id, final_name)
+    isolate <- stage4_scalar_text(record$isolate)
+    locus <- stage4_scalar_text(record$locus)
+    source_read_ids <- unique(c(as.character(record$source_read_ids), stage4_scalar_text(ids[i])))
+    source_read_ids <- source_read_ids[nzchar(source_read_ids)]
+    tax <- stage4_project_taxonomy_row(
+      taxonomy_summary, consensus_id, final_name, source_read_ids, isolate, locus
+    )
+    blast <- if (!nrow(tax)) stage4_project_blast_row(
+      blast_hits, consensus_id, final_name, source_read_ids, isolate, locus
+    ) else data.frame()
     parts <- stage4_taxon_parts(tax)
     seq_text <- stage4_scalar_text(record$sequence)
+    identity <- stage4_df_number(tax, "best_match_identity_percent")
+    if (is.na(identity)) identity <- stage4_df_number(blast, "identity_percent")
+    coverage <- stage4_df_number(tax, "best_match_query_coverage_percent")
+    if (is.na(coverage)) coverage <- stage4_df_number(blast, "query_coverage_percent")
     rows[[i]] <- data.frame(
       Source = source_name,
       Source_MD5 = source_md5,
@@ -144,8 +233,8 @@ stage4_extract_project_evidence <- function(project, source_name, source_md5 = "
       Project_Schema = suppressWarnings(as.integer(project$schema_version)),
       Consensus_ID = consensus_id,
       Final_Name = final_name,
-      Isolate = stage4_scalar_text(record$isolate),
-      Locus = stage4_scalar_text(record$locus),
+      Isolate = isolate,
+      Locus = locus,
       Analysis_Status = stage4_scalar_text(record$status),
       Sequence_Length = nchar(seq_text),
       Consensus_Revision = if (is.list(record$curation)) suppressWarnings(as.integer(record$curation$revision)) else 0L,
@@ -156,13 +245,13 @@ stage4_extract_project_evidence <- function(project, source_name, source_md5 = "
       Confidence = stage4_df_value(tax, "confidence"),
       Supported_Genus = parts$genus,
       Supported_Species = parts$species,
-      Best_Molecular_Match = stage4_df_value(tax, "best_molecular_match"),
-      Best_Match_Accession = stage4_df_value(tax, "best_match_accession"),
-      Best_Match_Identity = stage4_df_number(tax, "best_match_identity_percent"),
-      Best_Match_Coverage = stage4_df_number(tax, "best_match_query_coverage_percent"),
+      Best_Molecular_Match = stage4_df_value(tax, "best_molecular_match", stage4_df_value(blast, "organism")),
+      Best_Match_Accession = stage4_df_value(tax, "best_match_accession", stage4_df_value(blast, "accession")),
+      Best_Match_Identity = identity,
+      Best_Match_Coverage = coverage,
       Reference_Support = stage4_df_value(tax, "reference_support"),
       Locus_Discrimination = stage4_df_value(tax, "locus_discrimination"),
-      RID = stage4_df_value(tax, "rid"),
+      RID = stage4_df_value(tax, "rid", stage4_df_value(blast, "rid")),
       Taxonomy_Analyzed_At = stage4_df_value(tax, "analyzed_at"),
       stringsAsFactors = FALSE
     )

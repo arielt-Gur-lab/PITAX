@@ -75,4 +75,75 @@ unknown_error <- tryCatch(assay_migrate_schema5_state(unknown_state), error = fu
 assert_true(is.character(unknown_error) && grepl("controlled PITAX locus vocabulary", unknown_error, fixed = TRUE),
             "Schema-5 migration must reject unknown loci instead of remapping to ITS.")
 
+editor_from_profile <- function(row, amplicon = row$Expected_Amplicon_Length[1], max_pos = row$Maximum_Sequence_Position[1]) {
+  list(
+    assay_name = row$Assay_Name[1],
+    target = row$Locus_ID[1],
+    forward_primer = row$Forward_Primer_Name[1],
+    reverse_primer = row$Reverse_Primer_Name[1],
+    forward_primer_seq = row$Forward_Primer_Sequence[1],
+    reverse_primer_seq = row$Reverse_Primer_Sequence[1],
+    expected_amplicon_len = amplicon,
+    absolute_max_base_index = max_pos
+  )
+}
+
+simulate_commit_active_assay <- function(profiles, assay_id, editor, direction = "Forward") {
+  result <- assay_try_apply_editor_inputs(profiles, assay_id, editor)
+  if (!isTRUE(result$committed)) return(result)
+  idx <- match(result$assay_id, result$profiles$Assay_ID)
+  result$settings <- assay_resolve_read_settings(result$profiles[idx, , drop = FALSE], NULL, direction)
+  result
+}
+
+amplicon_change <- tryCatch(
+  simulate_commit_active_assay(its, "assay-its", editor_from_profile(its, amplicon = 720L, max_pos = 680L)),
+  error = function(e) e
+)
+assert_true(!inherits(amplicon_change, "error"), "Changing amplicon length must not crash assay commit/resolve.")
+assert_true(isTRUE(amplicon_change$committed), "A complete amplicon-length edit was not committed.")
+assert_true(identical(amplicon_change$profiles$Expected_Amplicon_Length[1], 720L), "Committed amplicon length was not stored.")
+assert_true(identical(amplicon_change$settings$expected_amplicon_len, 720L), "Resolved settings did not pick up the new amplicon length.")
+
+for (draft_max in list(NULL, NA_real_, NA_integer_, "", "  ", numeric(0))) {
+  skipped <- tryCatch(
+    simulate_commit_active_assay(its, "assay-its", editor_from_profile(its, amplicon = 720L, max_pos = draft_max)),
+    error = function(e) e
+  )
+  assert_true(!inherits(skipped, "error"), "Transient missing max position must not throw.")
+  assert_true(identical(skipped$committed, FALSE), "Transient missing max position must not commit.")
+  assert_true(identical(skipped$reason, "incomplete"), "Transient missing max position must be treated as an incomplete draft.")
+  assert_true(identical(skipped$profiles$Expected_Amplicon_Length[1], 650L), "Incomplete drafts must leave the stored amplicon length unchanged.")
+  assert_true(identical(skipped$profiles$Maximum_Sequence_Position[1], 680L), "Incomplete drafts must leave the stored max position unchanged.")
+}
+
+rejected_49 <- tryCatch(
+  simulate_commit_active_assay(its, "assay-its", editor_from_profile(its, amplicon = 650L, max_pos = 49L)),
+  error = function(e) e
+)
+assert_true(!inherits(rejected_49, "error"), "A real max position below 50 must be rejected without crashing Shiny commit.")
+assert_true(identical(rejected_49$committed, FALSE) && identical(rejected_49$reason, "invalid"), "A max position of 49 must not be committed.")
+assert_true(is.character(rejected_49$error) && grepl("at least 50 bp", rejected_49$error, fixed = TRUE), "A max position of 49 must keep the strict validation message.")
+assert_true(identical(rejected_49$profiles$Maximum_Sequence_Position[1], 680L), "Rejected max position 49 must not overwrite the stored profile.")
+direct_49 <- its
+direct_49$Maximum_Sequence_Position[1] <- 49L
+resolve_49 <- tryCatch(assay_resolve_read_settings(direct_49, NULL, "Forward"), error = function(e) conditionMessage(e))
+assert_true(is.character(resolve_49) && grepl("at least 50 bp", resolve_49, fixed = TRUE),
+            "assay_resolve_read_settings must still reject a real committed max position below 50.")
+
+accepted_50 <- tryCatch(
+  simulate_commit_active_assay(its, "assay-its", editor_from_profile(its, amplicon = 650L, max_pos = 50L)),
+  error = function(e) e
+)
+assert_true(!inherits(accepted_50, "error"), "A max position of 50 must not crash assay commit/resolve.")
+assert_true(isTRUE(accepted_50$committed), "A max position of 50 must be accepted.")
+assert_true(identical(accepted_50$profiles$Maximum_Sequence_Position[1], 50L), "Committed max position 50 was not stored.")
+assert_true(identical(accepted_50$settings$absolute_max_base_index, 50L), "Resolved settings did not pick up max position 50.")
+
+upload_text <- paste(readLines(file.path("R", "server", "stages", "20_upload.R"), warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+assert_true(grepl("assay_try_apply_editor_inputs(", upload_text, fixed = TRUE),
+            "commit_active_assay_from_inputs must apply editor inputs through assay_try_apply_editor_inputs.")
+assert_true(!grepl("Maximum_Sequence_Position[idx] <- 680L", upload_text, fixed = TRUE),
+            "Assay commit must not silently replace incomplete max position drafts with 680.")
+
 cat("Assay/schema-6 foundation tests passed.\n")

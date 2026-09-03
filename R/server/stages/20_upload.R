@@ -134,28 +134,24 @@
   commit_active_assay_from_inputs <- function() {
     profiles <- assay_coerce_profiles(rv$assay_profiles)
     if (!nrow(profiles)) profiles <- assay_default_profiles()
-    assay_id <- selected_assay_id()
-    if (!nzchar(assay_id) || !assay_id %in% profiles$Assay_ID) assay_id <- profiles$Assay_ID[1]
-    idx <- match(assay_id, profiles$Assay_ID)
+    result <- assay_try_apply_editor_inputs(profiles, selected_assay_id(), list(
+      assay_name = input$assay_name,
+      target = input$target,
+      forward_primer = input$forward_primer,
+      reverse_primer = input$reverse_primer,
+      forward_primer_seq = input$forward_primer_seq,
+      reverse_primer_seq = input$reverse_primer_seq,
+      expected_amplicon_len = input$expected_amplicon_len,
+      absolute_max_base_index = input$absolute_max_base_index
+    ))
+    if (!isTRUE(result$committed)) return(invisible(NULL))
+    idx <- match(result$assay_id, result$profiles$Assay_ID)
     if (is.na(idx) || !length(idx)) return(invisible(NULL))
-    locus_id <- pitax_normalize_locus_id(input$target, "ITS")
-    if (!nzchar(locus_id)) locus_id <- "ITS"
-    profiles$Assay_Name[idx] <- assay_scalar_text(input$assay_name, pitax_locus_display_name(locus_id, locus_id))
-    profiles$Locus_ID[idx] <- locus_id
-    profiles$Locus_Display_Name[idx] <- pitax_locus_display_name(locus_id, locus_id)
-    profiles$Forward_Primer_Name[idx] <- assay_scalar_text(input$forward_primer)
-    profiles$Reverse_Primer_Name[idx] <- assay_scalar_text(input$reverse_primer)
-    profiles$Forward_Primer_Sequence[idx] <- assay_clean_sequence(input$forward_primer_seq)
-    profiles$Reverse_Primer_Sequence[idx] <- assay_clean_sequence(input$reverse_primer_seq)
-    profiles$Expected_Amplicon_Length[idx] <- suppressWarnings(as.integer(input$expected_amplicon_len))[1]
-    profiles$Maximum_Sequence_Position[idx] <- suppressWarnings(as.integer(input$absolute_max_base_index))[1]
-    if (is.na(profiles$Expected_Amplicon_Length[idx])) profiles$Expected_Amplicon_Length[idx] <- 650L
-    if (is.na(profiles$Maximum_Sequence_Position[idx])) profiles$Maximum_Sequence_Position[idx] <- 680L
-    rv$assay_profiles <- assay_coerce_profiles(profiles)
+    rv$assay_profiles <- result$profiles
     rv$project_defaults <- assay_project_defaults_from_legacy_settings(current_settings_from_inputs())
-    rv$settings <- assay_resolve_read_settings(rv$assay_profiles[idx, , drop = FALSE], rv$project_defaults, input$sequencing_primer)
-    selected_assay_id(assay_id)
-    invisible(assay_id)
+    rv$settings <- assay_resolve_read_settings(result$profiles[idx, , drop = FALSE], rv$project_defaults, input$sequencing_primer)
+    selected_assay_id(result$assay_id)
+    invisible(result$assay_id)
   }
 
   observe({
