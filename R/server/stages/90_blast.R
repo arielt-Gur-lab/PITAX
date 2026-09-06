@@ -1033,4 +1033,3 @@
     filename=function() "NCBI_BLAST_all_hits.csv",
     content=function(file) write.csv(rv$blast_hits, file, row.names=FALSE, fileEncoding="UTF-8")
   )
-

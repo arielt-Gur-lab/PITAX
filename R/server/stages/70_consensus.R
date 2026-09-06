@@ -25,11 +25,13 @@
       if (notify) showNotification("No processed reads are available.", type = "error")
       return(FALSE)
     }
+
     locus_error <- stage3_run_locus_error(rv$read_assignments)
     if (!is.null(locus_error)) {
       if (notify) showNotification(locus_error, type = "error", duration = 10)
       return(FALSE)
     }
+
     built <- tryCatch(
       stage3_build_consensus_set(
         rv$read_assignments, rv$results,
@@ -41,35 +43,75 @@
       ),
       error = function(e) structure(list(error = conditionMessage(e)), class = "consensus_build_error")
     )
+
     if (inherits(built, "consensus_build_error")) {
       if (notify) showNotification(paste("Consensus build failed:", built$error), type = "error", duration = 12)
       return(FALSE)
     }
+
     old_records <- tryCatch(stage3_analysis_records(rv$consensus_set), error = function(e) list())
     new_records <- stage3_analysis_records(built)
-    old_signature <- if (length(old_records)) vapply(old_records, function(x) paste0(x$final_name, "\r", x$seq), character(1)) else character()
-    new_signature <- if (length(new_records)) vapply(new_records, function(x) paste0(x$final_name, "\r", x$seq), character(1)) else character()
-    if (!identical(old_signature, new_signature) && (nrow(rv$blast_jobs) || nrow(rv$blast_hits) || nrow(rv$taxonomy_summary))) {
-      if (nrow(rv$blast_jobs)) {
-        rv$blast_jobs$status <- "STALE"
-        if ("auto_poll_enabled" %in% names(rv$blast_jobs)) {
-          rv$blast_jobs$auto_poll_enabled <- FALSE
-          rv$blast_jobs$next_poll_at <- ""
-          rv$blast_jobs$manual_retrieval_required <- FALSE
-        }
-      }
-      rv$blast_raw <- list(); rv$blast_hits <- data.frame(); rv$blast_ids <- data.frame()
-      rv$taxonomy_summary <- data.frame(); rv$taxonomy_hits <- data.frame(); rv$taxonomy_counts <- data.frame()
-      rv$blast_batch_status_text <- "Stage 3 analysis sequences changed; previous BLAST evidence is stale and must be rerun."
-      rv$taxonomy_status_text <- "Stage 3 analysis sequences changed; previous taxonomic interpretation was removed. Re-run BLAST, then Taxonomy."
+
+    record_signature <- function(x) {
+      paste0(stage3_scalar_text(x$final_name), "\r", stage3_scalar_text(x$seq))
     }
+
+    old_signature <- if (length(old_records)) {
+      setNames(vapply(old_records, record_signature, character(1)), names(old_records))
+    } else {
+      character()
+    }
+
+    new_signature <- if (length(new_records)) {
+      setNames(vapply(new_records, record_signature, character(1)), names(new_records))
+    } else {
+      character()
+    }
+
+    all_ids <- union(names(old_signature), names(new_signature))
+    changed_ids <- all_ids[
+      vapply(
+        all_ids,
+        function(id) {
+          old_value <- if (id %in% names(old_signature)) old_signature[[id]] else NA_character_
+          new_value <- if (id %in% names(new_signature)) new_signature[[id]] else NA_character_
+          !identical(old_value, new_value)
+        },
+        logical(1)
+      )
+    ]
+
+    # Invalidate only analysis sequences that actually changed.
+    # A rebuild must never make unrelated BLAST jobs stale.
+    if (length(changed_ids)) {
+      for (id in changed_ids) {
+        invalidate_downstream_for_sample(
+          id,
+          "Stage 3 analysis sequence changed during rebuild"
+        )
+      }
+
+      rv$blast_batch_status_text <- paste0(
+        "Stage 3 rebuild changed ",
+        length(changed_ids),
+        " analysis sequence(s). Only their previous BLAST evidence was marked stale."
+      )
+    }
+
     rv$consensus_set <- built
     sync_consensus_choices()
-    rv$project_status_text <- paste0("Unsaved Stage 3 build: ", nrow(built$summary), " analysis sequence(s).")
+
+    rv$project_status_text <- paste0(
+      "Unsaved Stage 3 build: ",
+      nrow(built$summary),
+      " analysis sequence(s)."
+    )
+
     gate_error <- stage3_consensus_gate_error(rv$consensus_set, rv$results)
     if (notify && !is.null(gate_error)) {
       showNotification(gate_error, type = "warning", duration = 10)
     }
+
     is.null(gate_error)
   }
 

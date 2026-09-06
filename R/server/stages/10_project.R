@@ -145,29 +145,80 @@
     old_result <- rv$results[[sample_name]]
     old_seq <- if (!is.null(old_result$seq)) as.character(old_result$seq) else ""
     new_seq <- if (!is.null(new_result$seq)) as.character(new_result$seq) else ""
+
     rv$results[[sample_name]] <- new_result
     sync_summary_from_results()
+
     if (identical(input$inspect_sample, sample_name)) {
       updateTextAreaInput(session, "trimmed_sequence_preview", value = new_seq)
     }
-    if (!identical(old_seq, new_seq)) {
-      old_revision <- if (is.list(old_result$curation)) suppressWarnings(as.integer(old_result$curation$revision[1])) else NA_integer_
-      new_revision <- if (is.list(new_result$curation)) suppressWarnings(as.integer(new_result$curation$revision[1])) else NA_integer_
-      revision_note <- if (is.finite(old_revision) && is.finite(new_revision)) paste0(label, "; revision ", old_revision, " -> ", new_revision) else label
-      # Clearing the whole consensus set must stale BLAST/taxonomy for every prior
-      # analysis ID, not only the edited read's isolate. Partial invalidation left
-      # READY jobs on other isolates while Stage 3 was empty.
-      prior_consensus_ids <- if (is.list(rv$consensus_set) && length(rv$consensus_set$records)) {
-        names(rv$consensus_set$records)
+
+    sequence_changed <- !identical(old_seq, new_seq)
+
+    if (sequence_changed) {
+      old_revision <- if (is.list(old_result$curation)) {
+        suppressWarnings(as.integer(old_result$curation$revision[1]))
       } else {
-        character()
+        NA_integer_
       }
-      rv$consensus_set <- stage3_empty_consensus_set()
-      for (consensus_id in prior_consensus_ids) invalidate_downstream_for_sample(consensus_id, revision_note)
+
+      new_revision <- if (is.list(new_result$curation)) {
+        suppressWarnings(as.integer(new_result$curation$revision[1]))
+      } else {
+        NA_integer_
+      }
+
+      revision_note <- if (
+        length(old_revision) &&
+        length(new_revision) &&
+        is.finite(old_revision[1]) &&
+        is.finite(new_revision[1])
+      ) {
+        paste0(label, "; revision ", old_revision[1], " -> ", new_revision[1])
+      } else {
+        label
+      }
+
+      # Preserve the previous Stage 3 set long enough to compare old vs new.
+      # Rebuild from the newly curated source read; build_analysis_sequences()
+      # performs per-analysis-sequence comparison and invalidates only records
+      # whose emitted analysis sequence actually changed.
+      rebuild_ok <- tryCatch(
+        isTRUE(build_analysis_sequences(notify = FALSE)),
+        error = function(e) {
+          rv$project_status_text <- paste0(
+            "Sequence changed, but analysis sequence rebuild failed: ",
+            conditionMessage(e)
+          )
+          FALSE
+        }
+      )
+
+      # Backward compatibility: some legacy projects may have BLAST rows keyed
+      # directly to the source read instead of a Stage 3 consensus ID.
       invalidate_downstream_for_sample(sample_name, revision_note)
+
+      if (!isTRUE(rebuild_ok)) {
+        showNotification(
+          paste0(
+            "Sequence was updated, but PITAX could not rebuild the analysis ",
+            "sequence automatically. Use Build / rebuild before BLAST."
+          ),
+          type = "warning",
+          duration = 10
+        )
+      }
     }
-    rv$project_status_text <- paste0("Unsaved curation change: ", sample_name, " | ", label, ".")
-    invisible(!identical(old_seq, new_seq))
+
+    rv$project_status_text <- paste0(
+      "Unsaved curation change: ",
+      sample_name,
+      " | ",
+      label,
+      "."
+    )
+
+    invisible(sequence_changed)
   }
 
   restore_settings_inputs <- function(settings) {
@@ -274,7 +325,6 @@
     rv$multilocus_imports <- list()
     rv$project_migration_log <- stage2_scalar_text(st$migration_log)
     rv$blast_jobs <- ensure_blast_jobs_schema(if (is.data.frame(st$blast_jobs)) st$blast_jobs else NULL)
-    # Safe reload: do not resume aggressive automatic NCBI polling for pending RIDs.
     if (nrow(rv$blast_jobs)) {
       pending <- rv$blast_jobs$status %in% c("SUBMITTED", "WAITING")
       if (any(pending)) {
@@ -481,14 +531,10 @@
     )
   })
 
-  # Open ?share=TOKEN into a fresh independent session (immutable snapshot copy).
-  # Must run inside a reactive consumer (observe), not session$onFlushed:
-  # apply_loaded_project_object reads/writes rv$* and would abort outside a consumer.
   share_query_handled <- FALSE
   observe({
     search <- session$clientData$url_search
     if (isTRUE(share_query_handled)) return()
-    # NULL means clientData not ready yet; "" means ready with no query.
     if (is.null(search)) return()
     share_query_handled <<- TRUE
 
@@ -515,7 +561,6 @@
       session$sendCustomMessage("hideLoader", list())
       return()
     }
-    # Prefer the share banner; keep project status short.
     rv$project_status_text <- "Shared project session (independent copy)."
     rv$share_banner_text <- paste0(
       "Shared project loaded\n",
