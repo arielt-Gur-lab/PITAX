@@ -194,7 +194,7 @@ ui <- fluidPage(
         ),
         div(class = "panel-box checkpoint checkpoint-modern",
           div(class = "checkpoint-copy", card_title("Checkpoint A | Renamed and assigned reads", "Save resolved read names and biological identity before trimming.", "save")),
-          downloadButton("download_rename_checkpoint", "Download checkpoint ZIP")
+          actionButton("export_preset_assign_checkpoint", "Open Export (Assign checkpoint)", icon = icon("download"), class = "btn-default")
         ),
               ),
       # --------------------------------------------------------
@@ -242,8 +242,8 @@ ui <- fluidPage(
             div(class = "subsection-title", "Run-level audit"),
             DTOutput("ab1_evidence_run_table"),
             div(class = "blast-action-row",
-              downloadButton("download_ab1_evidence_run", "Download run audit CSV", class = "btn-default"),
-              downloadButton("download_ab1_evidence_detail", "Download selected-base audit CSV", class = "btn-default")
+              actionButton("export_preset_qc_ab1_run", "Export run audit", class = "btn-default", icon = icon("download")),
+              actionButton("export_preset_qc_ab1_detail", "Export selected-base audit", class = "btn-default", icon = icon("download"))
             ),
             div(class = "subsection-divider"),
             div(class = "subsection-title", "Selected sample | per-base evidence"),
@@ -294,7 +294,7 @@ ui <- fluidPage(
           div(class = "checkpoint-copy",
             card_title("Checkpoint B | Renamed and curated sequences", "Save the resolved naming and QC/curation state before export.", "save")
           ),
-          downloadButton("download_trim_checkpoint", "Download checkpoint ZIP")
+          actionButton("export_preset_qc_checkpoint", "Open Export (QC checkpoint)", icon = icon("download"), class = "btn-default")
         ),
               ),
       # --------------------------------------------------------
@@ -318,8 +318,8 @@ ui <- fluidPage(
             card_title("Consensus gate", "Single reads remain valid representatives. Paired reads must have a reliable overlap and no unresolved review positions before downstream analysis.", "check-circle"),
             uiOutput("consensus_gate_status"),
             div(class = "button-row",
-              downloadButton("download_consensus_fasta", "Analysis FASTA"),
-              downloadButton("download_consensus_checkpoint", "Consensus checkpoint ZIP")
+              actionButton("export_preset_consensus_fasta", "Export analysis FASTA", icon = icon("download")),
+              actionButton("export_preset_consensus", "Export consensus checkpoint", icon = icon("download"))
             )
           )
         ),
@@ -381,10 +381,24 @@ ui <- fluidPage(
           uiOutput("export_summary")
         ),
         div(class = "export-tile-grid",
-          div(class = "export-tile", div(class = "export-tile-icon", icon("search")), h4("BLAST FASTA"), p("Processed sequences ready for sequence search."), downloadButton("download_blast_fasta", "Download FASTA")),
-          div(class = "export-tile", div(class = "export-tile-icon", icon("file-text")), h4("FASTA + metadata"), p("Processed sequences with run metadata in FASTA headers."), downloadButton("download_full_fasta", "Download FASTA")),
-          div(class = "export-tile", div(class = "export-tile-icon", icon("table")), h4("Summary CSV"), p("Compact processing and QC summary for downstream review."), downloadButton("download_summary_csv", "Download CSV")),
-          div(class = "export-tile export-tile-primary", div(class = "export-tile-icon", icon("archive")), h4("Complete results package"), p("Sequences, QC evidence, settings and curation records in one ZIP."), downloadButton("download_all_zip", "Download results ZIP"))
+          div(class = "export-tile export-tile-primary",
+            div(class = "export-tile-icon", icon("archive")),
+            h4("Shared Export package"),
+            p("Choose tables, sequences, plots and evidence from any completed stage. Every package includes RUN_INFO.txt."),
+            actionButton("export_preset_export_package", "Open Export builder", icon = icon("download"), class = "btn-primary")
+          ),
+          div(class = "export-tile",
+            div(class = "export-tile-icon", icon("search")),
+            h4("Analysis FASTA"),
+            p("Analysis-oriented sequences for BLAST or archival use."),
+            actionButton("export_preset_analysis_fasta_tile", "Open sequence export", icon = icon("download"))
+          ),
+          div(class = "export-tile",
+            div(class = "export-tile-icon", icon("table")),
+            h4("Stage data"),
+            p("Open the shared dialog scoped to the current project state."),
+            actionButton("open_export_from_stage", "Open shared Export", icon = icon("download"))
+          )
         ),
               ),
       # --------------------------------------------------------
@@ -405,7 +419,7 @@ ui <- fluidPage(
               div(class = "button-row",
                 actionButton("copy_blast_sequence", "Copy sequence", icon = icon("copy")),
                 actionButton("open_ncbi_blast", "Open NCBI BLAST", icon = icon("external-link")),
-                downloadButton("download_selected_blast", "Selected FASTA")
+                actionButton("export_preset_blast_selected", "Export selected FASTA", icon = icon("download"))
               )
             ),
             div(class = "sequence-code-panel",
@@ -441,8 +455,7 @@ ui <- fluidPage(
         div(class = "panel-box checkpoint checkpoint-modern",
           div(class = "checkpoint-copy", card_title("Checkpoint D | BLAST workspace", "Export BLAST job metadata and accession-level hits.", "save")),
           div(class = "button-row",
-            downloadButton("download_blast_jobs", "Job/results CSV"),
-            downloadButton("download_blast_hits", "All BLAST hits CSV")
+            actionButton("export_preset_blast_jobs", "Export BLAST jobs and hits", icon = icon("download"))
           )
         ),
               ),
@@ -493,16 +506,13 @@ ui <- fluidPage(
           card_title("Team identification summary", "One row per processed sequence, combining QC, BLAST and final taxonomic interpretation.", "users"),
           DTOutput("team_summary_table"),
           div(class = "button-row export-inline-actions",
-            downloadButton("download_team_summary_csv", "Team summary CSV"),
-            downloadButton("download_team_summary_xlsx", "Team summary Excel")
+            actionButton("export_preset_taxonomy", "Open Export (Taxonomy)", icon = icon("download"), class = "btn-default")
           )
         ),
         div(class = "panel-box checkpoint checkpoint-modern",
           div(class = "checkpoint-copy", card_title("Checkpoint E | Taxonomic interpretation", "Save the final taxonomic evidence and interpretation package.", "save")),
           div(class = "button-row",
-            downloadButton("download_taxonomy_summary", "Summary CSV"),
-            downloadButton("download_taxonomy_hits", "Enriched hits CSV"),
-            downloadButton("download_taxonomy_checkpoint", "Checkpoint ZIP")
+            actionButton("export_preset_taxonomy_checkpoint", "Open Export (Taxonomy checkpoint)", icon = icon("download"))
           )
         ),
               ),
@@ -559,10 +569,7 @@ ui <- fluidPage(
         div(class = "panel-box checkpoint checkpoint-modern",
           div(class = "checkpoint-copy", card_title("Checkpoint F | Multi-locus profile", "Export the isolate profile, every locus-specific evidence row and all included sequences.", "save")),
           div(class = "button-row",
-            downloadButton("download_multilocus_profiles", "Profiles CSV"),
-            downloadButton("download_multilocus_evidence", "Per-locus evidence CSV"),
-            downloadButton("download_multilocus_fasta", "Multi-locus FASTA"),
-            downloadButton("download_multilocus_checkpoint", "Checkpoint ZIP")
+            actionButton("export_preset_multilocus", "Open Export (Multi-locus)", icon = icon("download"))
           )
         ),
               ),

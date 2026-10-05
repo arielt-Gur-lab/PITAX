@@ -1,4 +1,4 @@
-PITAX v3.3.0 - N-locus INTEGRATE, Share Project, multi-assay / multi-locus
+PITAX v3.4.0 - Shared Export package builder
 =========================================================
 
 Purpose
@@ -7,10 +7,11 @@ Stage 3 is accepted for continued development using the controlled clean and
 single-conflict AB1 fixtures. A real independently sequenced Forward/Reverse
 pair remains a deferred biological validation item.
 
-Alpha 10.3 retains the visual review and multi-locus layers, adds the schema-6
-assay foundation, and makes runtime source encoding independent of the Windows
-or Connect locale. Raw non-ASCII UI symbols are represented by Unicode escapes
-and protected by a source contract.
+Alpha 10.4 keeps the visual review and multi-locus layers and replaces the
+scattered result-download handlers with one shared Export dialog. Packages are
+built from an explicit component catalog, a frozen project snapshot and a
+RUN_INFO.txt manifest. Save project and the blank assignment-key template remain
+separate from result export.
 
 The authoritative guide for continuing development is:
 
@@ -60,9 +61,9 @@ Run `run_tests.bat` on Windows with R installed.
 
 Expected final line:
 
-  All PITAX v3.3.0 tests passed.
+  All PITAX v3.4.0 tests passed.
 
-The suite now has 16 groups. Alpha 10 covers controlled loci, multi-assay profiles,
+The suite now has 20 groups. Alpha 10 covers controlled loci, multi-assay profiles,
 schema-5 migration, gated Steps UI navigation and same-project multi-locus integration.
 Stage 4 tests prove duplicate Isolate/Locus blocking, provenance retention, missing-evidence
 reporting, correct separation of multiple isolates in the visual selector and that a 2:1
@@ -71,6 +72,8 @@ DataTables header/body alignment throughout the application. Group 14 protects
 the organized file/module boundaries and rejects raw non-ASCII runtime source.
 Group 16 covers reflection follow-up correctness (invalidation breadth, Assay_ID
 signature, READY-only taxonomy RID binding and BLAST revision checks).
+Group 20 covers the shared export engine (catalog availability, package planning,
+sequence roles, BLAST partial states and RUN_INFO.txt contents).
 
 Release update workflow
 -----------------------

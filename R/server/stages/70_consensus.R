@@ -358,19 +358,5 @@
     datatable(evidence, rownames = FALSE, filter = "top", options = list(pageLength = 25, scrollX = TRUE, autoWidth = TRUE))
   })
 
-  output$download_consensus_fasta <- downloadHandler(
-    filename = function() paste0(project_export_stem(), "_isolate_level.fasta"),
-    content = function(file) {
-      req(is.null(stage3_consensus_gate_error(rv$consensus_set, rv$results)))
-      writeLines(make_fasta(stage3_analysis_records(rv$consensus_set), FALSE), file)
-    }
-  )
-
-  output$download_consensus_checkpoint <- downloadHandler(
-    filename = function() paste0(project_export_stem(), "_checkpoint_C_consensus.zip"),
-    content = function(file) {
-      req(is.list(rv$consensus_set), length(rv$consensus_set$records))
-      write_consensus_checkpoint_zip(file, rv$consensus_set, rv$read_assignments, rv$settings)
-    }
-  )
+  # Consensus exports now open the shared Export dialog (see 80_export.R).
 

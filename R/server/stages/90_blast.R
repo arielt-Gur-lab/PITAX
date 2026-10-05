@@ -62,13 +62,7 @@
   observeEvent(input$open_ncbi_blast,
                session$sendCustomMessage("openUrl", list(url="https://blast.ncbi.nlm.nih.gov/Blast.cgi?PAGE_TYPE=BlastSearch&PROGRAM=blastn")))
 
-  output$download_selected_blast <- downloadHandler(
-    filename=function() paste0(clean_fasta_name(blast_selected()$final_name), ".fasta"),
-    content=function(file) writeLines(
-      paste0(">", clean_fasta_name(blast_selected()$final_name), "\n", wrap_sequence(blast_selected()$seq, 80)),
-      file
-    )
-  )
+  # Selected BLAST sequence export is routed through the shared Export dialog.
 
   # NCBI BLAST is a shared service. Keep automated BLAST contacts at least
   # 10 seconds apart. Per-RID timing uses RTOE floor + auto next_poll_at
@@ -1020,16 +1014,4 @@
     substr(txt, 1, min(5000, nchar(txt)))
   })
 
-  output$download_blast_jobs <- downloadHandler(
-    filename=function() "NCBI_BLAST_jobs_and_identifications.csv",
-    content=function(file) {
-      jobs <- rv$blast_jobs
-      if (nrow(rv$blast_ids)) jobs <- merge(jobs, rv$blast_ids, by=c("final_name","original_name","rid"), all.x=TRUE)
-      write.csv(jobs, file, row.names=FALSE, fileEncoding="UTF-8")
-    }
-  )
-
-  output$download_blast_hits <- downloadHandler(
-    filename=function() "NCBI_BLAST_all_hits.csv",
-    content=function(file) write.csv(rv$blast_hits, file, row.names=FALSE, fileEncoding="UTF-8")
-  )
+  # BLAST job/hit exports are routed through the shared Export dialog.

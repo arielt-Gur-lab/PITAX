@@ -119,6 +119,11 @@ echo [19/19] Share Project snapshot tests
 if errorlevel 1 goto :failed
 
 echo.
+echo [20/20] Shared export engine behavior tests
+"%RDIR%\bin\Rscript.exe" "tests\unit\export_engine_smoke.R"
+if errorlevel 1 goto :failed
+
+echo.
 echo All PITAX v%PITAX_VERSION% tests passed.
 pause
 exit /b 0

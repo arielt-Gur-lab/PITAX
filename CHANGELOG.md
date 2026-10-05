@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.4.0
+
+- Rebuilt result Export as one shared package builder available from the header and every workflow stage.
+- Added an explicit export-component catalog with availability states (available / partial / not created / stale / blocked), frozen snapshots, Excel/FASTA/PNG writers, and required RUN_INFO.txt metadata.
+- Migrated Assign, QC, Consensus, BLAST, Taxonomy and Multi-locus result downloads onto the shared dialog while keeping Save project and the blank assignment-key template as separate non-result downloads.
+- Complete packages can now include BLAST, taxonomy and multi-locus evidence when those layers exist; chromatogram PNGs are generated explicitly from per-read processing settings.
+- Added behavioral export-engine tests covering pre-trim Assign export, pending edits, row/column selection, sequence roles, BLAST partial states, mixed sample readiness, and package contents.
+- Updated stale reflection and BLAST contract markers so they match the current project-load and curation invalidation code paths.
+
 ## 3.3.0
 
 - INTEGRATE accumulates imported `.sangerproject` files across Add clicks (`rv$multilocus_imports`) instead of replacing the previous selection, so 3+ loci can be queued without picking every file in one dialog.

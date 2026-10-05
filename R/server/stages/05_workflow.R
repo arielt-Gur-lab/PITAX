@@ -183,46 +183,55 @@
     to_consensus_label <- if (simple) "Continue to NCBI BLAST" else "Continue to Consensus"
     back_export_label <- if (simple) "Back to Trim & QC" else "Back to Consensus"
 
+    export_btn <- actionButton("open_export_from_stage", "Export", icon = icon("download"), class = "btn-default")
     actions <- switch(
       step,
       "upload" = tagList(
+        export_btn,
         div(class = "stage-topbar-spacer"),
         actionButton("to_settings", "Continue to Assay", icon = icon("arrow-right"), class = "btn-primary")
       ),
       "settings" = tagList(
         actionButton("back_upload", "Back", icon = icon("arrow-left")),
+        export_btn,
         div(class = "stage-topbar-spacer"),
         actionButton("to_rename", "Continue to Assign", icon = icon("arrow-right"), class = "btn-primary")
       ),
       "rename" = tagList(
         actionButton("back_settings_from_rename", "Back to Assay", icon = icon("arrow-left")),
+        export_btn,
         div(class = "stage-topbar-spacer"),
         actionButton("run_trimming", "Start trimming", icon = icon("play"), class = "btn-primary")
       ),
       "qc" = tagList(
         actionButton("back_rename_from_qc", "Back to Assign", icon = icon("arrow-left")),
+        export_btn,
         div(class = "stage-topbar-spacer"),
         actionButton("to_consensus", to_consensus_label, icon = icon("arrow-right"), class = "btn-primary")
       ),
       "consensus" = tagList(
         actionButton("back_qc_from_consensus", "Back to QC", icon = icon("arrow-left")),
+        export_btn,
         div(class = "stage-topbar-spacer"),
         actionButton("build_consensus", "Build / rebuild", icon = icon("cogs"), class = "btn-success"),
         actionButton("to_blast", "Continue to NCBI BLAST", icon = icon("arrow-right"), class = "btn-primary")
       ),
       "export" = tagList(
         actionButton("back_from_export", back_export_label, icon = icon("arrow-left")),
+        export_btn,
         div(class = "stage-topbar-spacer"),
-        span(class = "compact-hint", "Requires finished PROCESS: Trim & QC (Simple) or Consensus (Paired) with ready analysis sequences.")
+        span(class = "compact-hint", "Shared Export opens from any stage. Full packages need ready analysis sequences.")
       ),
       "blast" = tagList(
         actionButton("back_to_process", "Back to Process", icon = icon("arrow-left")),
+        export_btn,
         div(class = "stage-topbar-spacer"),
         actionButton("to_taxonomy", "Continue to Taxonomic Summary", icon = icon("arrow-right"), class = "btn-primary"),
         actionButton("reset_pipeline", "Start new run")
       ),
       "taxonomy" = tagList(
         actionButton("back_blast", "Back to NCBI BLAST", icon = icon("arrow-left")),
+        export_btn,
         div(class = "stage-topbar-spacer"),
         actionButton("run_taxonomy", "Analyze selected", icon = icon("play"), class = "btn-primary"),
         actionButton("run_taxonomy_all", "Analyze all retrieved", icon = icon("tasks"), class = "btn-success"),
@@ -231,6 +240,7 @@
       ),
       "multilocus" = tagList(
         actionButton("back_taxonomy_from_multilocus", "Back to Taxonomic Summary", icon = icon("arrow-left")),
+        export_btn,
         div(class = "stage-topbar-spacer"),
         actionButton("build_multilocus_profile", "Build / rebuild profile", icon = icon("cogs"), class = "btn-success")
       ),

@@ -148,8 +148,8 @@ assert_true(grepl("blast_auto_check", blast_text, fixed = TRUE) &&
             "Auto-poll must show an in-progress notification before the NCBI Get.")
 
 load_text <- pitax_read_text("R", "server", "stages", "10_project.R")
-assert_true(grepl("Safe reload", load_text, fixed = TRUE) &&
-              grepl("auto_poll_enabled\\[pending\\] <- FALSE", load_text),
+assert_true(grepl("auto_poll_enabled[pending] <- FALSE", load_text, fixed = TRUE) &&
+              grepl("manual_retrieval_required[pending] <- TRUE", load_text, fixed = TRUE),
             "Project load must disable auto-poll for pending RIDs.")
 
 cat("BLAST RTOE auto-poll smokes passed.\n")
