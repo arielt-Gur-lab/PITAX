@@ -249,9 +249,6 @@
     updateTabsetPanel(session,"pipeline_step",selected=if (identical(rv$project_mode, "simple")) "qc" else "consensus")
   })
   observeEvent(input$back_blast, updateTabsetPanel(session,"pipeline_step",selected="blast"))
-  observeEvent(input$open_export_output, {
-    workflow_goto("export")
-  })
 
   current_settings_from_inputs <- function() {
     list(

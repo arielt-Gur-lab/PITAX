@@ -362,54 +362,5 @@
               options = list(pageLength = 25, scrollX = TRUE, autoWidth = TRUE))
   })
 
-  output$download_multilocus_profiles <- downloadHandler(
-    filename = function() "PITAX_multi_locus_isolate_profiles.csv",
-    content = function(file) {
-      req(nrow(rv$multilocus_profile$profiles), isTRUE(multilocus_export_ready()))
-      write.csv(rv$multilocus_profile$profiles, file, row.names = FALSE, fileEncoding = "UTF-8")
-    }
-  )
-
-  output$download_multilocus_evidence <- downloadHandler(
-    filename = function() "PITAX_multi_locus_per_locus_evidence.csv",
-    content = function(file) {
-      req(nrow(rv$multilocus_profile$evidence), isTRUE(multilocus_export_ready()))
-      write.csv(rv$multilocus_profile$evidence, file, row.names = FALSE, fileEncoding = "UTF-8")
-    }
-  )
-
-  output$download_multilocus_fasta <- downloadHandler(
-    filename = function() "PITAX_multi_locus_sequences.fasta",
-    content = function(file) {
-      req(nrow(rv$multilocus_profile$evidence), isTRUE(multilocus_export_ready()))
-      writeLines(stage4_make_fasta(rv$multilocus_profile), file)
-    }
-  )
-
-  output$download_multilocus_checkpoint <- downloadHandler(
-    filename = function() "PITAX_checkpoint_F_multi_locus.zip",
-    content = function(file) {
-      req(nrow(rv$multilocus_profile$evidence), isTRUE(multilocus_export_ready()))
-      write_stage4_checkpoint_zip(file, rv$multilocus_profile)
-    }
-  )
-
-  output$download_taxonomy_summary <- downloadHandler(
-    filename=function() paste0(clean_fasta_name(ifelse(is.null(input$tax_sample), "sample", input$tax_sample)), "_taxonomic_summary.csv"),
-    content=function(file) write.csv(selected_tax_summary(), file, row.names=FALSE, fileEncoding="UTF-8")
-  )
-
-  output$download_taxonomy_hits <- downloadHandler(
-    filename=function() paste0(clean_fasta_name(ifelse(is.null(input$tax_sample), "sample", input$tax_sample)), "_taxonomy_enriched_hits.csv"),
-    content=function(file) write.csv(selected_tax_hits(), file, row.names=FALSE, fileEncoding="UTF-8")
-  )
-
-  output$download_taxonomy_checkpoint <- downloadHandler(
-    filename=function() paste0(clean_fasta_name(ifelse(is.null(input$tax_sample), "sample", input$tax_sample)), "_checkpoint_E_taxonomy.zip"),
-    content=function(file) {
-      req(nrow(selected_tax_summary()))
-      source_hits <- blast_hits_for_sample(input$tax_sample)
-      make_taxonomy_checkpoint_zip(file, selected_tax_summary(), selected_tax_hits(), selected_tax_counts(), source_hits)
-    }
-  )
+  # Multi-locus and taxonomy checkpoint downloads are routed through the shared Export dialog.
 

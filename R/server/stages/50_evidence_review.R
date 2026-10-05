@@ -112,32 +112,6 @@
               options = list(pageLength = 15, scrollX = TRUE, autoWidth = TRUE, dom = "tip"))
   })
 
-  output$download_ab1_evidence_run <- downloadHandler(
-    filename = function() paste0("PITAX_v3_stage1_AB1_run_audit_", format(Sys.Date(), "%Y%m%d"), ".csv"),
-    content = function(file) {
-      df <- ab1_evidence_run_summary(rv$results)
-      df$Final_Name <- vapply(df$Sample, qc_display_name, character(1))
-      df <- df[, c("Sample", "Final_Name", setdiff(names(df), c("Sample", "Final_Name"))), drop = FALSE]
-      utils::write.csv(df, file, row.names = FALSE, na = "")
-    }
-  )
-
-  output$download_ab1_evidence_detail <- downloadHandler(
-    filename = function() {
-      key <- selected_sample_key()
-      r <- selected_result()
-      pitax_assert_export_identity(r, key)
-      paste0(clean_fasta_name(qc_display_name(key)), "_PITAX_v3_stage1_AB1_base_audit.csv")
-    },
-    content = function(file) {
-      key <- selected_sample_key()
-      r <- selected_result()
-      d <- pitax_evidence_detail_export(r, key)
-      d$Final_Name <- qc_display_name(key)
-      d <- d[, c("Sample_ID", "Final_Name", setdiff(names(d), c("Sample_ID", "Final_Name"))), drop = FALSE]
-      utils::write.csv(d, file, row.names = FALSE, na = "")
-    }
-  )
   output$primer_match_table <- renderDT({
     req(isTRUE(input$enable_primer_mapping))
     datatable(primer_match_table(selected_result(), selected_processing_settings()), rownames = FALSE,

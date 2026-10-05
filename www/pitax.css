@@ -886,6 +886,22 @@
       .taxonomy-explain-details[open] summary { margin-bottom:8px; }
       .taxonomy-explain-body { color:#52647a; font-size:12px; line-height:1.5; background:#fafcff; border-radius:8px; padding:10px 12px; }
 
+      .export-dialog .export-component-list { max-height:280px; overflow:auto; border:1px solid #e2e8f0; border-radius:10px; padding:8px 10px; margin-bottom:12px; background:#fafcff; }
+      .export-dialog .export-component-row { display:flex; gap:10px; align-items:flex-start; padding:8px 4px; border-bottom:1px solid #edf2f7; }
+      .export-dialog .export-component-row.is-disabled { opacity:0.55; }
+      .export-dialog .export-component-row.is-disabled input { pointer-events:none; }
+      .export-dialog .export-component-title { font-weight:650; color:#1f334d; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+      .export-dialog .export-component-reason { color:#5b6b7c; font-size:12px; margin-top:2px; }
+      .export-dialog .export-component-count { color:#7a8796; font-size:11px; margin-top:2px; }
+      .export-status-badge { display:inline-block; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:700; text-transform:uppercase; }
+      .export-status-available { background:#e8f7ee; color:#176b3a; }
+      .export-status-partial { background:#fff6df; color:#8a6200; }
+      .export-status-missing { background:#eef2f6; color:#5b6b7c; }
+      .export-status-stale { background:#fdeeee; color:#9b1c1c; }
+      .export-status-blocked { background:#f3e8ff; color:#6b21a8; }
+      .export-preview-table { width:100%; font-size:12px; margin-bottom:10px; }
+      .export-preview-table th, .export-preview-table td { padding:4px 6px; border-bottom:1px solid #e5eaf0; vertical-align:top; }
+
       @media (max-width:1180px) {
         .taxonomy-metric-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
         .taxonomy-result-hero { grid-template-columns:82px minmax(0,1fr); padding-right:20px; }

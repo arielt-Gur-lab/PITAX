@@ -723,52 +723,5 @@
               options=list(pageLength=25, scrollX=TRUE, autoWidth=TRUE, columnDefs=defs))
   })
 
-  output$download_team_summary_csv <- downloadHandler(
-    filename=function() paste0(project_export_stem(), "_team_identification_summary.csv"),
-    content=function(file) write.csv(team_summary_df(), file, row.names=FALSE, fileEncoding="UTF-8")
-  )
+  # Taxonomy exports are routed through the shared Export dialog.
 
-  output$download_team_summary_xlsx <- downloadHandler(
-    filename=function() paste0(project_export_stem(), "_team_identification_summary.xlsx"),
-    content=function(file) {
-      req(nrow(team_summary_df()))
-      wb <- openxlsx::createWorkbook(creator="Sanger Sequence Pipeline")
-      header_style <- openxlsx::createStyle(fgFill="#1F4E78", fontColour="#FFFFFF", textDecoration="bold", halign="center", valign="center")
-      wrap_style <- openxlsx::createStyle(wrapText=TRUE, valign="top")
-
-      add_sheet <- function(name, df, freeze=TRUE) {
-        if (is.null(df) || !ncol(df)) df <- data.frame(Message="No data available", stringsAsFactors=FALSE)
-        openxlsx::addWorksheet(wb, name)
-        openxlsx::writeData(wb, name, df, withFilter=nrow(df)>0, headerStyle=header_style)
-        if (freeze) openxlsx::freezePane(wb, name, firstRow=TRUE)
-        if (nrow(df)) openxlsx::addStyle(wb, name, wrap_style, rows=2:(nrow(df)+1), cols=seq_len(ncol(df)), gridExpand=TRUE, stack=TRUE)
-        openxlsx::setColWidths(wb, name, cols=seq_len(ncol(df)), widths="auto")
-        long_cols <- which(names(df) %in% c("Comment","decision_reason","record_title","hit_title","NCBI hit title"))
-        if (length(long_cols)) openxlsx::setColWidths(wb, name, cols=long_cols, widths=45)
-      }
-
-      add_sheet("Summary", team_summary_df())
-      add_sheet("BLAST Hits", rv$blast_hits)
-      add_sheet("Taxonomy Details", rv$taxonomy_summary)
-      add_sheet("Species Evidence", rv$taxonomy_counts)
-      add_sheet("Consensus Summary", rv$consensus_set$summary)
-      add_sheet("Source Read QC", read_export_summary_df())
-      add_sheet("QC Flags", all_qc_peak_flags())
-      add_sheet("Manual Curation", all_curation_log())
-      if (!is.null(rv$rename)) add_sheet("Rename Map", rv$rename)
-      if (is.data.frame(rv$read_assignments) && nrow(rv$read_assignments)) add_sheet("Read Assignments", rv$read_assignments)
-      if (is.list(rv$architecture)) {
-        add_sheet("Assays", rv$architecture$assays)
-        add_sheet("Isolates", rv$architecture$isolates)
-        add_sheet("Loci", rv$architecture$loci)
-        add_sheet("Reads", rv$architecture$reads)
-      }
-      settings_df <- data.frame(
-        Field=c("Application version","Exported at", if (!is.null(rv$settings)) names(rv$settings) else character()),
-        Value=c(APP_VERSION, format(Sys.time(), "%Y-%m-%d %H:%M:%S"), if (!is.null(rv$settings)) unlist(rv$settings, use.names=FALSE) else character()),
-        stringsAsFactors=FALSE
-      )
-      add_sheet("Run Settings", settings_df, freeze=FALSE)
-      openxlsx::saveWorkbook(wb, file, overwrite=TRUE)
-    }
-  )
