@@ -67,8 +67,12 @@ blast_text <- pitax_read_text("R", "server", "stages", "90_blast.R")
 taxonomy_text <- pitax_read_text("R", "server", "stages", "100_taxonomy.R")
 assert_true(grepl('cols <- c("Source_ID", "Isolate", "Assay_ID", "Locus", "Direction", "Final_Name")', upload_text, fixed = TRUE),
             "Upload signature must include Assay_ID.")
-assert_true(grepl("prior_consensus_ids", project_text, fixed = TRUE),
-            "Project curation must invalidate all prior consensus IDs after a sequence change.")
+assert_true(grepl("build_analysis_sequences(notify = FALSE)", project_text, fixed = TRUE),
+            "Project curation must rebuild analysis sequences after a sequence change.")
+assert_true(grepl("invalidate_downstream_for_sample(sample_name, revision_note)", project_text, fixed = TRUE),
+            "Project curation must invalidate downstream evidence for the curated source read after a sequence change.")
+assert_true(grepl("whose emitted analysis sequence actually changed", project_text, fixed = TRUE),
+            "Rebuild path must keep per-analysis-sequence invalidation for records whose emitted sequence changed.")
 assert_true(grepl("job_revision", blast_text, fixed = TRUE) && grepl("current_revision", blast_text, fixed = TRUE),
             "BLAST retrieve must compare stored and current consensus revisions.")
 assert_true(grepl('jobs\\[as\\.character\\(jobs\\$status\\) == "READY"', taxonomy_text),

@@ -1,9 +1,9 @@
 # PITAX — מסמך מאסטר להמשך הפיתוח
 
-גרסת מסמך: 1.0
-בסיס קוד נוכחי: `3.3.0`
+גרסת מסמך: 1.1
+בסיס קוד נוכחי: `3.4.0`
 סכמת פרויקט נוכחית: `6`
-השלב הפעיל: `Alpha 10` — Schema 6; Share Project יוצר snapshot בלתי משתנה בשרת עם קישור `?share=TOKEN` (תפוגה 1/3/7 ימים). אין שיתוף סשן חי ואין עריכה משותפת. מגבלות marker נקבעות על ידי המשתמש; scheduler NCBI גלובלי בין sessions נשאר לחובת Stage 5 לפני stable.
+השלב הפעיל: `Alpha 10` — Schema 6; Share Project יוצר snapshot בלתי משתנה בשרת עם קישור `?share=TOKEN` (תפוגה 1/3/7 ימים). Export הוא מנגנון חבילה משותף לכל השלבים עם קטלוג רכיבים מפורש ו-`RUN_INFO.txt`. אין שיתוף סשן חי ואין עריכה משותפת. מגבלות marker נקבעות על ידי המשתמש; scheduler NCBI גלובלי בין sessions נשאר לחובת Stage 5 לפני stable.
 
 ## 1. תפקיד המסמך
 
@@ -267,7 +267,15 @@ PITAX/
 │   │   ├── multilocus/           # isolate-level profile
 │   │   └── sanger/               # AB1, trimming, QC, curation
 │   ├── services/taxonomy_tools.R # NCBI taxonomy ופרשנות
-│   └── export/export_tools.R      # FASTA/CSV/ZIP ו-BLAST parsers
+│   └── export/                    # shared export catalog, plan, writers, dialog
+│       ├── export_tools.R         # legacy FASTA/checkpoint helpers + BLAST parsers
+│       ├── catalog.R
+│       ├── snapshot.R
+│       ├── availability.R
+│       ├── plan.R
+│       ├── writers.R
+│       ├── execute.R
+│       └── dialog_ui.R
 ├── www/                           # CSS, JavaScript, logo
 ├── tests/
 │   ├── unit/
@@ -357,16 +365,25 @@ PITAX/
 
 ### 12.1 עקרון snapshot
 
-כל export צריך להיות traceable לגרסת האפליקציה, settings, שמות והרצפים ששימשו אותו. Checkpoints אינם רק קבצי נוחות; הם נקודות ביקורת.
+כל export צריך להיות traceable לגרסת האפליקציה, settings, שמות והרצפים ששימשו אותו. חבילות הייצוא אינן רק קבצי נוחות; הן נקודות ביקורת.
 
-השלבים הקיימים כוללים:
+מגרסה 3.4.0 ואילך ייצוא התוצאות עובר במנגנון משותף:
 
-- Assignment checkpoint.
-- QC checkpoint.
-- Consensus checkpoint עם evidence per column.
-- Final export.
-- Taxonomy checkpoint.
-- Multi-locus checkpoint.
+- קטלוג רכיבים מפורש תחת `R/export/catalog.R` (לא סריקה אוטומטית של טבלאות במצב).
+- תמונת מצב קפואה בזמן פתיחת הדיאלוג.
+- תכנון קבצים לפני הכתיבה, כולל תצוגת מצב לכל רכיב.
+- כתיבת ZIP עם Excel/FASTA/PNG נבחרים ועם `RUN_INFO.txt` חובה.
+- שמירת `.sangerproject` ותבנית מפתח השיוך נשארות מחוץ למנגנון תוצאות זה.
+
+השלבים הקיימים כוללים רכיבי ייצוא עבור:
+
+- Assignment / architecture לפני חיתוך.
+- QC evidence, curation, metrics plots and chromatograms.
+- Consensus / analysis sequences.
+- BLAST jobs, accession hits and raw RID text.
+- Taxonomy summaries and enriched hits.
+- Multi-locus profiles and per-locus evidence.
+- Comprehensive project packages that may include all available layers.
 
 ### 12.2 שינוי upstream
 
@@ -385,7 +402,7 @@ PITAX/
 
 ## 13. בדיקות ושערי גרסה
 
-`run_tests.bat` הוא שער הקבלה ב־Windows. לפני 15 הקבוצות רץ preflight שמבצע `parse()` לכל קובצי R של האפליקציה, הבדיקות והסקריפטים; כשל תחבירי עוצר את הריצה לפני Test 1. לאחר מכן רצות 15 קבוצות:
+`run_tests.bat` הוא שער הקבלה ב־Windows. לפני הקבוצות הממוספרות רץ preflight שמבצע `parse()` לכל קובצי R של האפליקציה, הבדיקות והסקריפטים; כשל תחבירי עוצר את הריצה לפני Test 1. לאחר מכן רצות הקבוצות, כולל קבוצת המנוע המשותף לייצוא.
 
 1. Taxonomy logic.
 2. QC ambiguous-peak flags.
