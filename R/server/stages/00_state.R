@@ -1,6 +1,7 @@
   rv <- reactiveValues(
     results = list(), summary = NULL, rename = NULL, settings = NULL,
     assay_profiles = assay_default_profiles(),
+    locus_vocabulary = pitax_locus_vocabulary(),
     project_defaults = assay_project_defaults_from_legacy_settings(),
     read_assignments = stage2_empty_assignments(), architecture = NULL,
     consensus_set = stage3_empty_consensus_set(),

@@ -1,4 +1,4 @@
-PITAX v3.4.0 - Shared Export package builder
+PITAX v3.5.0 - Project locus editor and assignment text edits
 =========================================================
 
 Purpose
@@ -61,7 +61,7 @@ Run `run_tests.bat` on Windows with R installed.
 
 Expected final line:
 
-  All PITAX v3.4.0 tests passed.
+  All PITAX v3.5.0 tests passed.
 
 The suite now has 20 groups. Alpha 10 covers controlled loci, multi-assay profiles,
 schema-5 migration, gated Steps UI navigation and same-project multi-locus integration.

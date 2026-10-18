@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.5.0
+
+- Assay setup now adds project-local loci and edits their display names beside the locus dropdown. Saved locus IDs stay stable, aliases/duplicates/invalid IDs are checked, and custom and unused loci survive Save/Load and Share Project. Existing schema-6 files default to the built-in locus list.
+- Assignment text edits now explicitly choose existing isolate codes or copying source barcodes into isolate codes. Source IDs remain immutable; matching uses literal text, supports empty replacements and checked/all row scope, and reports matched/changed counts instead of a misleading success when nothing matched.
+- Loaded projects now synchronize read identities when the assay locus changes without re-uploading AB1 files. Fixed loader/table message callbacks to use the required Shiny handler signature.
+- Added behavioral and real-server tests for locus editing, actual AB1 processing, project round-trips, pending table edits, replacement scope and analysis invalidation.
+
 ## 3.4.0
 
 - Rebuilt result Export as one shared package builder available from the header and every workflow stage.

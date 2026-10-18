@@ -27,6 +27,7 @@
         rename = rv$rename,
         settings = rv$settings,
         assay_profiles = rv$assay_profiles,
+        locus_vocabulary = rv$locus_vocabulary,
         project_defaults = rv$project_defaults,
         project_mode = rv$project_mode,
         read_assignments = rv$read_assignments,
@@ -223,7 +224,7 @@
 
   restore_settings_inputs <- function(settings) {
     if (is.null(settings) || !is.list(settings)) return(invisible(NULL))
-    if (!is.null(settings$target)) updateSelectInput(session, "target", selected = settings$target)
+    if (!is.null(settings$target)) updateSelectInput(session, "target", choices = pitax_locus_choices(rv$locus_vocabulary), selected = settings$target)
     if (!is.null(settings$forward_primer)) updateTextInput(session, "forward_primer", value = settings$forward_primer)
     if (!is.null(settings$forward_primer_seq)) updateTextInput(session, "forward_primer_seq", value = settings$forward_primer_seq)
     if (!is.null(settings$reverse_primer)) updateTextInput(session, "reverse_primer", value = settings$reverse_primer)
@@ -276,8 +277,14 @@
         return(list(ok = FALSE, message = st$error))
       }
     }
-    loaded_profiles <- assay_coerce_profiles(st$assay_profiles)
-    profile_error <- assay_validate_profiles(loaded_profiles)
+    loaded_loci <- tryCatch(pitax_coerce_locus_vocabulary(st$locus_vocabulary), error = function(e) e)
+    if (inherits(loaded_loci, "error")) {
+      msg <- paste("Project locus list is invalid:", conditionMessage(loaded_loci))
+      if (notify) showNotification(msg, type = "error", duration = 10)
+      return(list(ok = FALSE, message = msg))
+    }
+    loaded_profiles <- assay_apply_locus_labels(st$assay_profiles, loaded_loci)
+    profile_error <- assay_validate_profiles(loaded_profiles, loaded_loci)
     if (!is.null(profile_error)) {
       msg <- paste("Project assay profiles are invalid:", profile_error)
       if (notify) showNotification(msg, type = "error", duration = 10)
@@ -314,6 +321,7 @@
     rv$summary <- st$summary
     rv$rename <- st$rename
     rv$settings <- st$settings
+    rv$locus_vocabulary <- loaded_loci
     rv$assay_profiles <- loaded_profiles
     rv$project_defaults <- assay_project_defaults_from_legacy_settings(st$project_defaults)
     rv$project_mode <- if (!is.null(st$project_mode) && st$project_mode %in% c("simple", "paired_consensus")) st$project_mode else "paired_consensus"

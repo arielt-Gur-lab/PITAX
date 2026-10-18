@@ -105,7 +105,7 @@
             paste0(rv$assay_profiles$Assay_Name[j], " | ", rv$assay_profiles$Locus_Display_Name[j])
           ))
         )),
-        tags$td(class = "assignment-locus", if (nzchar(assignments$Locus[i])) pitax_locus_display_name(assignments$Locus[i], assignments$Locus[i]) else "-"),
+        tags$td(class = "assignment-locus", if (nzchar(assignments$Locus[i])) pitax_locus_display_name(assignments$Locus[i], assignments$Locus[i], rv$locus_vocabulary) else "-"),
         tags$td(tags$select(
           id = assignment_input_id("assign_direction", read_id), class = "form-control assignment-direction",
           tags$option(value = "", disabled = NA, selected = if (!identical(direction, "Forward") && !identical(direction, "Reverse")) NA, "Select..."),
@@ -131,16 +131,21 @@
   observeEvent(input$apply_assignment_batch, {
     req(nrow(rv$read_assignments))
     rows <- selected_assignment_rows()
-    rv$read_assignments <- collect_assignment_editor()
-    isolate_values <- as.character(rv$read_assignments$Isolate[rows])
-    if (nzchar(input$batch_isolate_find)) isolate_values <- gsub(input$batch_isolate_find, input$batch_isolate_replace, isolate_values, fixed = TRUE)
-    if (nzchar(input$batch_isolate_prefix)) isolate_values <- paste0(input$batch_isolate_prefix, isolate_values)
-    if (nzchar(input$batch_isolate_suffix)) isolate_values <- paste0(isolate_values, input$batch_isolate_suffix)
-    rv$read_assignments$Isolate[rows] <- isolate_values
-    if (!is.null(input$batch_assay) && nzchar(trimws(input$batch_assay))) rv$read_assignments$Assay_ID[rows] <- trimws(input$batch_assay)
-    if (nzchar(input$batch_direction)) rv$read_assignments$Direction[rows] <- input$batch_direction
-    sync_assignment_state()
-    showNotification(paste("Updated", length(rows), "read assignment(s)."), type = "message")
+    edited <- collect_assignment_editor()
+    result <- stage2_apply_batch_edits(
+      edited, rows, input$batch_isolate_find, input$batch_isolate_replace,
+      input$batch_isolate_prefix, input$batch_isolate_suffix,
+      stage2_scalar_text(input$batch_text_source, "isolate"), input$batch_assay, input$batch_direction
+    )
+    changed <- sum(vapply(rows, function(i) !identical(edited[i, , drop = FALSE], result$assignments[i, , drop = FALSE]), logical(1)))
+    rv$read_assignments <- result$assignments
+    error <- sync_assignment_state()
+    find <- if (is.null(input$batch_isolate_find)) "" else as.character(input$batch_isolate_find)
+    message <- paste0("Changed ", changed, " of ", length(rows), " selected read assignment(s).")
+    if (nzchar(find)) message <- paste0(message, " Find matched ", result$matched, " row(s).")
+    if (nzchar(find) && result$matched == 0L) message <- paste0(message, " Search applies to the chosen text source. To use a barcode, choose Copy source barcodes into isolate codes.")
+    if (!is.null(error)) message <- paste0(message, " Draft: ", error)
+    showNotification(message, type = if (!is.null(error) || changed == 0L) "warning" else "message", duration = 8)
   })
 
   observeEvent(input$reset_assignments, {
