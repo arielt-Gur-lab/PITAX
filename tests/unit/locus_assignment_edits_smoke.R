@@ -76,5 +76,63 @@ unlink(path)
 check(identical(pitax_coerce_locus_vocabulary(restored$locus_vocabulary), loci), "Saved catalog changed on readback.")
 check(identical(pitax_coerce_locus_vocabulary(NULL), defaults), "Legacy schema-6 catalog default changed.")
 check("SDHD" %in% restored$locus_vocabulary$Locus_ID, "An unused custom locus was not preserved.")
+# Profile-specific naming changes labels, never the canonical biological locus.
+source(file.path("R", "domain", "consensus", "stage3_consensus.R"))
+source(file.path("R", "domain", "multilocus", "stage4_multilocus.R"))
+source(file.path("R", "export", "export_tools.R"))
+source(file.path("R", "export", "availability.R"))
+first <- assay_profile_from_legacy_settings(list(target = "ITS", assay_name = "Assay One"), "assay-one")
+second <- assay_profile_from_legacy_settings(list(target = "LSU", assay_name = "Assay Two"), "assay-two")
+first$Name_Source <- "assay"
+profiles <- rbind(first, second)
+named <- stage2_make_read_assignments(c("F.ab1", "R.ab1"), default_assay_id = "assay-one")
+named$Isolate <- "FB1"; named$Direction <- c("Forward", "Reverse")
+named <- stage2_sync_generated_names(named, assay_profiles = profiles)
+check(identical(named$Final_Name, c("FB1_Assay-One_F", "FB1_Assay-One_R")), "Assay display name was not used.")
+check(all(named$Locus == "ITS"), "Naming choice changed the biological locus.")
+check(is.null(stage2_identity_error(named)) && is.null(stage2_validate_assignments(named, assay_profiles = profiles)), "Assay-based names failed validation.")
+legacy_profiles <- profiles; legacy_profiles$Name_Source <- NULL
+check(all(assay_coerce_profiles(legacy_profiles)$Name_Source == "locus"), "Old profiles did not default to locus names.")
+invalid_profile <- profiles; invalid_profile$Name_Source[1] <- "invalid"
+check(!is.null(assay_validate_profiles(invalid_profile)), "Invalid naming mode was accepted.")
+check(assay_resolve_read_settings(first)$assay_name_source == "assay", "Processing metadata lost the naming choice.")
+
+result <- function() list(seq = "ACGTACGT", curation = list(trim_start = 1L, trim_end = 8L, revision = 0L),
+  summary = data.frame(trim_start = 1L, trim_end = 8L),
+  ab1_evidence = list(detail = data.frame(Basecaller_quality = rep(30, 8))),
+  metrics = data.frame(peak_ratio = rep(3, 8)))
+results <- list(F = result(), R = result())
+paired <- stage3_build_consensus_set(named, results, min_overlap = 4L)
+check(paired$records[[1]]$final_name == "FB1_Assay-One" && paired$records[[1]]$locus == "ITS", "Paired naming lost the selected label or biological locus.")
+simple <- stage3_build_consensus_set(named, results, project_mode = "simple", min_overlap = 4L)
+check(simple$records[[1]]$final_name == "FB1_Assay-One_F", "Independent analysis ignored the naming choice.")
+single <- stage3_build_consensus_set(named[1, , drop = FALSE], results, min_overlap = 4L)
+check(single$records[[1]]$final_name == "FB1_Assay-One", "Single-read paired representative ignored the label.")
+check(grepl(">FB1_Assay-One", make_fasta(stage3_analysis_records(paired)), fixed = TRUE), "Analysis FASTA ignored the chosen name.")
+ambiguous <- named; ambiguous$Name_Label[2] <- "Different assay"
+rejects(stage3_build_consensus_set(ambiguous, results, min_overlap = 4L), "different naming labels")
+
+mixed <- named; mixed$Isolate <- c("FB1", "FB2"); mixed$Assay_ID[2] <- "assay-two"
+mixed <- stage2_sync_generated_names(mixed, assay_profiles = profiles)
+check(identical(mixed$Final_Name, c("FB1_Assay-One_F", "FB2_LSU_R")), "Naming mode leaked between profiles.")
+profiles$Name_Source[1] <- "locus"
+locus_named <- stage2_sync_generated_names(named, assay_profiles = profiles)
+check(identical(locus_named$Final_Name, c("FB1_ITS_F", "FB1_ITS_R")), "Switching back did not restore locus naming.")
+profiles$Name_Source <- "assay"; profiles$Assay_Name <- "Same Name"
+collision <- stage2_sync_generated_names(mixed, assay_profiles = profiles)
+collision$Isolate <- "FB1"; collision$Direction <- "Forward"
+collision <- stage2_sync_generated_names(collision, assay_profiles = profiles)
+check(grepl("unique", stage2_identity_error(collision)), "Cleaned naming collisions were accepted.")
+
+project <- list(format = "SangerSequencePipelineProject", schema_version = 6L, app_version = "3.5.1",
+  state = list(results = results, consensus_set = paired))
+evidence <- stage4_extract_project_evidence(project, "Test project")
+check(evidence$Locus == "ITS" && evidence$Name_Label == "Assay One", "Multi-locus evidence mixed the label with biological identity.")
+profile <- stage4_empty_profile(); profile$evidence <- evidence
+check(grepl(">FB1_Assay-One", stage4_make_fasta(profile), fixed = TRUE), "Multi-locus FASTA ignored the chosen label.")
+snap <- list(multilocus_profile = profile, read_assignments = named)
+exported <- pitax_export_extract_multilocus_sequences(snap)
+check(exported[[1]]$final_name == "FB1_Assay-One" && exported[[1]]$locus == "ITS", "Shared export lost name choice or locus identity.")
+
 cat("Project locus and assignment batch behavior tests passed.\n")
 

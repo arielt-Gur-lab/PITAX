@@ -21,7 +21,7 @@ stage4_empty_evidence <- function() {
   data.frame(
     Source = character(), Source_MD5 = character(), Project_App_Version = character(),
     Project_Saved_At = character(), Project_Schema = integer(), Consensus_ID = character(),
-    Final_Name = character(), Isolate = character(), Locus = character(),
+    Final_Name = character(), Isolate = character(), Locus = character(), Name_Label = character(),
     Analysis_Status = character(), Sequence_Length = integer(), Consensus_Revision = integer(),
     Sequence = character(), Taxonomy_Status = character(), Recommended_Identification = character(),
     Recommended_Level = character(), Confidence = character(), Supported_Genus = character(),
@@ -258,6 +258,7 @@ stage4_extract_project_evidence <- function(project, source_name, source_md5 = "
       Final_Name = final_name,
       Isolate = isolate,
       Locus = locus,
+      Name_Label = stage4_scalar_text(record$name_label, locus),
       Analysis_Status = stage4_scalar_text(record$status),
       Sequence_Length = nchar(seq_text),
       Consensus_Revision = if (is.list(record$curation)) suppressWarnings(as.integer(record$curation$revision)) else 0L,
@@ -411,6 +412,7 @@ stage4_ensure_profile <- function(profile) {
   if (!is.list(profile) || !identical(stage4_scalar_text(profile$schema), "pitax-multilocus-profile-v1")) return(stage4_empty_profile())
   if (!is.data.frame(profile$sources)) profile$sources <- stage4_empty_sources()
   if (!is.data.frame(profile$evidence)) profile$evidence <- stage4_empty_evidence()
+  if (!"Name_Label" %in% names(profile$evidence)) profile$evidence$Name_Label <- profile$evidence$Locus
   if (!is.data.frame(profile$profiles)) profile$profiles <- stage4_empty_profile_summary()
   if (is.null(profile$warnings)) profile$warnings <- character()
   profile
@@ -466,7 +468,7 @@ stage4_current_project_matches <- function(profile, project, source_name = "Curr
   current <- tryCatch(stage4_extract_project_evidence(project, source_name, ""), error = function(e) NULL)
   if (is.null(current) || nrow(current) != nrow(stored)) return(FALSE)
   compare_cols <- c(
-    "Isolate", "Locus", "Analysis_Status", "Consensus_Revision", "Sequence",
+    "Isolate", "Locus", "Final_Name", "Name_Label", "Analysis_Status", "Consensus_Revision", "Sequence",
     "Taxonomy_Status", "Recommended_Identification", "Recommended_Level", "RID"
   )
   key <- function(df) paste(tolower(trimws(df$Isolate)), tolower(trimws(df$Locus)), sep = "\r")
@@ -485,7 +487,7 @@ stage4_make_fasta <- function(profile) {
     ev <- profile$evidence[i, , drop = FALSE]
     if (!nzchar(ev$Sequence)) next
     header <- paste0(
-      ">", clean_fasta_name(paste(ev$Isolate, ev$Locus, sep = "_")),
+      ">", clean_fasta_name(stage3_compose_sequence_name(ev$Isolate, stage4_scalar_text(ev$Name_Label, ev$Locus))),
       " isolate=", clean_fasta_name(ev$Isolate),
       " locus=", clean_fasta_name(ev$Locus),
       " consensus_revision=", ev$Consensus_Revision,

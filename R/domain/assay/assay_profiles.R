@@ -114,6 +114,7 @@ assay_empty_profiles <- function() {
   data.frame(
     Assay_ID = character(),
     Assay_Name = character(),
+    Name_Source = character(),
     Locus_ID = character(),
     Locus_Display_Name = character(),
     Forward_Primer_Name = character(),
@@ -149,6 +150,7 @@ assay_coerce_profiles <- function(df) {
   df <- df[, names(template), drop = FALSE]
   text_columns <- setdiff(names(template), c("Expected_Amplicon_Length", "Maximum_Sequence_Position"))
   for (nm in text_columns) df[[nm]] <- as.character(df[[nm]])
+  df$Name_Source[is.na(df$Name_Source) | !nzchar(trimws(df$Name_Source))] <- "locus"
   df$Locus_ID <- vapply(df$Locus_ID, pitax_normalize_locus_id, character(1))
   df$Locus_Display_Name <- vapply(seq_len(nrow(df)), function(i) {
     assay_scalar_text(df$Locus_Display_Name[i], pitax_locus_display_name(df$Locus_ID[i], df$Locus_ID[i]))
@@ -170,6 +172,7 @@ assay_profile_from_legacy_settings <- function(settings = NULL, assay_id = NULL)
   data.frame(
     Assay_ID = assay_id,
     Assay_Name = assay_name,
+    Name_Source = assay_scalar_text(settings$assay_name_source, "locus"),
     Locus_ID = locus_id,
     Locus_Display_Name = display_name,
     Forward_Primer_Name = assay_scalar_text(settings$forward_primer),
@@ -190,6 +193,7 @@ assay_validate_profiles <- function(df, locus_vocabulary = NULL) {
   if (any(!nzchar(trimws(df$Assay_ID)))) return("Every assay requires an Assay_ID.")
   if (anyDuplicated(df$Assay_ID)) return("Assay_ID values must be unique.")
   if (any(!nzchar(trimws(df$Assay_Name)))) return("Every assay requires a display name.")
+  if (any(!df$Name_Source %in% c("locus", "assay"))) return("Choose Locus name or Assay display name for generated names.")
   if (any(!nzchar(df$Locus_ID))) return("Every assay must use a valid locus identifier.")
   if (!is.null(locus_vocabulary) && any(!df$Locus_ID %in% pitax_coerce_locus_vocabulary(locus_vocabulary)$Locus_ID)) {
     return("Every assay must use a locus registered in the project locus list.")
@@ -239,6 +243,7 @@ assay_try_apply_editor_inputs <- function(profiles, assay_id = "", editor = list
   candidate <- original
   locus_id <- pitax_normalize_locus_id(editor$target)
   candidate$Assay_Name[idx] <- assay_scalar_text(editor$assay_name, pitax_locus_display_name(locus_id, locus_id))
+  candidate$Name_Source[idx] <- assay_scalar_text(editor$assay_name_source, original$Name_Source[idx])
   candidate$Locus_ID[idx] <- locus_id
   candidate$Locus_Display_Name[idx] <- pitax_locus_display_name(locus_id, locus_id, locus_vocabulary)
   candidate$Forward_Primer_Name[idx] <- assay_scalar_text(editor$forward_primer)
@@ -286,6 +291,7 @@ assay_resolve_read_settings <- function(profile, project_defaults = NULL, direct
   settings$target <- profiles$Locus_ID[1]
   settings$assay_id <- profiles$Assay_ID[1]
   settings$assay_name <- profiles$Assay_Name[1]
+  settings$assay_name_source <- profiles$Name_Source[1]
   settings$forward_primer <- profiles$Forward_Primer_Name[1]
   settings$forward_primer_seq <- profiles$Forward_Primer_Sequence[1]
   settings$reverse_primer <- profiles$Reverse_Primer_Name[1]

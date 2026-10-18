@@ -14,6 +14,7 @@
       saved_at = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
       active_tab = if (!is.null(input$pipeline_step)) input$pipeline_step else "upload",
       ui_state = list(
+        assay_editor_select = selected_assay_id(),
         inspect_sample = input$inspect_sample,
         consensus_sample = input$consensus_sample,
         blast_sample = input$blast_sample,
@@ -224,6 +225,7 @@
 
   restore_settings_inputs <- function(settings) {
     if (is.null(settings) || !is.list(settings)) return(invisible(NULL))
+    updateRadioButtons(session, "assay_name_source", selected = assay_scalar_text(settings$assay_name_source, "locus"))
     if (!is.null(settings$target)) updateSelectInput(session, "target", choices = pitax_locus_choices(rv$locus_vocabulary), selected = settings$target)
     if (!is.null(settings$forward_primer)) updateTextInput(session, "forward_primer", value = settings$forward_primer)
     if (!is.null(settings$forward_primer_seq)) updateTextInput(session, "forward_primer_seq", value = settings$forward_primer_seq)
@@ -354,6 +356,9 @@
     rebuild_blast_ids()
 
     restore_settings_inputs(rv$settings)
+    active_assay <- assay_scalar_text(obj$ui_state$assay_editor_select, assay_scalar_text(rv$settings$assay_id, loaded_profiles$Assay_ID[1]))
+    sync_assay_editor_choices(active_assay)
+    load_assay_editor_inputs(selected_assay_id())
     updateRadioButtons(session, "project_mode", selected = rv$project_mode)
     sync_project_mode_navigation(rv$project_mode)
     if (is.list(rv$consensus_set$settings)) {

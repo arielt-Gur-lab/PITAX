@@ -39,6 +39,10 @@ stage3_compose_sequence_name <- function(isolate, locus) {
   paste(isolate, locus, sep = "_")
 }
 
+stage3_assignment_name_label <- function(assignment) {
+  stage3_scalar_text(assignment$Name_Label, stage3_scalar_text(assignment$Locus))
+}
+
 stage3_empty_summary <- function() {
   data.frame(
     Consensus_ID = character(), Final_Name = character(), Isolate = character(), Locus = character(),
@@ -471,7 +475,8 @@ stage3_single_read_record <- function(assignment, result, consensus_id, built_at
 
   list(
     schema = "pitax-consensus-record-v1", consensus_id = consensus_id,
-    final_name = if (isTRUE(independent)) stage3_scalar_text(assignment$Final_Name, stage3_compose_sequence_name(assignment$Isolate, assignment$Locus)) else stage3_compose_sequence_name(assignment$Isolate, assignment$Locus),
+    final_name = if (isTRUE(independent)) stage3_scalar_text(assignment$Final_Name, stage3_compose_sequence_name(assignment$Isolate, stage3_assignment_name_label(assignment))) else stage3_compose_sequence_name(assignment$Isolate, stage3_assignment_name_label(assignment)),
+    name_label = stage3_assignment_name_label(assignment),
     isolate = stage3_scalar_text(assignment$Isolate), locus = stage3_scalar_text(assignment$Locus),
     status = if (nzchar(ev$sequence)) if (isTRUE(independent)) "INDEPENDENT_READ" else "SINGLE_READ" else "SOURCE_MISSING",
     sequence = ev$sequence, source_read_ids = stage3_scalar_text(assignment$Source_ID),
@@ -492,7 +497,8 @@ stage3_pair_record <- function(assignments, results, consensus_id, settings, bui
   rresult <- results[[stage3_scalar_text(rrow$Source_ID)]]
   base_record <- list(
     schema = "pitax-consensus-record-v1", consensus_id = consensus_id,
-    final_name = stage3_compose_sequence_name(frow$Isolate, frow$Locus),
+    final_name = stage3_compose_sequence_name(frow$Isolate, stage3_assignment_name_label(frow)),
+    name_label = stage3_assignment_name_label(frow),
     isolate = stage3_scalar_text(frow$Isolate), locus = stage3_scalar_text(frow$Locus),
     source_read_ids = c(stage3_scalar_text(frow$Source_ID), stage3_scalar_text(rrow$Source_ID)),
     forward_read = stage3_scalar_text(frow$Source_ID), reverse_read = stage3_scalar_text(rrow$Source_ID),
@@ -584,12 +590,16 @@ stage3_build_consensus_set <- function(assignments, results, min_overlap = 40L, 
       source <- stage3_scalar_text(rows$Source_ID)
       record <- stage3_single_read_record(rows, results[[source]], consensus_id, built_at, independent = identical(project_mode, "simple"))
     } else if (nrow(rows) == 2L && identical(sort(as.character(rows$Direction)), c("Forward", "Reverse"))) {
+      labels <- vapply(seq_len(nrow(rows)), function(i) stage3_clean_name_part(stage3_assignment_name_label(rows[i, , drop = FALSE])), character(1))
+      if (length(unique(labels)) != 1L) stop("Paired reads have different naming labels. Choose Locus name or the same assay display name for both profiles.", call. = FALSE)
       record <- stage3_pair_record(rows, results, consensus_id, settings, built_at)
     } else {
       stop(paste0("Isolate/locus ", rows$Isolate[1], "/", rows$Locus[1], " has multiple reads but not one explicit Forward/Reverse pair."), call. = FALSE)
     }
     records[[consensus_id]] <- stage3_ensure_record_curation(record)
   }
+  final_names <- vapply(records, function(x) stage3_scalar_text(x$final_name), character(1))
+  if (anyDuplicated(final_names)) stop("Generated analysis sequence names must be unique. Choose distinct assay display names or use Locus name.", call. = FALSE)
   summary <- if (length(records)) do.call(rbind, lapply(records, stage3_summary_row)) else stage3_empty_summary()
   rownames(summary) <- NULL
   list(

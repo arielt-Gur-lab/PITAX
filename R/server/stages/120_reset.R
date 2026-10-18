@@ -13,6 +13,8 @@
     rv$project_loaded_name <- ""
     rv$workflow_unlocked <- c("upload")
     rv$workflow_completed <- character(0)
+    sync_assay_editor_choices()
+    load_assay_editor_inputs(selected_assay_id())
     updateTabsetPanel(session,"pipeline_step",selected="upload")
   }
   observeEvent(input$reset_pipeline, reset_pipeline_state())

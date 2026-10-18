@@ -100,6 +100,7 @@
   }
 
   selected_assay_id <- reactiveVal("")
+  assay_editor_revision <- reactiveVal(0L)
 
   sync_assay_editor_choices <- function(preferred = NULL) {
     profiles <- assay_coerce_profiles(rv$assay_profiles)
@@ -120,64 +121,61 @@
     idx <- match(assay_id, profiles$Assay_ID)
     if (is.na(idx)) return(invisible(NULL))
     row <- profiles[idx, , drop = FALSE]
-    updateTextInput(session, "assay_name", value = row$Assay_Name[1])
-    updateSelectInput(session, "target", choices = pitax_locus_choices(rv$locus_vocabulary), selected = row$Locus_ID[1])
-    updateTextInput(session, "forward_primer", value = row$Forward_Primer_Name[1])
-    updateTextInput(session, "reverse_primer", value = row$Reverse_Primer_Name[1])
-    updateTextInput(session, "forward_primer_seq", value = row$Forward_Primer_Sequence[1])
-    updateTextInput(session, "reverse_primer_seq", value = row$Reverse_Primer_Sequence[1])
-    updateNumericInput(session, "expected_amplicon_len", value = row$Expected_Amplicon_Length[1])
-    updateNumericInput(session, "absolute_max_base_index", value = row$Maximum_Sequence_Position[1])
+    assay_editor_revision(assay_editor_revision() + 1L)
+    session$sendCustomMessage("assayEditorLoaded", list(
+      assay_id = assay_id, revision = assay_editor_revision(),
+      values = list(
+        assay_name = row$Assay_Name[1], assay_name_source = row$Name_Source[1], target = row$Locus_ID[1],
+        forward_primer = row$Forward_Primer_Name[1], reverse_primer = row$Reverse_Primer_Name[1],
+        forward_primer_seq = row$Forward_Primer_Sequence[1], reverse_primer_seq = row$Reverse_Primer_Sequence[1],
+        expected_amplicon_len = row$Expected_Amplicon_Length[1], absolute_max_base_index = row$Maximum_Sequence_Position[1]
+      ), locus_choices = lapply(seq_len(nrow(rv$locus_vocabulary)), function(i) {
+        list(value = rv$locus_vocabulary$Locus_ID[i], label = rv$locus_vocabulary$Display_Name[i])
+      })
+    ))
     invisible(NULL)
   }
 
   commit_active_assay_from_inputs <- function() {
     profiles <- assay_coerce_profiles(rv$assay_profiles)
     if (!nrow(profiles)) profiles <- assay_default_profiles()
-    result <- assay_try_apply_editor_inputs(profiles, selected_assay_id(), list(
-      assay_name = input$assay_name,
-      target = input$target,
-      forward_primer = input$forward_primer,
-      reverse_primer = input$reverse_primer,
-      forward_primer_seq = input$forward_primer_seq,
-      reverse_primer_seq = input$reverse_primer_seq,
-      expected_amplicon_len = input$expected_amplicon_len,
-      absolute_max_base_index = input$absolute_max_base_index
-    ), locus_vocabulary = rv$locus_vocabulary)
+    snapshot <- input$assay_editor_snapshot
+    if (!is.list(snapshot) || !identical(snapshot$assay_id, selected_assay_id()) ||
+        !identical(as.integer(snapshot$revision), assay_editor_revision())) return(invisible(NULL))
+    # The client sends one coherent editor snapshot tagged with the loaded
+    # profile/revision. Late inputs from another profile cannot overwrite it.
+    editor <- snapshot$values
+    result <- assay_try_apply_editor_inputs(profiles, selected_assay_id(), editor, locus_vocabulary = rv$locus_vocabulary)
     if (!isTRUE(result$committed)) return(invisible(NULL))
     idx <- match(result$assay_id, result$profiles$Assay_ID)
     if (is.na(idx) || !length(idx)) return(invisible(NULL))
     rv$assay_profiles <- result$profiles
-    rv$project_defaults <- assay_project_defaults_from_legacy_settings(current_settings_from_inputs())
-    rv$settings <- assay_resolve_read_settings(result$profiles[idx, , drop = FALSE], rv$project_defaults, input$sequencing_primer)
+    rv$project_defaults <- assay_project_defaults_from_legacy_settings(editor)
+    rv$settings <- assay_resolve_read_settings(result$profiles[idx, , drop = FALSE], rv$project_defaults, editor$sequencing_primer)
     selected_assay_id(result$assay_id)
     invisible(result$assay_id)
   }
 
   observe({
-    rv$assay_profiles
-    isolate(sync_assay_editor_choices(selected_assay_id()))
+    profiles <- assay_coerce_profiles(rv$assay_profiles)
+    session$sendCustomMessage("assayEditorChoices", list(choices = lapply(seq_len(nrow(profiles)), function(i) {
+      list(value = profiles$Assay_ID[i], label = paste0(profiles$Assay_Name[i], " | ", profiles$Locus_Display_Name[i]))
+    })))
   })
 
   observeEvent(input$assay_editor_select, {
     req(nzchar(input$assay_editor_select))
+    if (identical(selected_assay_id(), input$assay_editor_select)) return()
     if (nzchar(selected_assay_id()) && !identical(selected_assay_id(), input$assay_editor_select)) {
       commit_active_assay_from_inputs()
     }
     selected_assay_id(input$assay_editor_select)
     load_assay_editor_inputs(input$assay_editor_select)
-    sync_assay_editor_choices(input$assay_editor_select)
   }, ignoreInit = TRUE)
 
-  observeEvent(list(input$assay_name, input$target, input$forward_primer, input$reverse_primer,
-                    input$forward_primer_seq, input$reverse_primer_seq,
-                    input$expected_amplicon_len, input$absolute_max_base_index,
-                    input$window, input$min_peak_ratio, input$min_relative_signal,
-                    input$min_len_before_collapse, input$bad_run_windows, input$min_usable_len), {
+  observeEvent(input$assay_editor_snapshot, {
     if (!nzchar(selected_assay_id())) return()
-    if (is.null(input$target) || !nzchar(as.character(input$target)[1])) return()
     commit_active_assay_from_inputs()
-    sync_assay_editor_choices(selected_assay_id())
     if (nrow(rv$read_assignments)) sync_assignment_state()
   }, ignoreInit = TRUE)
 
@@ -310,6 +308,7 @@
   current_settings_from_inputs <- function() {
     list(
       target=input$target,
+      assay_name_source=input$assay_name_source,
       forward_primer=input$forward_primer,
       forward_primer_seq=sanitize_dna(input$forward_primer_seq),
       reverse_primer=input$reverse_primer,
