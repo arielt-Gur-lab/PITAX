@@ -4,7 +4,7 @@
 
 - Added a per-assay Locus name / Assay display name choice for generated read and sequence names. Existing profiles default to locus naming.
 - Naming choices follow the active profile, survive Save/Load and Share Project, and propagate to Assign, analysis/consensus, BLAST inputs and sequence exports without changing biological locus identity or pairing keys.
-- Assay editor updates are tied to the loaded profile so delayed events cannot overwrite another profile when switching.
+- Fixed custom locus selections and assay edits reverting when switching profiles: editor updates are tied to the loaded profile and revision. Added a real-browser persistence regression covering two custom loci, profile switching and fresh-session project reload.
 - Naming changes invalidate outdated analysis names. Conflicting paired labels and duplicate generated names are reported explicitly.
 
 ## 3.5.0
