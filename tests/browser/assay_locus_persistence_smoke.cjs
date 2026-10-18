@@ -24,7 +24,16 @@ const assert = require('node:assert/strict');
     const expectProfile = (p, name, locus) => p.waitForFunction(({ name, locus }) =>
       document.getElementById('assay_name').value === name &&
       document.getElementById('target').value === locus,
-    { name, locus }, { timeout: 10000 });
+    { name, locus }, { timeout: 10000 }).catch(async error => {
+      console.error('Unexpected assay state:', await p.evaluate(() => ({
+        selected: document.getElementById('assay_editor_select').value,
+        name: document.getElementById('assay_name').value,
+        locus: document.getElementById('target').value,
+        snapshot: Shiny.shinyapp.$inputValues.assay_editor_snapshot,
+        choices: document.getElementById('assay_editor_select').selectize.options
+      })));
+      throw error;
+    });
     const addLocus = async (id, label) => {
       await page.click('#locus_add');
       await page.fill('#locus_new_id', id);

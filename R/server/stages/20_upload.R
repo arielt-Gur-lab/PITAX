@@ -257,7 +257,8 @@
     if (!is.na(idx)) {
       rv$settings <- assay_resolve_read_settings(profiles[idx, , drop = FALSE], rv$project_defaults, input$sequencing_primer)
     }
-    sync_assay_editor_choices(selected_assay_id())
+    # Profile IDs did not change. Updating labels in place avoids a delayed
+    # selector rebuild restoring the previous selection after a user switches.
     load_assay_editor_inputs(selected_assay_id())
     sync_assignment_state()
     rv$project_status_text <- "Unsaved project locus list changes."
