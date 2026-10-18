@@ -20,8 +20,8 @@ pitax_locus_vocabulary <- function() {
   )
 }
 
-pitax_locus_choices <- function() {
-  vocabulary <- pitax_locus_vocabulary()
+pitax_locus_choices <- function(vocabulary = NULL) {
+  vocabulary <- pitax_coerce_locus_vocabulary(vocabulary)
   stats::setNames(vocabulary$Locus_ID, vocabulary$Display_Name)
 }
 
@@ -44,14 +44,66 @@ pitax_normalize_locus_id <- function(x, fallback = "") {
     "SDHB" = "SDHB",
     "IGS" = "IGS"
   )
-  if (value %in% names(aliases)) unname(aliases[[value]]) else fallback
+  if (value %in% names(aliases)) return(unname(aliases[[value]]))
+  if (value %in% c("OTHER", "UNKNOWN", "UNASSIGNED")) return(fallback)
+  if (grepl("^[A-Z][A-Z0-9_.-]{0,39}$", value)) value else fallback
 }
 
-pitax_locus_display_name <- function(locus_id, fallback = "") {
+pitax_locus_display_name <- function(locus_id, fallback = "", vocabulary = NULL) {
   locus_id <- pitax_normalize_locus_id(locus_id)
-  vocabulary <- pitax_locus_vocabulary()
+  vocabulary <- pitax_coerce_locus_vocabulary(vocabulary)
   idx <- match(locus_id, vocabulary$Locus_ID)
   if (is.na(idx)) fallback else vocabulary$Display_Name[idx]
+}
+
+# The catalog belongs to a project, never to a process-global option/environment.
+# Missing catalogs in older schema-6 projects resolve to the built-in entries.
+pitax_coerce_locus_vocabulary <- function(vocabulary = NULL) {
+  defaults <- pitax_locus_vocabulary()
+  if (is.null(vocabulary)) return(defaults)
+  if (!is.data.frame(vocabulary) || !all(names(defaults) %in% names(vocabulary))) {
+    stop("The project locus list must contain Locus_ID and Display_Name columns.", call. = FALSE)
+  }
+  vocabulary <- vocabulary[, names(defaults), drop = FALSE]
+  vocabulary$Locus_ID <- vapply(vocabulary$Locus_ID, pitax_normalize_locus_id, character(1))
+  vocabulary$Display_Name <- trimws(as.character(vocabulary$Display_Name))
+  if (any(!nzchar(vocabulary$Locus_ID))) {
+    stop("Locus IDs must start with a letter and contain at most 40 letters, digits, dots, hyphens or underscores. Other, Unknown and Unassigned are reserved.", call. = FALSE)
+  }
+  if (anyNA(vocabulary$Display_Name) || any(!nzchar(vocabulary$Display_Name)) || any(nchar(vocabulary$Display_Name) > 100L)) {
+    stop("Every locus needs a display name of 1 to 100 characters.", call. = FALSE)
+  }
+  vocabulary <- rbind(vocabulary, defaults[!defaults$Locus_ID %in% vocabulary$Locus_ID, , drop = FALSE])
+  if (anyDuplicated(vocabulary$Locus_ID)) stop("Locus IDs must be unique, including aliases and letter case.", call. = FALSE)
+  if (anyDuplicated(tolower(vocabulary$Display_Name))) stop("Locus display names must be unique.", call. = FALSE)
+  rownames(vocabulary) <- NULL
+  vocabulary
+}
+
+pitax_save_locus <- function(vocabulary, locus_id, display_name, existing_id = NULL) {
+  vocabulary <- pitax_coerce_locus_vocabulary(vocabulary)
+  locus_id <- pitax_normalize_locus_id(locus_id)
+  display_name <- assay_scalar_text(display_name)
+  if (!is.null(existing_id)) {
+    existing_id <- assay_scalar_text(existing_id)
+    if (!existing_id %in% vocabulary$Locus_ID || !identical(locus_id, existing_id)) {
+      stop("A saved locus ID is stable. Edit its display name or add a new locus.", call. = FALSE)
+    }
+    vocabulary$Display_Name[match(existing_id, vocabulary$Locus_ID)] <- display_name
+  } else {
+    if (locus_id %in% vocabulary$Locus_ID) stop("That locus ID already exists. Choose it from the list or edit its display name.", call. = FALSE)
+    vocabulary <- rbind(vocabulary, data.frame(Locus_ID = locus_id, Display_Name = display_name, stringsAsFactors = FALSE))
+  }
+  pitax_coerce_locus_vocabulary(vocabulary)
+}
+
+assay_apply_locus_labels <- function(profiles, vocabulary) {
+  profiles <- assay_coerce_profiles(profiles)
+  vocabulary <- pitax_coerce_locus_vocabulary(vocabulary)
+  idx <- match(profiles$Locus_ID, vocabulary$Locus_ID)
+  found <- !is.na(idx)
+  profiles$Locus_Display_Name[found] <- vocabulary$Display_Name[idx[found]]
+  profiles
 }
 
 assay_clean_sequence <- function(x) {
@@ -99,7 +151,7 @@ assay_coerce_profiles <- function(df) {
   for (nm in text_columns) df[[nm]] <- as.character(df[[nm]])
   df$Locus_ID <- vapply(df$Locus_ID, pitax_normalize_locus_id, character(1))
   df$Locus_Display_Name <- vapply(seq_len(nrow(df)), function(i) {
-    pitax_locus_display_name(df$Locus_ID[i], assay_scalar_text(df$Locus_Display_Name[i]))
+    assay_scalar_text(df$Locus_Display_Name[i], pitax_locus_display_name(df$Locus_ID[i], df$Locus_ID[i]))
   }, character(1))
   df$Forward_Primer_Sequence <- vapply(df$Forward_Primer_Sequence, assay_clean_sequence, character(1))
   df$Reverse_Primer_Sequence <- vapply(df$Reverse_Primer_Sequence, assay_clean_sequence, character(1))
@@ -132,14 +184,16 @@ assay_profile_from_legacy_settings <- function(settings = NULL, assay_id = NULL)
 
 assay_default_profiles <- function() assay_profile_from_legacy_settings(list(target = "ITS"))
 
-assay_validate_profiles <- function(df) {
+assay_validate_profiles <- function(df, locus_vocabulary = NULL) {
   df <- assay_coerce_profiles(df)
   if (!nrow(df)) return("At least one assay profile is required.")
   if (any(!nzchar(trimws(df$Assay_ID)))) return("Every assay requires an Assay_ID.")
   if (anyDuplicated(df$Assay_ID)) return("Assay_ID values must be unique.")
   if (any(!nzchar(trimws(df$Assay_Name)))) return("Every assay requires a display name.")
-  valid_loci <- pitax_locus_vocabulary()$Locus_ID
-  if (any(!df$Locus_ID %in% valid_loci)) return("Every assay must use a locus from the controlled PITAX vocabulary.")
+  if (any(!nzchar(df$Locus_ID))) return("Every assay must use a valid locus identifier.")
+  if (!is.null(locus_vocabulary) && any(!df$Locus_ID %in% pitax_coerce_locus_vocabulary(locus_vocabulary)$Locus_ID)) {
+    return("Every assay must use a locus registered in the project locus list.")
+  }
   if (any(is.na(df$Expected_Amplicon_Length) | df$Expected_Amplicon_Length < 1L)) return("Expected amplicon length must be a positive integer for every assay.")
   if (any(is.na(df$Maximum_Sequence_Position) | df$Maximum_Sequence_Position < 50L)) return("Maximum sequence position must be at least 50 bp for every assay.")
   NULL
@@ -167,7 +221,7 @@ assay_editor_parse_integer <- function(x) {
 
 # Apply Assay editor fields only when numeric drafts are complete.
 # Incomplete values are skipped; invalid complete values are rejected without throwing.
-assay_try_apply_editor_inputs <- function(profiles, assay_id = "", editor = list()) {
+assay_try_apply_editor_inputs <- function(profiles, assay_id = "", editor = list(), locus_vocabulary = NULL) {
   original <- assay_coerce_profiles(profiles)
   if (!nrow(original)) original <- assay_default_profiles()
   assay_id <- assay_scalar_text(assay_id)
@@ -183,11 +237,10 @@ assay_try_apply_editor_inputs <- function(profiles, assay_id = "", editor = list
     return(list(committed = FALSE, reason = "incomplete", profiles = original, error = NULL, assay_id = assay_id))
   }
   candidate <- original
-  locus_id <- pitax_normalize_locus_id(editor$target, "ITS")
-  if (!nzchar(locus_id)) locus_id <- "ITS"
+  locus_id <- pitax_normalize_locus_id(editor$target)
   candidate$Assay_Name[idx] <- assay_scalar_text(editor$assay_name, pitax_locus_display_name(locus_id, locus_id))
   candidate$Locus_ID[idx] <- locus_id
-  candidate$Locus_Display_Name[idx] <- pitax_locus_display_name(locus_id, locus_id)
+  candidate$Locus_Display_Name[idx] <- pitax_locus_display_name(locus_id, locus_id, locus_vocabulary)
   candidate$Forward_Primer_Name[idx] <- assay_scalar_text(editor$forward_primer)
   candidate$Reverse_Primer_Name[idx] <- assay_scalar_text(editor$reverse_primer)
   candidate$Forward_Primer_Sequence[idx] <- assay_clean_sequence(editor$forward_primer_seq)
@@ -195,7 +248,7 @@ assay_try_apply_editor_inputs <- function(profiles, assay_id = "", editor = list
   candidate$Expected_Amplicon_Length[idx] <- assay_editor_parse_integer(amplicon)
   candidate$Maximum_Sequence_Position[idx] <- assay_editor_parse_integer(max_pos)
   candidate <- assay_coerce_profiles(candidate)
-  validation_error <- assay_validate_profiles(candidate[idx, , drop = FALSE])
+  validation_error <- assay_validate_profiles(candidate[idx, , drop = FALSE], locus_vocabulary)
   if (!is.null(validation_error)) {
     return(list(committed = FALSE, reason = "invalid", profiles = original, error = validation_error, assay_id = assay_id))
   }
@@ -248,7 +301,7 @@ assay_migrate_schema5_state <- function(state) {
   legacy_settings <- if (is.list(state$settings)) state$settings else list()
   raw_target <- assay_scalar_text(legacy_settings$target)
   resolved_locus <- pitax_normalize_locus_id(raw_target, "")
-  if (!nzchar(resolved_locus)) {
+  if (!nzchar(resolved_locus) || !resolved_locus %in% pitax_locus_vocabulary()$Locus_ID) {
     stop(
       paste0(
         "Cannot migrate project schema 5 to schema 6: the legacy target '",

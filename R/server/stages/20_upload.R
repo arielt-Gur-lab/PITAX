@@ -121,7 +121,7 @@
     if (is.na(idx)) return(invisible(NULL))
     row <- profiles[idx, , drop = FALSE]
     updateTextInput(session, "assay_name", value = row$Assay_Name[1])
-    updateSelectInput(session, "target", selected = row$Locus_ID[1])
+    updateSelectInput(session, "target", choices = pitax_locus_choices(rv$locus_vocabulary), selected = row$Locus_ID[1])
     updateTextInput(session, "forward_primer", value = row$Forward_Primer_Name[1])
     updateTextInput(session, "reverse_primer", value = row$Reverse_Primer_Name[1])
     updateTextInput(session, "forward_primer_seq", value = row$Forward_Primer_Sequence[1])
@@ -143,7 +143,7 @@
       reverse_primer_seq = input$reverse_primer_seq,
       expected_amplicon_len = input$expected_amplicon_len,
       absolute_max_base_index = input$absolute_max_base_index
-    ))
+    ), locus_vocabulary = rv$locus_vocabulary)
     if (!isTRUE(result$committed)) return(invisible(NULL))
     idx <- match(result$assay_id, result$profiles$Assay_ID)
     if (is.na(idx) || !length(idx)) return(invisible(NULL))
@@ -178,7 +178,7 @@
     if (is.null(input$target) || !nzchar(as.character(input$target)[1])) return()
     commit_active_assay_from_inputs()
     sync_assay_editor_choices(selected_assay_id())
-    if (!is.null(input$ab1_files) && nrow(input$ab1_files)) sync_assignment_state()
+    if (nrow(rv$read_assignments)) sync_assignment_state()
   }, ignoreInit = TRUE)
 
   observeEvent(input$assay_add_profile, {
@@ -208,6 +208,63 @@
     selected_assay_id(profiles$Assay_ID[1])
     sync_assay_editor_choices(profiles$Assay_ID[1])
     load_assay_editor_inputs(profiles$Assay_ID[1])
+  })
+
+  editing_locus_id <- reactiveVal(NULL)
+
+  open_locus_editor <- function(existing_id = NULL) {
+    vocabulary <- pitax_coerce_locus_vocabulary(rv$locus_vocabulary)
+    editing_locus_id(existing_id)
+    editing <- !is.null(existing_id)
+    showModal(modalDialog(
+      title = if (editing) "Edit locus" else "Add locus",
+      if (editing) tagList(
+        p(strong("Locus ID: "), tags$code(existing_id)),
+        p(class = "compact-hint", "The ID stays fixed so existing reads and results keep their identity.")
+      ) else textInput("locus_new_id", "Locus ID", "", placeholder = "e.g. SDHC"),
+      textInput("locus_display_name", "Display name", if (editing) vocabulary$Display_Name[match(existing_id, vocabulary$Locus_ID)] else ""),
+      div(class = "compact-hint", "Saved with this project. A new locus is selected for the active assay."),
+      footer = tagList(modalButton("Cancel"), actionButton("locus_save", "Save locus", class = "btn-primary")),
+      easyClose = FALSE
+    ))
+  }
+
+  observeEvent(input$locus_add, open_locus_editor())
+  observeEvent(input$locus_edit, {
+    locus_id <- assay_scalar_text(input$target)
+    req(locus_id %in% rv$locus_vocabulary$Locus_ID)
+    open_locus_editor(locus_id)
+  })
+  observeEvent(input$locus_save, {
+    existing_id <- editing_locus_id()
+    new_id <- if (is.null(existing_id)) input$locus_new_id else existing_id
+    vocabulary <- tryCatch(
+      pitax_save_locus(rv$locus_vocabulary, new_id, input$locus_display_name, existing_id),
+      error = function(e) e
+    )
+    if (inherits(vocabulary, "error")) {
+      showNotification(conditionMessage(vocabulary), type = "error", duration = 8)
+      return()
+    }
+    commit_active_assay_from_inputs()
+    locus_id <- pitax_normalize_locus_id(new_id)
+    profiles <- assay_apply_locus_labels(rv$assay_profiles, vocabulary)
+    idx <- match(selected_assay_id(), profiles$Assay_ID)
+    if (is.null(existing_id) && !is.na(idx)) {
+      profiles$Locus_ID[idx] <- locus_id
+      profiles$Locus_Display_Name[idx] <- pitax_locus_display_name(locus_id, locus_id, vocabulary)
+    }
+    rv$locus_vocabulary <- vocabulary
+    rv$assay_profiles <- profiles
+    if (!is.na(idx)) {
+      rv$settings <- assay_resolve_read_settings(profiles[idx, , drop = FALSE], rv$project_defaults, input$sequencing_primer)
+    }
+    sync_assay_editor_choices(selected_assay_id())
+    load_assay_editor_inputs(selected_assay_id())
+    sync_assignment_state()
+    rv$project_status_text <- "Unsaved project locus list changes."
+    removeModal()
+    showNotification(if (is.null(existing_id)) "Locus added and selected for the active assay." else "Locus display name updated.", type = "message")
   })
 
   session$onFlushed(function() {

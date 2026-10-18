@@ -90,6 +90,30 @@ stage2_empty_assignments <- function() {
 
 stage2_assignment_columns <- function() names(stage2_empty_assignments())
 
+# Text edits are literal and only write biological Isolate fields. Copying a
+# barcode is an explicit operator action, never an inferred biological identity.
+stage2_apply_batch_edits <- function(assignments, rows, find = "", replacement = "",
+                                     prefix = "", suffix = "", text_source = "isolate",
+                                     assay_id = "", direction = "") {
+  assignments <- stage2_coerce_assignments(assignments)
+  rows <- unique(as.integer(rows))
+  if (anyNA(rows) || any(rows < 1L | rows > nrow(assignments))) stop("Invalid assignment row selection.", call. = FALSE)
+  if (!text_source %in% c("isolate", "source")) stop("Choose isolate codes or source barcodes.", call. = FALSE)
+  # Spaces in the replacement/prefix/suffix are intentional text, not syntax.
+  text <- function(x) if (is.null(x) || !length(x) || is.na(x[1])) "" else as.character(x[1])
+  find <- text(find); replacement <- text(replacement); prefix <- text(prefix); suffix <- text(suffix)
+  values <- if (identical(text_source, "source")) assignments$Source_ID[rows] else assignments$Isolate[rows]
+  matches <- if (nzchar(find)) sum(grepl(find, values, fixed = TRUE), na.rm = TRUE) else 0L
+  if (nzchar(find)) values <- gsub(find, replacement, values, fixed = TRUE)
+  text_requested <- identical(text_source, "source") || nzchar(find) || nzchar(prefix) || nzchar(suffix)
+  if (text_requested) assignments$Isolate[rows] <- paste0(prefix, values, suffix)
+  assay_id <- stage2_scalar_text(assay_id)
+  if (nzchar(assay_id)) assignments$Assay_ID[rows] <- assay_id
+  direction <- stage2_scalar_text(direction)
+  if (nzchar(direction)) assignments$Direction[rows] <- stage2_normalize_direction(direction)
+  list(assignments = assignments, matched = as.integer(matches))
+}
+
 stage2_coerce_assignments <- function(df) {
   if (!is.data.frame(df)) return(stage2_empty_assignments())
   for (nm in setdiff(stage2_assignment_columns(), names(df))) df[[nm]] <- ""

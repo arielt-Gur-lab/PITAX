@@ -103,7 +103,7 @@ ui <- fluidPage(
 
         div(class = "stage-grid stage-grid-2",
           div(class = "panel-box settings-card",
-            card_title("Assay profiles", "Each assay has a controlled locus, primers and length limits. Assign every read to one assay later in Assign.", "flask"),
+            card_title("Assay profiles", "Each assay has a locus, primers and length limits. Add loci or edit their display names here; the locus list is saved with the project.", "flask"),
             div(class = "button-row",
               selectInput("assay_editor_select", "Active assay", choices = NULL),
               actionButton("assay_add_profile", "Add assay", icon = icon("plus")),
@@ -113,6 +113,10 @@ ui <- fluidPage(
             selectInput("target", "Locus",
                         pitax_locus_choices(),
                         selected = "ITS"),
+            div(class = "button-row",
+              actionButton("locus_add", "Add locus", icon = icon("plus")),
+              actionButton("locus_edit", "Edit selected locus", icon = icon("pencil"))
+            ),
             div(class = "form-grid-2",
               textInput("forward_primer", "Forward primer name", ""),
               textInput("reverse_primer", "Reverse primer name", "")
@@ -162,13 +166,17 @@ ui <- fluidPage(
             uiOutput("rename_key_status")
           ),
           div(class = "panel-box",
-            card_title("Batch assignment", "Apply isolate edits, gene and direction to checked rows. If no rows are checked, the action applies to all uploaded reads.", "edit"),
+            card_title("Batch assignment", "Apply literal text edits to isolate codes, or explicitly copy and edit source barcodes into isolate codes. Checked rows are used; if none are checked, all rows are used. Original barcodes stay unchanged.", "edit"),
+            selectInput("batch_text_source", "Text to edit", c(
+              "Isolate codes" = "isolate",
+              "Copy source barcodes into isolate codes" = "source"
+            ), selected = "isolate"),
             div(class = "form-grid-2",
               textInput("batch_isolate_prefix", "Isolate prefix", ""),
               textInput("batch_isolate_suffix", "Isolate suffix", "")
             ),
             div(class = "form-grid-2",
-              textInput("batch_isolate_find", "Find in isolate", ""),
+              textInput("batch_isolate_find", "Find text", ""),
               textInput("batch_isolate_replace", "Replace with", "")
             ),
             div(class = "form-grid-2",

@@ -60,7 +60,7 @@
         Shiny.addCustomMessageHandler('showLoader', function(message) {
           showStepLoader(message && message.text ? message.text : 'Loading workspace...');
         });
-        Shiny.addCustomMessageHandler('hideLoader', function() { hideStepLoader(true); });
+        Shiny.addCustomMessageHandler('hideLoader', function(message) { hideStepLoader(true); });
         $(document).on('shiny:busy', function() { $('#shiny_activity_bar').addClass('visible'); });
         $(document).on('shiny:idle', function() {
           $('#shiny_activity_bar').removeClass('visible');
@@ -71,7 +71,7 @@
         $(document).on('init.dt draw.dt', function() { scheduleTableAdjust(40); });
         $(document).on('shiny:value', function() { scheduleTableAdjust(90); });
         $(window).on('resize', function() { scheduleTableAdjust(100); });
-        Shiny.addCustomMessageHandler('adjustDataTables', function() { scheduleTableAdjust(30); });
+        Shiny.addCustomMessageHandler('adjustDataTables', function(message) { scheduleTableAdjust(30); });
 
         Shiny.addCustomMessageHandler('setHelpActive', function(message) {
           var btn = $('#workflow_open_help');
