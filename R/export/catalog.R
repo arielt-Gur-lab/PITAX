@@ -67,6 +67,7 @@ pitax_export_catalog <- function() {
       columns = list(
         pitax_export_col("Assay_ID", "Assay ID", "text", TRUE),
         pitax_export_col("Assay_Name", "Assay name", "text"),
+        pitax_export_col("Name_Source", "Name source", "text"),
         pitax_export_col("Locus_ID", "Locus ID", "text", TRUE),
         pitax_export_col("Locus_Display_Name", "Locus display name", "text"),
         pitax_export_col("Forward_Primer_Name", "Forward primer name", "text"),
@@ -109,6 +110,7 @@ pitax_export_catalog <- function() {
         pitax_export_col("Isolate", "Isolate", "text", TRUE),
         pitax_export_col("Assay_ID", "Assay ID", "text", TRUE),
         pitax_export_col("Locus", "Locus", "text", TRUE),
+        pitax_export_col("Name_Label", "Naming label", "text"),
         pitax_export_col("Direction", "Direction", "text"),
         pitax_export_col("Primer", "Primer", "text"),
         pitax_export_col("Final_Name", "Final name", "text", TRUE),

@@ -110,6 +110,9 @@ ui <- fluidPage(
               actionButton("assay_remove_profile", "Remove", icon = icon("trash"))
             ),
             textInput("assay_name", "Assay display name", ""),
+            radioButtons("assay_name_source", "Use in generated names",
+                         choices = c("Locus name" = "locus", "Assay display name" = "assay"),
+                         selected = "locus", inline = TRUE),
             selectInput("target", "Locus",
                         pitax_locus_choices(),
                         selected = "ITS"),

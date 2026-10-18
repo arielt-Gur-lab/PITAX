@@ -578,7 +578,7 @@ pitax_export_extract_multilocus_sequences <- function(snap, scope_ids = NULL) {
     seq <- as.character(ev$Sequence[i])
     out[[id]] <- list(
       id = id,
-      final_name = paste(ev$Isolate[i], ev$Locus[i], sep = "_"),
+      final_name = stage3_compose_sequence_name(ev$Isolate[i], stage4_scalar_text(ev$Name_Label[i], ev$Locus[i])),
       sequence = seq,
       sequence_role = "multilocus_locus",
       direction = "oriented",
