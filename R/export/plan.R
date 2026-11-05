@@ -74,6 +74,18 @@ pitax_export_build_plan <- function(snap, selection = pitax_export_default_selec
   omitted <- list()
   files <- list()
   warnings <- character()
+  # Diagnostics are retained without allowing an unrelated failed component
+  # to break a valid FASTA export.
+  failed_assessments <- names(availability)[vapply(availability, function(av) {
+    startsWith(as.character(av$reason %||% ""), "Component ") &&
+      grepl(" assessment failed: ", as.character(av$reason %||% ""), fixed = TRUE)
+  }, logical(1))]
+  if (length(failed_assessments)) {
+    warnings <- c(warnings, paste0(
+      "Some export components could not be assessed (other components remain usable): ",
+      paste(failed_assessments, collapse = ", ")
+    ))
+  }
   pending <- snap$pending_curation
   if (!is.null(pending)) {
     warnings <- c(warnings, "Unconfirmed curation edits are present and will NOT be applied during export.")
