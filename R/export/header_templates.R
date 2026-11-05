@@ -79,7 +79,7 @@ pitax_header_validate_template <- function(template, fields) {
   if (is.na(template) || !nzchar(trimws(template)) || grepl("[\r\n]", template)) {
     stop("FASTA header template must be one nonempty line.", call. = FALSE)
   }
-  template <- sub("^\\s*>\\s*", "", template)
+  template <- sub("^[[:space:]]*>[[:space:]]*", "", template)
   if (grepl(">", template, fixed = TRUE)) stop("FASTA header must not contain an extra '>' character.", call. = FALSE)
   tokens <- regmatches(template, gregexpr("\\{[A-Za-z][A-Za-z0-9_]*\\}", template, perl = TRUE))[[1]]
   if (is.null(tokens)) tokens <- character()
