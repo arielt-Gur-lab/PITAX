@@ -3,6 +3,8 @@
 # ============================================================
 
 pitax_export_execute <- function(snap, plan, dest_zip) {
+  phase <- "plan validation"
+  tryCatch({
   validated <- pitax_export_validate_plan(snap, plan)
   if (!isTRUE(validated$ok)) {
     stop(validated$error, call. = FALSE)
@@ -18,8 +20,10 @@ pitax_export_execute <- function(snap, plan, dest_zip) {
   scope_ids <- pitax_export_filter_scope_ids(snap, plan$selection)
 
   # Excel workbooks
+  phase <- "Excel workbook preparation"
   excel_files <- Filter(function(f) identical(f$kind, "excel"), plan$files)
   for (ef in excel_files) {
+    phase <- paste0("Excel workbook: ", ef$path)
     out_path <- file.path(temp_dir, ef$path)
     iso <- if (identical(plan$selection$excel_layout, "workbook_per_isolate") && length(ef$record_ids)) {
       ef$record_ids[1]
@@ -33,8 +37,10 @@ pitax_export_execute <- function(snap, plan, dest_zip) {
   }
 
   # Sequences: custom annotations are export-only, never alter analysis identity.
+  phase <- "FASTA sequence extraction"
   header_manifest <- list()
   for (id in plan$sequence_components) {
+    phase <- paste0("FASTA component ", id, " extraction/header generation")
     extractor <- pitax_export_extractor(id)
     seqs <- extractor(snap, scope_ids)
     if (identical(plan$selection$sequence_header, "custom")) {
@@ -50,6 +56,7 @@ pitax_export_execute <- function(snap, plan, dest_zip) {
     }
     related <- Filter(function(f) identical(f$component_id, id) && f$kind %in% c("fasta", "text"), plan$files)
     for (ff in related) {
+      phase <- paste0("FASTA file: ", ff$path)
       out_path <- file.path(temp_dir, ff$path)
       if (grepl("_missing_sequences\\.txt$", ff$path)) {
         lines <- vapply(ff$record_ids, function(rid) {
@@ -83,6 +90,7 @@ pitax_export_execute <- function(snap, plan, dest_zip) {
     }
   }
 
+  phase <- "FASTA metadata manifest"
   if (length(header_manifest)) {
     metadata_path <- file.path(temp_dir, "sequences", "FASTA_header_manifest.csv")
     dir.create(dirname(metadata_path), recursive = TRUE, showWarnings = FALSE)
@@ -93,6 +101,7 @@ pitax_export_execute <- function(snap, plan, dest_zip) {
   }
 
   # Text artifacts
+  phase <- "text artifacts"
   for (id in plan$text_components) {
     extractor <- pitax_export_extractor(id)
     items <- extractor(snap, scope_ids)
@@ -108,6 +117,7 @@ pitax_export_execute <- function(snap, plan, dest_zip) {
   }
 
   # Raw AB1 copies
+  phase <- "raw AB1 copies"
   for (id in plan$raw_components) {
     extractor <- pitax_export_extractor(id)
     df <- extractor(snap, scope_ids)
@@ -126,6 +136,7 @@ pitax_export_execute <- function(snap, plan, dest_zip) {
   }
 
   # Plots (optional failures)
+  phase <- "plots"
   if (isTRUE(plan$selection$include_plots)) {
     for (id in plan$plot_components) {
       related <- Filter(function(f) identical(f$component_id, id) && identical(f$kind, "plot"), plan$files)
@@ -167,12 +178,14 @@ pitax_export_execute <- function(snap, plan, dest_zip) {
     }
   }
 
+  phase <- "RUN_INFO metadata"
   run_info_path <- file.path(temp_dir, "RUN_INFO.txt")
   pitax_export_write_run_info(run_info_path, snap, plan, written, failures)
   written[[length(written) + 1L]] <- pitax_export_planned_file("RUN_INFO.txt", "run_info", kind = "text")
 
   files <- list.files(temp_dir, recursive = TRUE, full.names = TRUE)
   if (!length(files)) stop("Export produced no files.", call. = FALSE)
+  phase <- "ZIP packaging"
   zip::zipr(dest_zip, files, root = temp_dir)
 
   invisible(list(
@@ -182,6 +195,9 @@ pitax_export_execute <- function(snap, plan, dest_zip) {
     warnings = c(plan$warnings, if (length(failures)) paste0("Optional plot failures: ", length(failures)) else character())
   ))
 }
+  }, error = function(e) {
+    stop(paste0("Export phase [", phase, "] failed: ", conditionMessage(e)), call. = FALSE)
+  })
 
 pitax_export_package_filename <- function(snap, selection = list()) {
   stem <- "PITAX_export"
