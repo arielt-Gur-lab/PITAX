@@ -135,8 +135,13 @@ dir.create(unpacked)
 utils::unzip(full_zip, exdir = unpacked)
 fasta_files <- list.files(unpacked, pattern = "[.]fasta$", recursive = TRUE, full.names = TRUE)
 stopifnot(length(fasta_files) == 18L)
-first_header <- readLines(file.path(unpacked, "sequences", "qc_trimmed_sequences",
-                                   "ISO1_TEF_R.fasta"), n = 1L)
+first_fasta <- file.path(unpacked, "sequences", "qc_trimmed_sequences",
+                         "ISO1_TEF_R.fasta")
+if (!file.exists(first_fasta)) {
+  stop("ZIP archive layout wrong: ", paste(utils::unzip(full_zip, list = TRUE)$Name,
+                                          collapse = ", "))
+}
+first_header <- readLines(first_fasta, n = 1L)
 stopifnot(identical(first_header, ">ISO1_TEF_R organism=En"),
           !grepl("experiment=", first_header, fixed = TRUE))
 manifest <- utils::read.csv(file.path(unpacked, "sequences", "FASTA_header_manifest.csv"),
