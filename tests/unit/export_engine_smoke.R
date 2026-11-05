@@ -189,6 +189,41 @@ analysis <- pitax_export_extract_consensus_analysis_sequences(snap_qc, c("S1"))
 check(identical(trimmed$S1$sequence_role, "trimmed_curated_read"), "Trimmed role must be labeled")
 check(identical(analysis$ISO1_ITS$sequence_role, "consensus"), "Consensus role must be labeled")
 
+# --- Full FASTA names (per-read default), legacy rename-map precedence -----
+sel_read <- pitax_export_default_selection("qc", "stage")
+check(identical(sel_read$sequence_layout, "per_record"), "Per-read FASTA should be the default export layout")
+sel_read$component_ids <- "qc_trimmed_sequences"
+sel_read$include_plots <- FALSE
+plan_read <- pitax_export_build_plan(snap_qc, sel_read)
+read_paths <- vapply(Filter(function(x) identical(x$kind, "fasta"), plan_read$files), function(x) x$path, character(1))
+check(setequal(read_paths, c("sequences/qc_trimmed_sequences/ISO1_ITS_F.fasta",
+                             "sequences/qc_trimmed_sequences/ISO1_ITS_R.fasta")),
+      "Per-record export paths must retain the complete final read names")
+zip_read <- tempfile(fileext = ".zip")
+pitax_export_execute(snap_qc, plan_read, zip_read)
+read_dir <- tempfile("read_fasta_zip_")
+dir.create(read_dir)
+utils::unzip(zip_read, exdir = read_dir)
+fasta_read <- file.path(read_dir, "sequences", "qc_trimmed_sequences", "ISO1_ITS_R.fasta")
+check(file.exists(fasta_read), "ZIP must include the full-name per-read FASTA file")
+check(identical(readLines(fasta_read, n = 1L), ">ISO1_ITS_R"),
+      "The per-read FASTA header must use the complete final read name")
+
+sel_grouped <- sel_read
+sel_grouped$sequence_layout <- "per_isolate"
+plan_grouped <- pitax_export_build_plan(snap_qc, sel_grouped)
+grouped_paths <- vapply(Filter(function(x) identical(x$kind, "fasta"), plan_grouped$files), function(x) x$path, character(1))
+check(identical(grouped_paths, "sequences/qc_trimmed_sequences/ISO1.fasta"),
+      "Explicit per-isolate grouped exports should retain their isolate-only package filename")
+
+snap_legacy <- snap_qc
+snap_legacy$read_assignments$Final_Name[2] <- "320_TEF_R"
+snap_legacy$rename$New_name[2] <- "320"
+check(identical(pitax_export_final_name(snap_legacy, "S2"), "320_TEF_R"),
+      "Explicit Final_Name must override an outdated isolate-only rename map")
+check(identical(pitax_export_extract_qc_trimmed_sequences(snap_legacy, "S2")$S2$final_name, "320_TEF_R"),
+      "Read sequence export must inherit the full explicit final name"
+
 # --- BLAST partial / waiting / failed / stale --------------------------------
 state_blast <- state_qc
 state_blast$blast_jobs <- data.frame(
