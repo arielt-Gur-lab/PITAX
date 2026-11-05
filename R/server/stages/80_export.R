@@ -155,6 +155,26 @@
     ))
   }
 
+  observeEvent(input$export_select_fasta_only, {
+    availability <- export_dialog_state$plan$availability
+    selected <- character()
+    for (id in names(availability)) {
+      component <- pitax_export_get_component(id)
+      use <- !is.null(component) && identical(component$kind, "sequence") &&
+        availability[[id]]$status %in% pitax_export_selectable_statuses()
+      updateCheckboxInput(session, paste0("export_comp_", id), value = isTRUE(use))
+      if (isTRUE(use)) selected <- c(selected, id)
+    }
+    if (length(selected)) {
+      showNotification(paste0("Selected ", length(selected),
+                              " available FASTA sequence component(s). Other exports disabled."),
+                       type = "message", duration = 6)
+    } else {
+      showNotification("No FASTA sequence components are available for this selection.",
+                       type = "warning", duration = 8)
+    }
+  }, ignoreInit = TRUE)
+
   observeEvent(input$open_export_output, {
     open_shared_export_dialog(if (!is.null(input$pipeline_step)) as.character(input$pipeline_step)[1] else "export")
   }, ignoreInit = TRUE)
