@@ -66,8 +66,20 @@ pitax_export_planned_file <- function(path, component_id, record_ids = character
 }
 
 pitax_export_build_plan <- function(snap, selection = pitax_export_default_selection()) {
-  selection <- modifyList(pitax_export_default_selection(selection$stage_id %||% "export",
-                                                         selection$scope %||% "stage"), selection)
+  # Merge only top-level selection options. utils::modifyList() recursively
+  # merges nested lists/data.frames; with a default zero-row header_config$values
+  # and a saved 18-record values table it throws:
+  #   "replacement has 18 rows, data has 0"
+  # The metadata table is atomic project data, never a list of options to merge.
+  requested_selection <- selection
+  selection <- pitax_export_default_selection(requested_selection$stage_id %||% "export",
+                                               requested_selection$scope %||% "stage")
+  for (name in names(requested_selection)) {
+    if (!is.null(requested_selection[[name]])) {
+      selection[[name]] <- requested_selection[[name]]
+    }
+  }
+  selection$header_config <- pitax_header_coerce_config(selection$header_config)
   availability <- pitax_export_assess_all(snap, selection)
   requested <- unique(as.character(selection$component_ids))
   included <- character()
