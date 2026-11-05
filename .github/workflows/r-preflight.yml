@@ -19,3 +19,5 @@ jobs:
           use-public-rspm: true
       - name: Parse all R sources
         run: Rscript tests/preflight/parse_all_r_sources.R
+      - name: Exercise FASTA and empty-table exports with 18 records
+        run: Rscript tests/preflight/export_writer_base_smoke.R
