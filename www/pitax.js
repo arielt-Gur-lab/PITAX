@@ -4,6 +4,14 @@
       Shiny.addCustomMessageHandler('copyText', function(message) {
         navigator.clipboard.writeText(message.text);
       });
+      // The ZIP is created and validated on the server before navigation.
+      // A failed header/metadata validation stays in the export modal.
+      Shiny.addCustomMessageHandler('pitaxPreparedExportReady', function(message) {
+        var id = (message && message.id) || 'download_export_package';
+        var link = document.getElementById(id);
+        if (!link) return;
+        link.click();
+      });
 
       (function() {
         var owner = null;
