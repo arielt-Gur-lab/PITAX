@@ -24,6 +24,7 @@ pitax_export_default_selection <- function(stage_id = "export", scope = c("stage
     excel_layout = "sheet_per_component",
     sequence_layout = "per_record",
     sequence_header = "short",
+    header_config = pitax_header_default_config(),
     include_plots = TRUE,
     package_name = "PITAX_export_package.zip"
   )

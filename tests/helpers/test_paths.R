@@ -20,7 +20,7 @@ pitax_app_contract_files <- c(
   file.path("R", "server", "stages", c(
     "00_state.R", "05_workflow.R", "10_project.R", "20_upload.R", "30_trimming.R",
     "40_qc_summary.R", "50_evidence_review.R", "60_assignment.R",
-    "70_consensus.R", "80_export.R", "90_blast.R", "100_taxonomy.R",
+    "70_consensus.R", "80_export.R", "85_fasta_header_builder.R", "90_blast.R", "100_taxonomy.R",
     "110_multilocus.R", "120_reset.R"
   )),
   file.path("www", "pitax.js"),

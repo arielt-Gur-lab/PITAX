@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.6.0
+
+- Added Custom FASTA Header Builder to shared Export: reusable tokenized templates, per-record custom metadata, table cell editing, selected/all bulk edits, and a live preview of the exact headers.
+- Added portable CSV import/export for named templates; project-specific templates, drafts, custom field names and metadata values survive Save/Load and Share Project.
+- Custom FASTA headers support read, analysis/consensus, BLAST query and multi-locus sequence exports without changing read identity, internal naming, biological assignment or the FASTA filename.
+- Strict validation blocks unknown/missing template tokens, line breaks, FASTA header injection and duplicated primary sequence IDs. Each custom export includes FASTA_header_manifest.csv and the template/field list in RUN_INFO.
+- Added coverage for generated FASTA ZIP content, bulk metadata model, template validation, uniqueness, and serialized project persistence. No schema bump: the additional project state field is optional for existing schema-6 projects.
+
+
 ## 3.5.2
 
 - Fixed the Ambiguous peak review header-to-column alignment by using one DataTable with native horizontal scrolling rather than separate scrollX header/body tables.

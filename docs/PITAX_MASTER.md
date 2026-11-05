@@ -1,7 +1,7 @@
 # PITAX — מסמך מאסטר להמשך הפיתוח
 
-גרסת מסמך: 1.2
-בסיס קוד נוכחי: `3.5.1`
+גרסת מסמך: 1.3
+בסיס קוד נוכחי: `3.6.0`
 סכמת פרויקט נוכחית: `6`
 השלב הפעיל: `Alpha 10` — Schema 6; Share Project יוצר snapshot בלתי משתנה בשרת עם קישור `?share=TOKEN` (תפוגה 1/3/7 ימים). Export הוא מנגנון חבילה משותף לכל השלבים עם קטלוג רכיבים מפורש ו-`RUN_INFO.txt`. אין שיתוף סשן חי ואין עריכה משותפת. מגבלות marker נקבעות על ידי המשתמש; scheduler NCBI גלובלי בין sessions נשאר לחובת Stage 5 לפני stable.
 
@@ -193,11 +193,14 @@ AB1
 - `locus_vocabulary`: רשימת לוקוסים של הפרויקט, עם מזהים קבועים ושמות תצוגה הניתנים לעריכה; החל מגרסה 3.5.0. בפרויקט schema 6 ישן ללא השדה משתמשים ברשימה המובנית.
 - `project_defaults`: ברירות המחדל הכלליות של החיתוך שאינן שייכות ל־Assay מסוים.
 - `read_assignments`: זהויות ושיוכים מפורשים.
+- `fasta_header_config` (אופציונלי ב-schema 6): תבניות כותרת FASTA, רשימת שדות מטא־דאטה, טיוטה פעילה וערכים לפי מזהה רשומה יציב. היעדר השדה בפרויקט ישן מקבל תבנית ברירת מחדל ללא שינוי תוצאות.
 - `architecture`: מבט Project → Isolate → Locus → Read.
 - `consensus_set`: רשומות analysis והיסטוריית ביקורת.
 - `blast_jobs`, `blast_raw`, `blast_hits`.
 - `taxonomy_summary`, `taxonomy_hits`, `taxonomy_counts`.
 - `multilocus_profile`.
+
+ב־3.6.0 מנגנון Custom FASTA Headers פועל בשכבת Export בלבד: הוא מרחיב משתנים כגון {Final_Name}, {Isolate}, {Locus}, {Organism}, {Experiment} ו־{Seq_Date} לכותרת FASTA. ערכי metadata ניתנים לעריכה לכל Read או Analysis record ולהחלה קבוצתית, אך אינם קובעים זהות ביולוגית ואינם משנים שם קובץ, רצף, BLAST או revision. Template וערכים נכללים ב־Save/Load/Share; ניתן להעביר תבניות בין פרויקטים באמצעות CSV. קובץ `FASTA_header_manifest.csv` מתעד את הכותרות שיוצאו. שם מזהה כפול או משתנה נדרש חסר חוסמים ייצוא מותאם.
 
 ה־`.sangerproject` הוא מנגנון ההתמדה הנייד. אין להסתמך על מערכת הקבצים הזמנית של שרת Shiny כאחסון מעבדתי קבוע.
 

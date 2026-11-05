@@ -8,6 +8,7 @@
     multilocus_profile = stage4_empty_profile(),
     multilocus_imports = list(),
     project_mode = "simple",
+    fasta_header_config = pitax_header_default_config(),
     assignment_signature = "",
     project_migration_log = "",
     blast_jobs = data.frame(

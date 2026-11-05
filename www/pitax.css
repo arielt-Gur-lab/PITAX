@@ -787,6 +787,12 @@
       .pipeline-schema-title { font-size:10px; }
       .schema-label { font-size:10.5px; }
       .dataTables_wrapper { color:#334155; }
+      .fasta-header-builder { margin:16px 0; padding:16px; border:1px solid #d6e4f8; border-radius:12px; background:#f8fbff; }
+      .fasta-header-builder .form-group { max-width:100%; min-width:0; }
+      .fasta-header-table-scroll { width:100%; max-width:100%; overflow-x:auto; margin:10px 0 18px; }
+      .fasta-header-table-scroll table.dataTable { min-width:860px; }
+      .fasta-header-table-scroll table.dataTable th,
+      .fasta-header-table-scroll table.dataTable td { white-space:nowrap; }
       /* Peak review uses native horizontal scrolling around ONE table, so the
          headers cannot drift from columns in DataTables' split scrollX clones. */
       .peak-review-table-scroll { width:100%; max-width:100%; overflow-x:auto; }

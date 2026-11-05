@@ -32,10 +32,22 @@ pitax_export_execute <- function(snap, plan, dest_zip) {
     })
   }
 
-  # Sequences
+  # Sequences: custom annotations are export-only, never alter analysis identity.
+  header_manifest <- list()
   for (id in plan$sequence_components) {
     extractor <- pitax_export_extractor(id)
     seqs <- extractor(snap, scope_ids)
+    if (identical(plan$selection$sequence_header, "custom")) {
+      seqs <- pitax_header_apply_to_records(seqs, id, plan$selection$header_config)
+      for (rid in names(seqs)) {
+        rec <- seqs[[rid]]
+        if (is.null(rec$custom_header)) next
+        header_manifest[[length(header_manifest) + 1L]] <- data.frame(
+          Component = id, Record_ID = rid, Final_Name = as.character(rec$final_name),
+          Header = paste0(">", rec$custom_header), stringsAsFactors = FALSE
+        )
+      }
+    }
     related <- Filter(function(f) identical(f$component_id, id) && f$kind %in% c("fasta", "text"), plan$files)
     for (ff in related) {
       out_path <- file.path(temp_dir, ff$path)
@@ -69,6 +81,15 @@ pitax_export_execute <- function(snap, plan, dest_zip) {
         writeLines(ans$missing_lines, miss_path)
       }
     }
+  }
+
+  if (length(header_manifest)) {
+    metadata_path <- file.path(temp_dir, "sequences", "FASTA_header_manifest.csv")
+    dir.create(dirname(metadata_path), recursive = TRUE, showWarnings = FALSE)
+    utils::write.csv(do.call(rbind, header_manifest), metadata_path, row.names = FALSE, fileEncoding = "UTF-8")
+    written[[length(written) + 1L]] <- pitax_export_planned_file(
+      "sequences/FASTA_header_manifest.csv", "custom_fasta_headers", kind = "table"
+    )
   }
 
   # Text artifacts
