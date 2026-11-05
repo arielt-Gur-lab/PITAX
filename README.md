@@ -1,4 +1,4 @@
-PITAX v3.5.1 - Per-assay sequence naming
+PITAX v3.6.0 - Custom FASTA Header Builder
 =========================================================
 
 Purpose
@@ -16,6 +16,28 @@ separate from result export.
 The authoritative guide for continuing development is:
 
   docs/PITAX_MASTER.md
+
+Custom FASTA Header Builder (Export)
+------------------------------------
+1. Open Export from any stage after read assignments/sequence processing.
+2. Under FASTA headers, select "Custom FASTA headers".
+3. Edit the one-line token template, e.g.:
+   {Final_Name} organism={Organism} experiment="{Experiment}" date={Seq_Date}
+4. Double-click metadata cells for individual records, or select rows and
+   use bulk field/value updates; use All records for global experiment values.
+5. Add custom fields (e.g. Fungicide or Location) and use {Fungicide}
+   in the template. Built-ins are Final_Name, Isolate, Locus, Direction,
+   Source_ID and Record_ID.
+6. Review the live header preview; missing tokens and duplicate primary
+   FASTA sequence identifiers must be resolved before custom export.
+7. Download the ZIP: per-read filenames remain 315_TEF_R.fasta while headers
+   contain the chosen metadata. FASTA_header_manifest.csv lists the outputs.
+
+Saved templates and metadata values persist in the .sangerproject and shared
+snapshots. Template CSV export/import transfers reusable templates and their
+field names between projects; per-record values do not transfer automatically.
+Sequencing dates are entered by the user, not guessed from the export date.
+These headers never change the authoritative read/analysis identity or BLAST.
 
 Stage 4 workflow
 ----------------
@@ -61,9 +83,9 @@ Run `run_tests.bat` on Windows with R installed.
 
 Expected final line:
 
-  All PITAX v3.5.1 tests passed.
+  All PITAX v3.6.0 tests passed.
 
-The suite now has 20 groups. Alpha 10 covers controlled loci, multi-assay profiles,
+The suite now has 22 groups. Alpha 10 covers controlled loci, multi-assay profiles,
 schema-5 migration, gated Steps UI navigation and same-project multi-locus integration.
 Stage 4 tests prove duplicate Isolate/Locus blocking, provenance retention, missing-evidence
 reporting, correct separation of multiple isolates in the visual selector and that a 2:1
