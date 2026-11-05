@@ -309,7 +309,7 @@
     if (length(result$outcome$failures)) {
       export_dialog_state$last_result_message <- paste0(
         "ZIP ready (", length(result$outcome$failures),
-        " optional plot failure(s) described in RUN_INFO)."
+        " optional plot failure(s) described in RUN_INFO). Click the green '2. Download ready ZIP' button."
       )
     } else {
       export_dialog_state$last_result_message <- "ZIP prepared. Click the green '2. Download ready ZIP' button to save it."
