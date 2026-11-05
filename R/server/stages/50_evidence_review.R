@@ -219,7 +219,7 @@
           Shiny.setInputValue('peak_flag_context', {position: row[0], nonce: Math.random()}, {priority: 'event'});
         });
       "),
-      options = list(pageLength = 10, lengthChange = FALSE, scrollX = TRUE, autoWidth = TRUE, dom = "tip", order = list(list(0, "asc")))
+      options = list(pageLength = 10, lengthChange = FALSE, scrollX = FALSE, autoWidth = TRUE, dom = "tip", order = list(list(0, "asc")))
     )
   })
 
