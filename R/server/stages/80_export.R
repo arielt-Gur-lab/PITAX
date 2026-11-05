@@ -322,13 +322,7 @@
     filename = function() export_dialog_state$prepared_name %||% "PITAX_export.zip",
     contentType = "application/zip",
     content = function(file) {
-      prepared <- export_dialog_state$prepared_zip
-      if (is.null(prepared) || !file.exists(prepared)) {
-        stop("Prepared export expired. Re-open Export and try again.", call. = FALSE)
-      }
-      if (!file.copy(prepared, file, overwrite = TRUE)) {
-        stop("Could not transfer the prepared export ZIP.", call. = FALSE)
-      }
+      pitax_export_transfer_prepared_zip(export_dialog_state$prepared_zip, file)
     }
   )
 
