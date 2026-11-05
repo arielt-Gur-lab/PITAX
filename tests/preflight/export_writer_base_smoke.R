@@ -130,6 +130,12 @@ snapshot$source_stage <- "qc"
 full_zip <- tempfile(fileext = ".zip")
 pitax_export_execute(snapshot, plan, full_zip)
 stopifnot(file.exists(full_zip), file.info(full_zip)$size > 0)
+# The download handler must serve the exact ZIP bytes prepared on the server.
+delivered <- tempfile(fileext = ".zip")
+pitax_export_transfer_prepared_zip(full_zip, delivered)
+stopifnot(file.exists(delivered),
+          file.info(delivered)$size == file.info(full_zip)$size,
+          identical(unname(tools::md5sum(delivered)), unname(tools::md5sum(full_zip))))
 unpacked <- tempfile("pitax_18_record_export_")
 dir.create(unpacked)
 utils::unzip(full_zip, exdir = unpacked)
