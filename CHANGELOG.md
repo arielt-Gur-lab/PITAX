@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.6.1 — Custom FASTA export hotfix
+
+- Fixed a wrongly escaped FASTA-header validation regex in the writer that rejected ordinary metadata text containing "r"/"n" and triggered HTTP 500 during ZIP generation.
+- Fixed stale input text overriding a saved/loaded header template: only tokens in the active template are required; omitted Experiment/Seq_Date fields are no longer demanded by the preview.
+- Preview is now scoped to sequence components actually selected for export instead of unrelated project record families; required metadata fields are shown explicitly.
+- Replaced direct export download with a two-phase Shiny prepare-and-download flow. Export ZIPs are created and checked before the browser starts downloading; errors show actionable notifications in the modal rather than an HTTP 500 page.
+- Added regression tests for excluding optional experiment, the full research header, the writer's former r/n rejection and inline error feedback.
+
+
 ## 3.6.0
 
 - Added Custom FASTA Header Builder to shared Export: reusable tokenized templates, per-record custom metadata, table cell editing, selected/all bulk edits, and a live preview of the exact headers.
