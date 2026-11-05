@@ -2,6 +2,15 @@
 # Shared export dialog UI helpers
 # ============================================================
 
+# Native Shiny download link, created only after a verified ZIP exists.
+# This helper is also exercised in a headless-browser integration test.
+pitax_export_prepared_download_button <- function(path) {
+  if (is.null(path) || length(path) != 1L || !file.exists(path)) return(NULL)
+  if (is.na(file.info(path)$size) || file.info(path)$size < 1L) return(NULL)
+  shiny::downloadButton("download_export_package", "2. Download ready ZIP",
+                        class = "btn-success", icon = shiny::icon("download"))
+}
+
 pitax_export_dialog_ui <- function(stage_id = "export", availability = list(),
                                    default_ids = character(), preview = NULL,
                                    file_plan = list(), warnings = character(),
