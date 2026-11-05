@@ -104,6 +104,7 @@
     sel$excel_layout <- if (!is.null(input$export_excel_layout)) as.character(input$export_excel_layout)[1] else "sheet_per_component"
     sel$sequence_layout <- if (!is.null(input$export_sequence_layout)) as.character(input$export_sequence_layout)[1] else "per_record"
     sel$sequence_header <- if (!is.null(input$export_sequence_header)) as.character(input$export_sequence_header)[1] else "short"
+    sel$header_config <- header_builder_config()
     sel$include_plots <- if (is.null(input$export_include_plots)) TRUE else isTRUE(input$export_include_plots)
     sel
   }
@@ -124,6 +125,7 @@
     plan <- pitax_export_build_plan(snap, sel)
     export_dialog_state$snap <- snap
     export_dialog_state$plan <- plan
+    export_header_state$config <- pitax_header_coerce_config(rv$fasta_header_config)
     export_dialog_state$stage_id <- stage_id
 
     asg <- snap$read_assignments
@@ -146,7 +148,8 @@
       isolate_choices = isolate_choices,
       locus_choices = locus_choices,
       assay_choices = assay_choices,
-      current_sample = snap$current_sample
+      current_sample = snap$current_sample,
+      header_config = export_header_state$config
     ))
   }
 
