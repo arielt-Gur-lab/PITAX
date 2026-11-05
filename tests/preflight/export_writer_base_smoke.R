@@ -1,8 +1,9 @@
 # Base-R export smoke regression: no CRAN packages required.
 # Intended for GitHub Actions startup/CI preflight and local development.
 stopifnot(file.exists("VERSION.txt"))
-for (path in c("R/export/export_tools.R", "R/export/availability.R",
-               "R/export/plan.R", "R/export/writers.R",
+for (path in c("R/export/export_tools.R", "R/export/catalog.R",
+               "R/export/availability.R",
+               "R/export/plan.R", "R/export/writers.R", "R/export/execute.R",
                "R/export/header_templates.R")) source(path, local = FALSE)
 
 empty18 <- as.data.frame(setNames(rep(list(character()), 18L),
@@ -48,4 +49,104 @@ config$values$Experiment[] <- ""
 config$values$Seq_Date[] <- ""
 rendered <- pitax_header_apply_to_records(records, "qc_trimmed_sequences", config)
 stopifnot(identical(rendered[["S18"]]$custom_header, "ISO18_TEF_R organism=En"))
-cat("Base-R FASTA export and empty-table smoke passed (18 records).\n")
+# Active template controls the visible table fields; old saved templates do not
+# force Experiment into newly saved profiles that omit it.
+config$draft_template <- ">{Final_Name} organism={Organism}"
+asgs <- data.frame(Source_ID = paste0("S", seq_len(18L)),
+                   Isolate = paste0("ISO", seq_len(18L)),
+                   Locus = rep("TEF", 18L),
+                   Direction = rep("Reverse", 18L),
+                   Final_Name = paste0("ISO", seq_len(18L), "_TEF_R"),
+                   stringsAsFactors = FALSE)
+snapshot <- list(read_assignments = asgs, results = records,
+                 consensus_set = list(records = list()),
+                 multilocus_profile = list())
+display <- pitax_header_active_edit_table(snapshot, config)
+stopifnot(nrow(display) == 18L,
+          !("Experiment" %in% names(display)),
+          !("Seq_Date" %in% names(display)),
+          "Organism" %in% names(display),
+          identical(pitax_header_active_metadata_fields(config), "Organism"))
+config$templates[["Without Experiment"]] <- config$draft_template
+config$active_template <- "Without Experiment"
+restored <- pitax_header_coerce_config(unserialize(serialize(config, NULL)))
+stopifnot(identical(pitax_header_active_metadata_fields(restored), "Organism"))
+
+# The former plan builder assessed EVERY component, so a broken unrelated
+# taxonomy table could abort even a FASTA-only export.
+fake_assessor <- function(id, snap, selection) {
+  if (identical(id, "taxonomy_team_summary")) {
+    broken <- data.frame()
+    broken$unexpected <- seq_len(18L)
+  }
+  pitax_export_status("available", record_count = 18L)
+}
+component_status <- pitax_export_assess_all(
+  snapshot, list(), component_ids = c("qc_trimmed_sequences", "taxonomy_team_summary"),
+  assessor = fake_assessor
+)
+stopifnot(identical(component_status$qc_trimmed_sequences$status, "available"),
+          identical(component_status$taxonomy_team_summary$status, "blocked"),
+          grepl("replacement has 18 rows, data has 0",
+                component_status$taxonomy_team_summary$reason, fixed = TRUE),
+          grepl("taxonomy_team_summary",
+                component_status$taxonomy_team_summary$reason, fixed = TRUE))
+
+# Exercise the actual export plan with 18 source reads and deliberately
+# incomplete/unavailable non-FASTA project components.
+snapshot$results <- lapply(records, function(x) list(seq = x$sequence))
+snapshot$summary <- data.frame()
+snapshot$upload_files <- data.frame()
+snapshot$settings <- list()
+snapshot$assay_profiles <- data.frame()
+snapshot$project_defaults <- list()
+snapshot$rename <- data.frame()
+snapshot$architecture <- list()
+snapshot$blast_jobs <- data.frame()
+snapshot$blast_hits <- data.frame()
+snapshot$blast_raw <- list()
+snapshot$taxonomy_summary <- data.frame()
+snapshot$taxonomy_hits <- data.frame()
+snapshot$taxonomy_counts <- data.frame()
+snapshot$project_mode <- "simple"
+snapshot$snapshot_id <- "18_read_smoke_snapshot"
+selection <- pitax_export_default_selection("qc", "stage")
+selection$component_ids <- "qc_trimmed_sequences"
+selection$include_plots <- FALSE
+selection$sequence_header <- "custom"
+selection$header_config <- config
+plan <- pitax_export_build_plan(snapshot, selection)
+stopifnot(identical(plan$sequence_components, "qc_trimmed_sequences"),
+          length(Filter(function(f) identical(f$kind, "fasta"), plan$files)) == 18L,
+          identical(plan$availability$qc_trimmed_sequences$status, "available"))
+
+# End-to-end: the same 18 values that previously crashed modifyList must
+# survive build -> validate/rebuild -> writer -> ZIP manifest.
+snapshot$app_version <- "3.6.4"
+snapshot$schema_version <- 6L
+snapshot$captured_at <- Sys.time()
+snapshot$timezone <- "UTC"
+snapshot$source_stage <- "qc"
+full_zip <- tempfile(fileext = ".zip")
+pitax_export_execute(snapshot, plan, full_zip)
+stopifnot(file.exists(full_zip), file.info(full_zip)$size > 0)
+unpacked <- tempfile("pitax_18_record_export_")
+dir.create(unpacked)
+utils::unzip(full_zip, exdir = unpacked)
+fasta_files <- list.files(unpacked, pattern = "[.]fasta$", recursive = TRUE, full.names = TRUE)
+stopifnot(length(fasta_files) == 18L)
+first_fasta <- file.path(unpacked, "sequences", "qc_trimmed_sequences",
+                         "ISO1_TEF_R.fasta")
+if (!file.exists(first_fasta)) {
+  stop("ZIP archive layout wrong: ", paste(utils::unzip(full_zip, list = TRUE)$Name,
+                                          collapse = ", "))
+}
+first_header <- readLines(first_fasta, n = 1L)
+stopifnot(identical(first_header, ">ISO1_TEF_R organism=En"),
+          !grepl("experiment=", first_header, fixed = TRUE))
+manifest <- utils::read.csv(file.path(unpacked, "sequences", "FASTA_header_manifest.csv"),
+                            stringsAsFactors = FALSE)
+stopifnot(nrow(manifest) == 18L,
+          !any(grepl("experiment=", manifest$Header, fixed = TRUE)))
+
+cat("End-to-end 18-read FASTA ZIP, plan isolation, optional template fields and empty-table smoke passed (18 records).\n")

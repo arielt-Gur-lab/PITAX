@@ -183,10 +183,13 @@ pitax_export_execute <- function(snap, plan, dest_zip) {
   pitax_export_write_run_info(run_info_path, snap, plan, written, failures)
   written[[length(written) + 1L]] <- pitax_export_planned_file("RUN_INFO.txt", "run_info", kind = "text")
 
-  files <- list.files(temp_dir, recursive = TRUE, full.names = TRUE)
+  # Files must be relative to root, and zipr() must use mirror mode.
+  # Its default cherry-pick mode FLATTENS the directory structure, potentially
+  # colliding identically named files from distinct sequence components.
+  files <- list.files(temp_dir, recursive = TRUE, full.names = FALSE)
   if (!length(files)) stop("Export produced no files.", call. = FALSE)
   phase <- "ZIP packaging"
-  zip::zipr(dest_zip, files, root = temp_dir)
+  zip::zipr(dest_zip, files, root = temp_dir, mode = "mirror")
 
   invisible(list(
     zip = dest_zip,

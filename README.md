@@ -1,4 +1,4 @@
-PITAX v3.6.1 - Custom FASTA Header Builder export hotfix
+PITAX v3.6.4 - Reliable custom FASTA export
 =========================================================
 
 Purpose
@@ -32,7 +32,7 @@ Custom FASTA Header Builder (Export)
    Only fields referenced in the saved active template are required. Removing
    experiment="{Experiment}" from the template removes the experiment field
    from the header and its validation requirements, even if the metadata
-   editor still has an unused Experiment column.
+   editor no longer shows the unused Experiment column for that template.\n   Other named templates may continue to use Experiment.
    Resolve missing values/duplicate identifiers before downloading.
    On error, the app now explains the failing record/field in the export
    dialog instead of navigating to an HTTP 500 page.
@@ -89,7 +89,7 @@ Run `run_tests.bat` on Windows with R installed.
 
 Expected final line:
 
-  All PITAX v3.6.1 tests passed.
+  All PITAX v3.6.4 tests passed.
 
 The suite now has 22 groups. Alpha 10 covers controlled loci, multi-assay profiles,
 schema-5 migration, gated Steps UI navigation and same-project multi-locus integration.

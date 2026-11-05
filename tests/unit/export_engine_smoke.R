@@ -510,6 +510,22 @@ if (requireNamespace("shiny", quietly = TRUE)) {
     stopifnot(identical(bundle$state$fasta_header_config$templates[["Fungicide study"]],
                         "{Final_Name} fungicide={Fungicide}"))
 
+    # Save a new header profile without Experiment, reload it and verify
+    # that neither validation nor the active metadata editor requires it.
+    session$setInputs(export_header_template = "{Final_Name} organism={Organism}")
+    session$setInputs(export_header_template_name = "Minimal isolate")
+    session$setInputs(export_header_save_template = 2L)
+    stopifnot(identical(rv$fasta_header_config$templates[["Minimal isolate"]],
+                        "{Final_Name} organism={Organism}"))
+    session$setInputs(export_header_saved_template = "Minimal isolate")
+    session$setInputs(export_header_load_template = 1L)
+    session$flushReact()
+    cfg <- pitax_header_coerce_config(rv$fasta_header_config)
+    stopifnot(identical(cfg$draft_template, "{Final_Name} organism={Organism}"))
+    stopifnot(!"Experiment" %in% names(pitax_header_active_edit_table(
+      export_dialog_state$snap, cfg)))
+
+
   })
 }
 
