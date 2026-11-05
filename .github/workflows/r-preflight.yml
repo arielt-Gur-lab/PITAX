@@ -23,3 +23,44 @@ jobs:
         run: Rscript tests/preflight/parse_all_r_sources.R
       - name: Exercise FASTA and empty-table exports with 18 records
         run: Rscript tests/preflight/export_writer_base_smoke.R
+
+  browser-download:
+    name: Verify real Shiny ZIP download in Chromium
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Install R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - name: Install Shiny and zip
+        run: Rscript -e 'install.packages(c("shiny", "zip"))'
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Test native Shiny ZIP download through Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/e2e/shiny_prepared_download.R >/tmp/pitax-shiny-e2e.log 2>&1 &
+          SHINY_PID=$!
+          trap 'cat /tmp/pitax-shiny-e2e.log; kill $SHINY_PID 2>/dev/null || true' EXIT
+          STARTED=0
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:47777 >/dev/null 2>&1; then
+              STARTED=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$STARTED" -ne 1 ]; then
+            echo "Shiny browser test server failed to start"
+            exit 1
+          fi
+          node tests/e2e/zip_download_browser.cjs
