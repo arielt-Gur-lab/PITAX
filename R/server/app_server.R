@@ -15,6 +15,7 @@ PITAX_SERVER_MODULES <- file.path(
     "60_assignment.R",
     "70_consensus.R",
     "80_export.R",
+    "85_fasta_header_builder.R",
     "90_blast.R",
     "100_taxonomy.R",
     "110_multilocus.R",
