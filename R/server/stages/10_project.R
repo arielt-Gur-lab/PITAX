@@ -30,6 +30,7 @@
         assay_profiles = rv$assay_profiles,
         locus_vocabulary = rv$locus_vocabulary,
         project_defaults = rv$project_defaults,
+        fasta_header_config = rv$fasta_header_config,
         project_mode = rv$project_mode,
         read_assignments = rv$read_assignments,
         architecture = rv$architecture,
@@ -326,6 +327,7 @@
     rv$locus_vocabulary <- loaded_loci
     rv$assay_profiles <- loaded_profiles
     rv$project_defaults <- assay_project_defaults_from_legacy_settings(st$project_defaults)
+    rv$fasta_header_config <- tryCatch(pitax_header_coerce_config(st$fasta_header_config), error = function(e) pitax_header_default_config())
     rv$project_mode <- if (!is.null(st$project_mode) && st$project_mode %in% c("simple", "paired_consensus")) st$project_mode else "paired_consensus"
     rv$read_assignments <- loaded_assignments
     rv$assignment_signature <- assignment_state_signature(loaded_assignments)
