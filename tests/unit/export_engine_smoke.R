@@ -423,6 +423,19 @@ if (requireNamespace("shiny", quietly = TRUE)) {
     av_qc <- export_dialog_state$plan$availability$qc_summary
     stopifnot(!is.null(av_qc))
     stopifnot(identical(av_qc$status, "not_created"))
+    # UI interactions must update the same project state saved by Save/Share.
+    session$setInputs(export_header_new_field = "Fungicide")
+    session$setInputs(export_header_add_field = 1L)
+    stopifnot("Fungicide" %in% rv$fasta_header_config$fields)
+    session$setInputs(export_header_template_name = "Fungicide study")
+    session$setInputs(export_header_template = "{Final_Name} fungicide={Fungicide}")
+    session$setInputs(export_header_save_template = 1L)
+    stopifnot(identical(rv$fasta_header_config$templates[["Fungicide study"]],
+                        "{Final_Name} fungicide={Fungicide}"))
+    bundle <- make_project_bundle()
+    stopifnot(identical(bundle$state$fasta_header_config$templates[["Fungicide study"]],
+                        "{Final_Name} fungicide={Fungicide}"))
+
   })
 }
 
