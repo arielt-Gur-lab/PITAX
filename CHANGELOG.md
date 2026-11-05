@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.6.2 — Emergency Shiny startup syntax fix
+
+- Fixed a missing comma between two `div()` elements in `R/export/dialog_ui.R` (line 164) introduced in the 3.6.1 help text, which caused an `unexpected symbol` R parse error and prevented the application from starting on Posit Connect Cloud.
+- The existing `tests/preflight/parse_all_r_sources.R` detects this exact class of failure and must pass prior to deployment.
+
+
 ## 3.6.1 — Custom FASTA export hotfix
 
 - Fixed a wrongly escaped FASTA-header validation regex in the writer that rejected ordinary metadata text containing "r"/"n" and triggered HTTP 500 during ZIP generation.
