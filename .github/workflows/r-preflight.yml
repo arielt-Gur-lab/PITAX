@@ -43,7 +43,7 @@ jobs:
       - name: Install Playwright
         run: |
           npm install --no-save playwright
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium firefox
       - name: Test native Shiny ZIP download through Chromium
         shell: bash
         run: |
@@ -64,3 +64,4 @@ jobs:
             exit 1
           fi
           node tests/e2e/zip_download_browser.cjs
+          PITAX_BROWSER=firefox node tests/e2e/zip_download_browser.cjs
