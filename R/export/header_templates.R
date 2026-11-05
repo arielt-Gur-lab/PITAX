@@ -155,6 +155,23 @@ pitax_header_edit_table <- function(snap, config) {
   df
 }
 
+pitax_header_active_metadata_fields <- function(config) {
+  config <- pitax_header_coerce_config(config)
+  # Metadata definitions are reusable across templates. An unused field does
+  # not belong in the active template's editable table.
+  tokens <- tryCatch(pitax_header_referenced_fields(config$draft_template, config$fields),
+                     error = function(e) character())
+  config$fields[config$fields %in% tokens]
+}
+
+pitax_header_active_edit_table <- function(snap, config) {
+  config <- pitax_header_coerce_config(config)
+  df <- pitax_header_edit_table(snap, config)
+  columns <- c("Record_Key", "Final_Name", "Isolate", "Locus", "Direction",
+               pitax_header_active_metadata_fields(config))
+  df[, columns, drop = FALSE]
+}
+
 pitax_header_set_value <- function(config, record_keys, field, value) {
   config <- pitax_header_coerce_config(config)
   if (!field %in% config$fields) stop("Only metadata fields are editable.", call. = FALSE)
