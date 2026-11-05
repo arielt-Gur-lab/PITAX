@@ -102,7 +102,7 @@
     )
     sel$component_ids <- ids
     sel$excel_layout <- if (!is.null(input$export_excel_layout)) as.character(input$export_excel_layout)[1] else "sheet_per_component"
-    sel$sequence_layout <- if (!is.null(input$export_sequence_layout)) as.character(input$export_sequence_layout)[1] else "combined"
+    sel$sequence_layout <- if (!is.null(input$export_sequence_layout)) as.character(input$export_sequence_layout)[1] else "per_record"
     sel$sequence_header <- if (!is.null(input$export_sequence_header)) as.character(input$export_sequence_header)[1] else "short"
     sel$include_plots <- if (is.null(input$export_include_plots)) TRUE else isTRUE(input$export_include_plots)
     sel
