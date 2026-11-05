@@ -78,7 +78,9 @@
     snap = NULL,
     plan = NULL,
     stage_id = "export",
-    last_result_message = ""
+    last_result_message = "",
+    prepared_zip = NULL,
+    prepared_name = NULL
   )
 
   pitax_collect_export_selection_from_input <- function(stage_id) {
@@ -216,30 +218,78 @@
     ), "stage")
   }, ignoreInit = TRUE)
 
-  output$download_export_package <- downloadHandler(
-    filename = function() {
-      snap <- export_dialog_state$snap
-      if (is.null(snap)) return("PITAX_export.zip")
-      sel <- tryCatch(
-        pitax_collect_export_selection_from_input(export_dialog_state$stage_id),
-        error = function(e) list(stage_id = export_dialog_state$stage_id)
-      )
-      pitax_export_package_filename(snap, sel)
-    },
-    content = function(file) {
-      snap <- export_dialog_state$snap
-      if (is.null(snap)) stop("Export snapshot is missing. Re-open the Export dialog.")
+  # Prepare the whole package as an ordinary Shiny action so invalid metadata
+  # is reported in the modal rather than as a bare HTTP 500 download response.
+  output$export_download_status <- renderText({
+    export_dialog_state$last_result_message %||% ""
+  })
+
+  observeEvent(input$export_prepare_download, {
+    export_dialog_state$last_result_message <- "Preparing export..."
+    snap <- export_dialog_state$snap
+    if (is.null(snap)) {
+      export_dialog_state$last_result_message <- "Export snapshot is missing. Re-open Export."
+      showNotification(export_dialog_state$last_result_message, type = "error", duration = 12)
+      return()
+    }
+
+    prepared <- tempfile("pitax_prepared_export_", fileext = ".zip")
+    result <- tryCatch({
       sel <- pitax_collect_export_selection_from_input(export_dialog_state$stage_id)
       plan <- pitax_export_build_plan(snap, sel)
-      export_dialog_state$plan <- plan
-      result <- pitax_export_execute(snap, plan, file)
-      if (length(result$failures)) {
-        export_dialog_state$last_result_message <- paste(
-          "Export finished with optional plot failures:",
-          paste(names(result$failures), collapse = ", ")
-        )
-      } else {
-        export_dialog_state$last_result_message <- "Export package created."
+      if (identical(sel$sequence_header, "custom") && !length(plan$sequence_components)) {
+        stop("Custom FASTA headers selected, but no FASTA sequence component is available. Select a FASTA component from the Components list.", call. = FALSE)
+      }
+      if (!length(plan$included_components)) {
+        stop("No exportable components selected.", call. = FALSE)
+      }
+      outcome <- pitax_export_execute(snap, plan, prepared)
+      if (!file.exists(prepared) || is.na(file.info(prepared)$size) || file.info(prepared)$size < 1) {
+        stop("Export did not produce a usable ZIP file.", call. = FALSE)
+      }
+      list(plan = plan, name = pitax_export_package_filename(snap, sel), outcome = outcome)
+    }, error = function(e) e)
+
+    if (inherits(result, "error")) {
+      if (file.exists(prepared)) unlink(prepared)
+      msg <- paste0("Export not downloaded: ", conditionMessage(result))
+      export_dialog_state$last_result_message <- msg
+      showNotification(msg, type = "error", duration = 16)
+      return()
+    }
+
+    old_path <- export_dialog_state$prepared_zip
+    export_dialog_state$prepared_zip <- prepared
+    export_dialog_state$prepared_name <- result$name
+    export_dialog_state$plan <- result$plan
+    if (!is.null(old_path) && file.exists(old_path)) unlink(old_path)
+    if (length(result$outcome$failures)) {
+      export_dialog_state$last_result_message <- paste0(
+        "ZIP ready (", length(result$outcome$failures),
+        " optional plot failure(s) described in RUN_INFO)."
+      )
+    } else {
+      export_dialog_state$last_result_message <- "ZIP ready. Starting download..."
+    }
+    # The browser opens the bound download URL only after the file is ready.
+    session$sendCustomMessage("pitaxPreparedExportReady", list(id = "download_export_package"))
+  }, ignoreInit = TRUE)
+
+  output$download_export_package <- downloadHandler(
+    filename = function() export_dialog_state$prepared_name %||% "PITAX_export.zip",
+    contentType = "application/zip",
+    content = function(file) {
+      prepared <- export_dialog_state$prepared_zip
+      if (is.null(prepared) || !file.exists(prepared)) {
+        stop("Prepared export expired. Re-open Export and try again.", call. = FALSE)
+      }
+      if (!file.copy(prepared, file, overwrite = TRUE)) {
+        stop("Could not transfer the prepared export ZIP.", call. = FALSE)
       }
     }
   )
+
+  session$onSessionEnded(function() {
+    p <- isolate(export_dialog_state$prepared_zip)
+    if (!is.null(p) && length(p) && file.exists(p)) unlink(p)
+  })
