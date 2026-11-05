@@ -194,10 +194,10 @@ pitax_export_execute <- function(snap, plan, dest_zip) {
     failures = failures,
     warnings = c(plan$warnings, if (length(failures)) paste0("Optional plot failures: ", length(failures)) else character())
   ))
-}
   }, error = function(e) {
     stop(paste0("Export phase [", phase, "] failed: ", conditionMessage(e)), call. = FALSE)
   })
+}
 
 pitax_export_package_filename <- function(snap, selection = list()) {
   stem <- "PITAX_export"
