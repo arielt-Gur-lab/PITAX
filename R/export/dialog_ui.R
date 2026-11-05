@@ -109,14 +109,15 @@ pitax_export_dialog_ui <- function(stage_id = "export", availability = list(),
         selectInput(
           "export_sequence_layout", "Sequence files",
           choices = c(
+            "One FASTA per read / record (full final name)" = "per_record",
             "Combined FASTA" = "combined",
-            "One file per record" = "per_record",
-            "One file per isolate" = "per_isolate",
-            "One file per locus" = "per_locus"
+            "One FASTA per isolate (grouped)" = "per_isolate",
+            "One FASTA per locus (grouped)" = "per_locus"
           ),
-          selected = "combined"
+          selected = "per_record"
         )
       ),
+      div(class = "compact-hint", "One FASTA per read uses the full assigned Final_Name (for example 320_TEF_R.fasta). Grouped FASTA files use the isolate or locus as their filename, with full record names inside the FASTA."),
       div(
         class = "form-grid-2",
         selectInput(
