@@ -140,6 +140,25 @@ filtered <- pitax_export_apply_row_column_filters(df_id, comp, sel_cols)
 check(nrow(filtered) == 1L, "Selected-row export must keep one row")
 check(identical(names(filtered), c("Source_ID", "Isolate", "Final_Name")), "Custom columns must be honored")
 
+# Regression: Excel tables may have zero records but still carry 18 columns.
+# Never feed a 0-row / 18-column frame to openxlsx.
+empty18 <- as.data.frame(setNames(rep(list(character()), 18L),
+                                 paste0("Column_", seq_len(18L))), stringsAsFactors = FALSE)
+check(nrow(empty18) == 0L && ncol(empty18) == 18L,
+      "Empty export table fixture should contain eighteen column names and zero rows")
+repaired18 <- pitax_export_prepare_sheet_data(empty18, NULL, sel_cols)
+check(nrow(repaired18) == 1L && identical(names(repaired18), "Message"),
+      "Excel export must replace empty eighteen-column data with a safe placeholder")
+selected_rows_absent <- data.frame(Source_ID = c("a", "b"), Name = c("A", "B"))
+filtered_empty <- pitax_export_prepare_sheet_data(
+  selected_rows_absent, NULL,
+  modifyList(sel_cols, list(row_mode = "selected", selected_rows = integer(),
+                            column_mode = "custom", column_ids = character()))
+)
+check(nrow(filtered_empty) >= 1L,
+      "Sheet preparation must never generate an invalid zero-row workbook sheet")
+
+
 # --- Multi-locus sequences and name collisions -------------------------------
 seq_recs <- list(
   a = list(id = "a", final_name = "ISO1 ITS", sequence = "AAA", sequence_role = "multilocus_locus",
@@ -321,6 +340,21 @@ check(nrow(manifest) == 2L && "Header" %in% names(manifest),
 run_custom <- paste(readLines(file.path(custom_dir, "RUN_INFO.txt")), collapse = "\n")
 check(grepl("fasta_header_template:", run_custom, fixed = TRUE),
       "Custom header template must be preserved in export provenance")
+
+broken_selection <- custom_sel
+broken_selection$header_config <- conf
+broken_selection$header_config$values$Experiment[
+  broken_selection$header_config$values$Record_Key == "read::S2"] <- ""
+broken_plan <- pitax_export_build_plan(snap_qc, broken_selection)
+broken_error <- tryCatch({
+  pitax_export_execute(snap_qc, broken_plan, tempfile(fileext = ".zip"))
+  NULL
+}, error = function(e) conditionMessage(e))
+check(!is.null(broken_error) &&
+      grepl("Export phase [FASTA component qc_trimmed_sequences", broken_error, fixed = TRUE) &&
+      grepl("Missing {Experiment}", broken_error, fixed = TRUE),
+      "Invalid custom-header export must identify the exact failing component and field")
+
 
 paired_recs <- pitax_export_extract_consensus_analysis_sequences(snap_qc)
 check(identical(pitax_header_apply_to_records(

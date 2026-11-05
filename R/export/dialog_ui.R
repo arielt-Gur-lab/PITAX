@@ -182,6 +182,10 @@ pitax_export_dialog_ui <- function(stage_id = "export", availability = list(),
         )
       ),
       div(class = "subsection-title", "Components"),
+      actionButton("export_select_fasta_only", "Select FASTA files only",
+                   icon = icon("file-code-o")),
+      div(class = "compact-hint",
+          "Use FASTA-only when you need sequence files without Excel or plot exports."),
       div(class = "export-component-list", rows),
       div(class = "subsection-title", "Preview"),
       if (is.data.frame(preview) && nrow(preview)) {

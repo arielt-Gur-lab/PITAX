@@ -155,6 +155,26 @@
     ))
   }
 
+  observeEvent(input$export_select_fasta_only, {
+    availability <- export_dialog_state$plan$availability
+    selected <- character()
+    for (id in names(availability)) {
+      component <- pitax_export_get_component(id)
+      use <- !is.null(component) && identical(component$kind, "sequence") &&
+        availability[[id]]$status %in% pitax_export_selectable_statuses()
+      updateCheckboxInput(session, paste0("export_comp_", id), value = isTRUE(use))
+      if (isTRUE(use)) selected <- c(selected, id)
+    }
+    if (length(selected)) {
+      showNotification(paste0("Selected ", length(selected),
+                              " available FASTA sequence component(s). Other exports disabled."),
+                       type = "message", duration = 6)
+    } else {
+      showNotification("No FASTA sequence components are available for this selection.",
+                       type = "warning", duration = 8)
+    }
+  }, ignoreInit = TRUE)
+
   observeEvent(input$open_export_output, {
     open_shared_export_dialog(if (!is.null(input$pipeline_step)) as.character(input$pipeline_step)[1] else "export")
   }, ignoreInit = TRUE)
@@ -234,8 +254,10 @@
     }
 
     prepared <- tempfile("pitax_prepared_export_", fileext = ".zip")
+    phase <- "selection"
     result <- tryCatch({
       sel <- pitax_collect_export_selection_from_input(export_dialog_state$stage_id)
+      phase <- "building export plan"
       plan <- pitax_export_build_plan(snap, sel)
       if (identical(sel$sequence_header, "custom") && !length(plan$sequence_components)) {
         stop("Custom FASTA headers selected, but no FASTA sequence component is available. Select a FASTA component from the Components list.", call. = FALSE)
@@ -243,16 +265,18 @@
       if (!length(plan$included_components)) {
         stop("No exportable components selected.", call. = FALSE)
       }
+      phase <- "writing export package"
       outcome <- pitax_export_execute(snap, plan, prepared)
       if (!file.exists(prepared) || is.na(file.info(prepared)$size) || file.info(prepared)$size < 1) {
         stop("Export did not produce a usable ZIP file.", call. = FALSE)
       }
+      phase <- "generating package name"
       list(plan = plan, name = pitax_export_package_filename(snap, sel), outcome = outcome)
     }, error = function(e) e)
 
     if (inherits(result, "error")) {
       if (file.exists(prepared)) unlink(prepared)
-      msg <- paste0("Export not downloaded: ", conditionMessage(result))
+      msg <- paste0("Export not downloaded [", phase, "]: ", conditionMessage(result))
       export_dialog_state$last_result_message <- msg
       showNotification(msg, type = "error", duration = 16)
       return()
