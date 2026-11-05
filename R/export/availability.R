@@ -798,9 +798,20 @@ pitax_export_assess_component <- function(component_id, snap, selection = list()
   pitax_export_status("blocked", "Unhandled component availability path.")
 }
 
-pitax_export_assess_all <- function(snap, selection = list(), component_ids = NULL) {
-  ids <- if (is.null(component_ids)) pitax_export_component_ids() else as.character(component_ids)
-  out <- lapply(ids, function(id) pitax_export_assess_component(id, snap, selection))
+pitax_export_assess_all <- function(snap, selection = list(), component_ids = NULL,
+                                    assessor = pitax_export_assess_component) {
+  # An unrelated unavailable component must not abort the entire export plan.
+  # Export selection, including FASTA-only, remains usable if e.g. a taxonomy
+  # or multilocus extractor encounters malformed project-specific data.
+  ids <- if (is.null(component_ids)) pitax_export_component_ids() else unique(as.character(component_ids))
+  out <- lapply(ids, function(id) {
+    tryCatch(assessor(id, snap, selection), error = function(e) {
+      pitax_export_status(
+        "blocked",
+        paste0("Component ", id, " assessment failed: ", conditionMessage(e))
+      )
+    })
+  })
   names(out) <- ids
   out
 }
