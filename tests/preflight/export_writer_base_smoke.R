@@ -3,7 +3,7 @@
 stopifnot(file.exists("VERSION.txt"))
 for (path in c("R/export/export_tools.R", "R/export/catalog.R",
                "R/export/availability.R",
-               "R/export/plan.R", "R/export/writers.R",
+               "R/export/plan.R", "R/export/writers.R", "R/export/execute.R",
                "R/export/header_templates.R")) source(path, local = FALSE)
 
 empty18 <- as.data.frame(setNames(rep(list(character()), 18L),
@@ -120,4 +120,28 @@ stopifnot(identical(plan$sequence_components, "qc_trimmed_sequences"),
           length(Filter(function(f) identical(f$kind, "fasta"), plan$files)) == 18L,
           identical(plan$availability$qc_trimmed_sequences$status, "available"))
 
-cat("Base-R FASTA plan isolation, optional template fields and empty-table smoke passed (18 records).\n")
+# End-to-end: the same 18 values that previously crashed modifyList must
+# survive build -> validate/rebuild -> writer -> ZIP manifest.
+snapshot$app_version <- "3.6.4"
+snapshot$schema_version <- 6L
+snapshot$captured_at <- Sys.time()
+snapshot$timezone <- "UTC"
+snapshot$source_stage <- "qc"
+full_zip <- tempfile(fileext = ".zip")
+pitax_export_execute(snapshot, plan, full_zip)
+stopifnot(file.exists(full_zip), file.info(full_zip)$size > 0)
+unpacked <- tempfile("pitax_18_record_export_")
+dir.create(unpacked)
+utils::unzip(full_zip, exdir = unpacked)
+fasta_files <- list.files(unpacked, pattern = "[.]fasta$", recursive = TRUE, full.names = TRUE)
+stopifnot(length(fasta_files) == 18L)
+first_header <- readLines(file.path(unpacked, "sequences", "qc_trimmed_sequences",
+                                   "ISO1_TEF_R.fasta"), n = 1L)
+stopifnot(identical(first_header, ">ISO1_TEF_R organism=En"),
+          !grepl("experiment=", first_header, fixed = TRUE))
+manifest <- utils::read.csv(file.path(unpacked, "sequences", "FASTA_header_manifest.csv"),
+                            stringsAsFactors = FALSE)
+stopifnot(nrow(manifest) == 18L,
+          !any(grepl("experiment=", manifest$Header, fixed = TRUE)))
+
+cat("End-to-end 18-read FASTA ZIP, plan isolation, optional template fields and empty-table smoke passed (18 records).\n")
