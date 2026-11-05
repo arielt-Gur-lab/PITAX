@@ -137,12 +137,13 @@
     preview <- lapply(seq_len(nrow(df)), function(i) {
       row <- df[i, , drop = FALSE]
       key <- as.character(row$Record_Key)
-      parts <- strsplit(key, "::", fixed = TRUE)[[1]]
-      comp <- switch(parts[1], read = "qc_trimmed_sequences",
+      kind <- sub("::.*$", "", key)
+      record_id <- sub("^[^:]+::", "", key)
+      comp <- switch(kind, read = "qc_trimmed_sequences",
                      analysis = "consensus_analysis_sequences", multilocus = "multilocus_sequences")
       rec <- list(final_name = row$Final_Name, isolate = row$Isolate,
                   locus = row$Locus, direction = row$Direction)
-      result <- tryCatch(pitax_header_render(rec, comp, parts[2], config), error = function(e) e)
+      result <- tryCatch(pitax_header_render(rec, comp, record_id, config), error = function(e) e)
       data.frame(Record = as.character(row$Final_Name),
                  Header = if (inherits(result, "error")) "" else paste0(">", result),
                  Status = if (inherits(result, "error")) conditionMessage(result) else "Ready",
@@ -170,6 +171,7 @@
       config <- pitax_header_coerce_config(export_header_state$config)
       utils::write.csv(data.frame(Name = names(config$templates),
                                   Template = unlist(config$templates, use.names = FALSE),
+                                  Fields = paste(config$fields, collapse = ";"),
                                   stringsAsFactors = FALSE),
                        file, row.names = FALSE, fileEncoding = "UTF-8")
     }
@@ -186,6 +188,18 @@
       showNotification("Invalid template CSV; expected Name and Template columns.", type = "error")
       return()
     }
+    # Portable template CSV carries field definitions; values remain project-specific.
+    if ("Fields" %in% names(table)) {
+      imported_fields <- unique(unlist(strsplit(paste(table$Fields, collapse = ";"), ";", fixed = TRUE)))
+      for (field in imported_fields) {
+        field <- trimws(as.character(field))
+        if (!nzchar(field) || field %in% config$fields || length(config$fields) >= 40L) next
+        valid <- tryCatch(pitax_header_validate_field(field, config$fields), error = function(e) NULL)
+        if (is.null(valid)) next
+        config$fields <- c(config$fields, valid)
+        config$values[[valid]] <- rep("", nrow(config$values))
+      }
+    }
     for (i in seq_len(nrow(table))) {
       nm <- trimws(as.character(table$Name[i]))
       tmpl <- as.character(table$Template[i])
@@ -194,7 +208,9 @@
       config$templates[[nm]] <- tmpl
     }
     header_builder_store(config)
+    updateSelectInput(session, "export_header_bulk_field", choices = config$fields,
+                      selected = config$fields[1])
     updateSelectInput(session, "export_header_saved_template", choices = names(config$templates),
                       selected = config$active_template)
-    showNotification("Imported FASTA header templates. Add their metadata fields before use.", type = "message")
+    showNotification("Imported FASTA header templates and field names. Populate metadata values before export.", type = "message")
   }, ignoreInit = TRUE)
