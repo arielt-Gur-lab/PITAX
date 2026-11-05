@@ -117,6 +117,12 @@
     }
     stage_id <- as.character(stage_id)[1]
     if (identical(stage_id, "help")) stage_id <- "export"
+    # Previous prepared ZIPs must not be offered for a newly opened dialog.
+    old_prepared <- export_dialog_state$prepared_zip
+    export_dialog_state$prepared_zip <- NULL
+    export_dialog_state$prepared_name <- NULL
+    export_dialog_state$last_result_message <- ""
+    if (!is.null(old_prepared) && file.exists(old_prepared)) unlink(old_prepared)
     snap <- pitax_export_snapshot_from_rv(rv, input, source_stage = stage_id)
     scope_mode <- if (!is.null(scope)) scope else if (identical(stage_id, "export")) "project" else "stage"
     sel <- pitax_export_default_selection(stage_id, scope_mode)
@@ -244,7 +250,20 @@
     export_dialog_state$last_result_message %||% ""
   })
 
+  output$export_prepared_download_ui <- renderUI({
+    path <- export_dialog_state$prepared_zip
+    if (is.null(path) || !length(path) || !file.exists(path)) return(NULL)
+    if (is.na(file.info(path)$size) || file.info(path)$size < 1L) return(NULL)
+    downloadButton("download_export_package", "2. Download ready ZIP",
+                   class = "btn-success", icon = icon("download"))
+  })
+
   observeEvent(input$export_prepare_download, {
+    # Preparing a new package invalidates any previous download link.
+    previous <- export_dialog_state$prepared_zip
+    export_dialog_state$prepared_zip <- NULL
+    export_dialog_state$prepared_name <- NULL
+    if (!is.null(previous) && file.exists(previous)) unlink(previous)
     export_dialog_state$last_result_message <- "Preparing export..."
     snap <- export_dialog_state$snap
     if (is.null(snap)) {
@@ -282,21 +301,21 @@
       return()
     }
 
-    old_path <- export_dialog_state$prepared_zip
-    export_dialog_state$prepared_zip <- prepared
     export_dialog_state$prepared_name <- result$name
     export_dialog_state$plan <- result$plan
-    if (!is.null(old_path) && file.exists(old_path)) unlink(old_path)
+    # Set this LAST so renderUI creates an enabled downloadButton only once
+    # the ZIP, its filename and plan are all valid.
+    export_dialog_state$prepared_zip <- prepared
     if (length(result$outcome$failures)) {
       export_dialog_state$last_result_message <- paste0(
         "ZIP ready (", length(result$outcome$failures),
         " optional plot failure(s) described in RUN_INFO)."
       )
     } else {
-      export_dialog_state$last_result_message <- "ZIP ready. Starting download..."
+      export_dialog_state$last_result_message <- "ZIP prepared. Click the green '2. Download ready ZIP' button to save it."
     }
-    # The browser opens the bound download URL only after the file is ready.
-    session$sendCustomMessage("pitaxPreparedExportReady", list(id = "download_export_package"))
+    # Never trigger a hidden link via asynchronous JavaScript: Shiny may
+    # suspend it, and browsers may block synthetic downloads after a delay.
   }, ignoreInit = TRUE)
 
   output$download_export_package <- downloadHandler(
@@ -312,6 +331,10 @@
       }
     }
   )
+
+  # Shiny normally suspends hidden download handlers. Even if the modal is
+  # transitioning, keep the content handler registered once the button exists.
+  outputOptions(output, "download_export_package", suspendWhenHidden = FALSE)
 
   session$onSessionEnded(function() {
     p <- isolate(export_dialog_state$prepared_zip)
