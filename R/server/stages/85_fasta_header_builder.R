@@ -151,6 +151,20 @@
     })
     out <- if (length(preview)) do.call(rbind, preview) else
       data.frame(Record = "", Header = "", Status = "No assigned reads", stringsAsFactors = FALSE)
+    # Within each sequence type, flag identifiers that would collide in FASTA.
+    if (nrow(df) && nrow(out) == nrow(df)) {
+      categories <- sub("::.*$", "", df$Record_Key)
+      identifiers <- ifelse(nzchar(out$Header),
+                           sub("[[:space:]].*$", "", sub("^>", "", out$Header)), "")
+      for (category in unique(categories)) {
+        subset <- which(categories == category & nzchar(identifiers) & out$Status == "Ready")
+        if (length(subset) > 1L) {
+          duplicates <- duplicated(tolower(identifiers[subset])) |
+                        duplicated(tolower(identifiers[subset]), fromLast = TRUE)
+          out$Status[subset[duplicates]] <- "Duplicate primary FASTA ID; include {Final_Name}"
+        }
+      }
+    }
     DT::datatable(out, rownames = FALSE, selection = "none",
                   options = list(pageLength = 10, scrollX = FALSE, autoWidth = TRUE,
                                  dom = "ftip", columnDefs = list(list(targets = 1, className = "dt-left"))))
