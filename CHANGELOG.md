@@ -5,7 +5,8 @@
 - Fixed the reproduced export-plan crash: recursive `modifyList()` tried to merge an 18-row `header_config$values` table into the default zero-row table, triggering `replacement has 18 rows, data has 0`. Selection settings now use a top-level merge and preserve the complete metadata table. Additional per-component availability isolation prevents unrelated extractor failures from blocking valid exports.
 - The FASTA metadata editor now shows only fields referenced in the active header template; removing `experiment="{Experiment}"` removes that column from the active editor and from export requirements. Other saved templates may still use the shared `Experiment` metadata definition.
 - Save reads the actual edited template text; the active export template is shown explicitly to verify exactly what is selected for export.
-- Added R regression tests with 18 records, a simulated unrelated component 18-rows-to-0 error, an actual 18-read FASTA export plan, and Save/Load field visibility.
+- Fixed ZIP packaging to use paths relative to the export root; the end-to-end R test exposed an unexpected temporary parent directory in downloaded archive paths.
+- Added R regression tests with 18 records, a simulated unrelated component 18-rows-to-0 error, an actual 18-read FASTA ZIP with per-record headers and manifest, and Save/Load field visibility.
 
 
 ## 3.6.3 — Export zero-row robustness and diagnostic hotfix
