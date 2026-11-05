@@ -1,7 +1,8 @@
 # Base-R export smoke regression: no CRAN packages required.
 # Intended for GitHub Actions startup/CI preflight and local development.
 stopifnot(file.exists("VERSION.txt"))
-for (path in c("R/export/export_tools.R", "R/export/availability.R",
+for (path in c("R/export/export_tools.R", "R/export/catalog.R",
+               "R/export/availability.R",
                "R/export/plan.R", "R/export/writers.R",
                "R/export/header_templates.R")) source(path, local = FALSE)
 
@@ -90,5 +91,33 @@ stopifnot(identical(component_status$qc_trimmed_sequences$status, "available"),
                 component_status$taxonomy_team_summary$reason, fixed = TRUE),
           grepl("taxonomy_team_summary",
                 component_status$taxonomy_team_summary$reason, fixed = TRUE))
+
+# Exercise the actual export plan with 18 source reads and deliberately
+# incomplete/unavailable non-FASTA project components.
+snapshot$results <- lapply(records, function(x) list(seq = x$sequence))
+snapshot$summary <- data.frame()
+snapshot$upload_files <- data.frame()
+snapshot$settings <- list()
+snapshot$assay_profiles <- data.frame()
+snapshot$project_defaults <- list()
+snapshot$rename <- data.frame()
+snapshot$architecture <- list()
+snapshot$blast_jobs <- data.frame()
+snapshot$blast_hits <- data.frame()
+snapshot$blast_raw <- list()
+snapshot$taxonomy_summary <- data.frame()
+snapshot$taxonomy_hits <- data.frame()
+snapshot$taxonomy_counts <- data.frame()
+snapshot$project_mode <- "simple"
+snapshot$snapshot_id <- "18_read_smoke_snapshot"
+selection <- pitax_export_default_selection("qc", "stage")
+selection$component_ids <- "qc_trimmed_sequences"
+selection$include_plots <- FALSE
+selection$sequence_header <- "custom"
+selection$header_config <- config
+plan <- pitax_export_build_plan(snapshot, selection)
+stopifnot(identical(plan$sequence_components, "qc_trimmed_sequences"),
+          length(Filter(function(f) identical(f$kind, "fasta"), plan$files)) == 18L,
+          identical(plan$availability$qc_trimmed_sequences$status, "available"))
 
 cat("Base-R FASTA plan isolation, optional template fields and empty-table smoke passed (18 records).\n")
