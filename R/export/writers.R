@@ -125,7 +125,7 @@ pitax_export_write_excel_workbook <- function(path, snap, plan, isolate_filter =
   invisible(path)
 }
 
-pitax_export_write_fasta_records <- function(path, records, header_mode = c("short", "rich")) {
+pitax_export_write_fasta_records <- function(path, records, header_mode = c("short", "rich", "custom")) {
   header_mode <- match.arg(header_mode)
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
   used <- character()
@@ -143,7 +143,13 @@ pitax_export_write_fasta_records <- function(path, records, header_mode = c("sho
       header_id <- clean_fasta_name(paste0(base, "__", nm))
     }
     used <- c(used, header_id)
-    header <- paste0(">", header_id)
+    header <- if (identical(header_mode, "custom")) {
+      custom <- as.character(rec$custom_header %||% "")[1]
+      if (is.na(custom) || !nzchar(custom) || grepl("[\\r\\n>]", custom)) {
+        stop(paste0("Invalid or missing custom FASTA header for ", nm), call. = FALSE)
+      }
+      paste0(">", custom)
+    } else paste0(">", header_id)
     if (identical(header_mode, "rich")) {
       header <- paste0(
         header,
@@ -235,6 +241,8 @@ pitax_export_write_run_info <- function(path, snap, plan, written_files, failure
     paste0("excel_layout: ", plan$selection$excel_layout),
     paste0("sequence_layout: ", plan$selection$sequence_layout),
     paste0("sequence_header: ", plan$selection$sequence_header),
+    if (identical(plan$selection$sequence_header, "custom")) paste0("fasta_header_template: ", plan$selection$header_config$draft_template) else NULL,
+    if (identical(plan$selection$sequence_header, "custom")) paste0("fasta_header_fields: ", paste(plan$selection$header_config$fields, collapse = ",")) else NULL,
     ""
   )
   if (length(plan$omitted_components)) {
