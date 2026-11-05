@@ -22,7 +22,7 @@ pitax_export_default_selection <- function(stage_id = "export", scope = c("stage
     column_mode = "display",
     column_ids = character(),
     excel_layout = "sheet_per_component",
-    sequence_layout = "combined",
+    sequence_layout = "per_record",
     sequence_header = "short",
     include_plots = TRUE,
     package_name = "PITAX_export_package.zip"
@@ -148,8 +148,19 @@ pitax_export_build_plan <- function(snap, selection = pitax_export_default_selec
         paste0("sequences/", id, ".fasta"), id, names(seqs), "fasta"
       )
     } else if (identical(seq_layout, "per_record")) {
+      # Each FASTA filename represents exactly one assigned read/analysis record.
+      # Keep sanitization collisions from silently overwriting other records.
+      used_stems <- character()
       for (nm in names(seqs)) {
-        stem <- clean_fasta_name(seqs[[nm]]$final_name)
+        stem <- clean_fasta_name(seqs[[nm]]$final_name %||% nm)
+        if (is.na(stem) || !nzchar(stem)) stem <- clean_fasta_name(nm)
+        if (tolower(stem) %in% tolower(used_stems)) {
+          stem <- paste0(stem, "__", clean_fasta_name(nm))
+        }
+        if (tolower(stem) %in% tolower(used_stems)) {
+          stop("Duplicate FASTA filenames after sanitization for component ", id, call. = FALSE)
+        }
+        used_stems <- c(used_stems, stem)
         files[[length(files) + 1L]] <- pitax_export_planned_file(
           paste0("sequences/", id, "/", stem, ".fasta"), id, nm, "fasta"
         )
