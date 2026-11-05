@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.6.3 — Export zero-row robustness and diagnostic hotfix
+
+- Hardened Excel export of empty tables: zero-row data frames (including tables with column names but no records) are replaced with a single explanatory row, avoiding downstream data-frame row-count failures.
+- Added a one-click "Select FASTA files only" action in the shared Export dialog so users needing sequence files can omit unrelated spreadsheet, plot and raw components.
+- Added phase-specific error reporting to export preparation and ZIP writing. Any recurring errors now identify whether they originated in selection, plan building, FASTA generation, workbook writing, RUN_INFO or ZIP packaging.
+- Added regression coverage for zero-row / 18-column tables and precise invalid-header error context.
+
+
 ## 3.6.2 — Emergency Shiny startup syntax fix
 
 - Fixed a missing comma between two `div()` elements in `R/export/dialog_ui.R` (line 164) introduced in the 3.6.1 help text, which caused an `unexpected symbol` R parse error and prevented the application from starting on Posit Connect Cloud.
