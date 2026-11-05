@@ -17,8 +17,7 @@
   output$export_header_values_table <- DT::renderDT({
     req(export_dialog_state$snap)
     config <- pitax_header_coerce_config(export_header_state$config)
-    df <- pitax_header_edit_table(export_dialog_state$snap, config)
-    df <- df[, c("Record_Key", "Final_Name", "Isolate", "Locus", "Direction", config$fields), drop = FALSE]
+    df <- pitax_header_active_edit_table(export_dialog_state$snap, config)
     DT::datatable(
       df, rownames = FALSE,
       selection = list(mode = "multiple", selected = NULL, target = "row"),
@@ -31,8 +30,8 @@
   observeEvent(input$export_header_values_table_cell_edit, {
     edit <- input$export_header_values_table_cell_edit
     config <- pitax_header_coerce_config(export_header_state$config)
-    df <- pitax_header_edit_table(export_dialog_state$snap, config)
-    columns <- c("Record_Key", "Final_Name", "Isolate", "Locus", "Direction", config$fields)
+    df <- pitax_header_active_edit_table(export_dialog_state$snap, config)
+    columns <- names(df)
     i <- suppressWarnings(as.integer(edit$row)); j <- suppressWarnings(as.integer(edit$col)) + 1L
     if (length(i) != 1L || length(j) != 1L || is.na(i) || is.na(j) ||
         i < 1L || i > nrow(df) || j < 6L || j > length(columns)) return()
@@ -60,13 +59,24 @@
     config$fields <- c(config$fields, field)
     config$values[[field]] <- rep("", nrow(config$values))
     header_builder_store(config)
-    updateSelectInput(session, "export_header_bulk_field", choices = config$fields, selected = field)
     updateTextInput(session, "export_header_new_field", value = "")
+    showNotification(paste0("Added {", field,
+                            "}. Insert this token into the header template to edit its values."),
+                     type = "message", duration = 7)
   }, ignoreInit = TRUE)
+
+  observe({
+    config <- pitax_header_coerce_config(export_header_state$config)
+    active <- pitax_header_active_metadata_fields(config)
+    selected <- input$export_header_bulk_field %||% ""
+    if (!selected %in% active) selected <- if (length(active)) active[1] else character()
+    updateSelectInput(session, "export_header_bulk_field",
+                      choices = active, selected = selected)
+  })
 
   observeEvent(input$export_header_apply_bulk, {
     config <- pitax_header_coerce_config(export_header_state$config)
-    df <- pitax_header_edit_table(export_dialog_state$snap, config)
+    df <- pitax_header_active_edit_table(export_dialog_state$snap, config)
     field <- as.character(input$export_header_bulk_field %||% "")[1]
     scope <- as.character(input$export_header_bulk_scope %||% "selected")[1]
     selected <- as.integer(input$export_header_values_table_rows_selected %||% integer())
@@ -98,6 +108,11 @@
 
   observeEvent(input$export_header_save_template, {
     config <- header_builder_config()
+    # Read current editor text directly when Save is clicked. Relying solely on
+    # a separate asynchronous input observer can save an older draft.
+    if (!is.null(input$export_header_template)) {
+      config$draft_template <- as.character(input$export_header_template)[1]
+    }
     name <- trimws(as.character(input$export_header_template_name %||% "")[1])
     if (is.na(name) || !nzchar(name) || nchar(name) > 80L) {
       showNotification("Enter a template name (1-80 characters).", type = "error")
@@ -113,7 +128,9 @@
     config$active_template <- name
     header_builder_store(config)
     updateSelectInput(session, "export_header_saved_template", choices = names(config$templates), selected = name)
-    showNotification(paste("Saved template:", name), type = "message")
+    showNotification(paste0("Saved template: ", name, ". Active header: >",
+                            pitax_header_validate_template(config$draft_template, config$fields)),
+                     type = "message", duration = 8)
   }, ignoreInit = TRUE)
 
   observeEvent(input$export_header_load_template, {
@@ -126,6 +143,13 @@
     updateTextInput(session, "export_header_template_name", value = name)
     updateTextAreaInput(session, "export_header_template", value = config$draft_template)
   }, ignoreInit = TRUE)
+
+  output$export_header_active_template <- renderText({
+    config <- header_builder_config()
+    actual <- tryCatch(pitax_header_validate_template(config$draft_template, config$fields),
+                       error = function(e) paste0("INVALID: ", conditionMessage(e)))
+    paste0("Active export template: >", actual)
+  })
 
   output$export_header_preview_table <- DT::renderDT({
     req(export_dialog_state$snap)
@@ -233,8 +257,6 @@
       config$templates[[nm]] <- tmpl
     }
     header_builder_store(config)
-    updateSelectInput(session, "export_header_bulk_field", choices = config$fields,
-                      selected = config$fields[1])
     updateSelectInput(session, "export_header_saved_template", choices = names(config$templates),
                       selected = config$active_template)
     showNotification("Imported FASTA header templates and field names. Populate metadata values before export.", type = "message")
