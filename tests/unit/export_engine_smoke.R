@@ -223,7 +223,7 @@ snap_legacy$rename$New_name[2] <- "320"
 check(identical(pitax_export_final_name(snap_legacy, "S2"), "320_TEF_R"),
       "Explicit Final_Name must override an outdated isolate-only rename map")
 check(identical(pitax_export_extract_qc_trimmed_sequences(snap_legacy, "S2")$S2$final_name, "320_TEF_R"),
-      "Read sequence export must inherit the full explicit final name"
+      "Read sequence export must inherit the full explicit final name")
 
 # --- Reusable, per-record custom FASTA headers -------------------------------
 conf <- pitax_header_default_config()
