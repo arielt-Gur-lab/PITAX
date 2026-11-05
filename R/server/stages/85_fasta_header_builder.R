@@ -3,11 +3,9 @@
   export_header_state <- reactiveValues(config = pitax_header_default_config())
 
   header_builder_config <- function() {
-    config <- pitax_header_coerce_config(export_header_state$config)
-    if (!is.null(input$export_header_template)) {
-      config$draft_template <- as.character(input$export_header_template)[1]
-    }
-    config
+    # Single source of truth: the saved/current configuration, not stale
+    # textInput state left behind while Shiny loads a different template.
+    pitax_header_coerce_config(export_header_state$config)
   }
   header_builder_store <- function(config) {
     config <- pitax_header_coerce_config(config)
@@ -131,52 +129,65 @@
 
   output$export_header_preview_table <- DT::renderDT({
     req(export_dialog_state$snap)
-    config <- pitax_header_coerce_config(export_header_state$config)
-    if (!is.null(input$export_header_template)) config$draft_template <- as.character(input$export_header_template)[1]
-    df <- pitax_header_catalog(export_dialog_state$snap)
-    preview <- lapply(seq_len(nrow(df)), function(i) {
-      row <- df[i, , drop = FALSE]
-      key <- as.character(row$Record_Key)
-      kind <- sub("::.*$", "", key)
-      record_id <- sub("^[^:]+::", "", key)
-      comp <- switch(kind, read = "qc_trimmed_sequences",
-                     analysis = "consensus_analysis_sequences", multilocus = "multilocus_sequences")
-      rec <- list(final_name = row$Final_Name, isolate = row$Isolate,
-                  locus = row$Locus, direction = row$Direction)
-      result <- tryCatch(pitax_header_render(rec, comp, record_id, config), error = function(e) e)
-      data.frame(Record = as.character(row$Final_Name),
-                 Header = if (inherits(result, "error")) "" else paste0(">", result),
-                 Status = if (inherits(result, "error")) conditionMessage(result) else "Ready",
-                 stringsAsFactors = FALSE)
-    })
-    out <- if (length(preview)) do.call(rbind, preview) else
-      data.frame(Record = "", Header = "", Status = "No assigned reads", stringsAsFactors = FALSE)
-    # Within each sequence type, flag identifiers that would collide in FASTA.
-    if (nrow(df) && nrow(out) == nrow(df)) {
-      categories <- sub("::.*$", "", df$Record_Key)
-      identifiers <- ifelse(nzchar(out$Header),
-                           sub("[[:space:]].*$", "", sub("^>", "", out$Header)), "")
-      for (category in unique(categories)) {
-        subset <- which(categories == category & nzchar(identifiers) & out$Status == "Ready")
-        if (length(subset) > 1L) {
-          duplicates <- duplicated(tolower(identifiers[subset])) |
-                        duplicated(tolower(identifiers[subset]), fromLast = TRUE)
-          out$Status[subset[duplicates]] <- "Duplicate primary FASTA ID; include {Final_Name}"
-        }
+    config <- header_builder_config()
+    selection <- pitax_collect_export_selection_from_input(export_dialog_state$stage_id)
+    snap <- export_dialog_state$snap
+    plan <- tryCatch(pitax_export_build_plan(snap, selection), error = function(e) e)
+    if (inherits(plan, "error")) {
+      return(DT::datatable(data.frame(Status = conditionMessage(plan)),
+                           rownames = FALSE, options = list(dom = "t")))
+    }
+    rows <- list()
+    scope_ids <- pitax_export_filter_scope_ids(snap, plan$selection)
+    for (comp in plan$sequence_components) {
+      recs <- pitax_export_extractor(comp)(snap, scope_ids)
+      for (rid in names(recs)) {
+        rec <- recs[[rid]]
+        if (isTRUE(rec$missing) || !nzchar(as.character(rec$sequence %||% ""))) next
+        rendered <- tryCatch(pitax_header_render(rec, comp, rid, config), error = function(e) e)
+        rows[[length(rows) + 1L]] <- data.frame(
+          Component = comp,
+          Record = as.character(rec$final_name %||% rid),
+          Header = if (inherits(rendered, "error")) "" else paste0(">", rendered),
+          Status = if (inherits(rendered, "error")) conditionMessage(rendered) else "Ready",
+          stringsAsFactors = FALSE
+        )
       }
+    }
+    if (!length(rows)) {
+      return(DT::datatable(data.frame(Status = "Select a FASTA sequence component to preview."),
+                           rownames = FALSE, options = list(dom = "t")))
+    }
+    out <- do.call(rbind, rows)
+    # Apply the same first-identifier uniqueness contract as the writer,
+    # but within each selected sequence component (one output namespace).
+    for (component_id in unique(out$Component)) {
+      indexes <- which(out$Component == component_id & out$Status == "Ready")
+      if (length(indexes) < 2L) next
+      ids <- tolower(sub("[[:space:]].*$", "", substring(out$Header[indexes], 2L)))
+      dup <- duplicated(ids) | duplicated(ids, fromLast = TRUE)
+      out$Status[indexes[dup]] <- "Duplicate FASTA identifier; include {Final_Name}"
     }
     DT::datatable(out, rownames = FALSE, selection = "none",
                   options = list(pageLength = 10, scrollX = FALSE, autoWidth = TRUE,
-                                 dom = "ftip", columnDefs = list(list(targets = 1, className = "dt-left"))))
+                                 dom = "ftip", columnDefs = list(list(targets = 2, className = "dt-left"))))
   }, server = FALSE)
 
   output$export_header_validation <- renderText({
     req(export_dialog_state$snap)
     config <- header_builder_config()
-    error <- tryCatch({pitax_header_validate_template(config$draft_template, config$fields); NULL},
-                      error = function(e) conditionMessage(e))
-    if (!is.null(error)) paste("Template error:", error) else
-      "Preview updates after editing. Blank required variables are errors: fill metadata before downloading custom FASTA."
+    fields <- tryCatch(
+      pitax_header_referenced_fields(config$draft_template, config$fields),
+      error = function(e) e
+    )
+    if (inherits(fields, "error")) return(paste("Template error:", conditionMessage(fields)))
+    required <- intersect(fields, config$fields)
+    if (!length(required)) {
+      "No custom metadata fields are required by this template. Unused columns do not affect export."
+    } else {
+      paste0("Required metadata for selected FASTA records: ", paste(required, collapse = ", "),
+             ". Other metadata columns are optional and do not appear in the header.")
+    }
   })
 
   output$download_fasta_header_templates <- downloadHandler(
