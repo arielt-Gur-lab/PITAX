@@ -60,11 +60,17 @@ pitax_export_write_excel_workbook <- function(path, snap, plan, isolate_filter =
   write_sheet <- function(sheet_name, df, comp) {
     sheet_name <- pitax_export_safe_sheet_name(sheet_name, used_names)
     used_names <<- c(used_names, sheet_name)
-    if (is.null(df) || !is.data.frame(df) || !ncol(df)) {
-      df <- data.frame(Message = "No data available", stringsAsFactors = FALSE)
+    if (is.null(df) || !is.data.frame(df) || !ncol(df) || !nrow(df)) {
+      df <- data.frame(Message = "No rows available for this selection", stringsAsFactors = FALSE)
+    } else {
+      df <- pitax_export_apply_row_column_filters(df, comp, plan$selection)
+      df <- pitax_export_coerce_column_types(df, comp)
+      # Some extractors return valid zero-row tables with nonzero columns.
+      # Explicitly replace these before passing them to openxlsx.
+      if (!nrow(df)) {
+        df <- data.frame(Message = "No rows available after filtering", stringsAsFactors = FALSE)
+      }
     }
-    df <- pitax_export_apply_row_column_filters(df, comp, plan$selection)
-    df <- pitax_export_coerce_column_types(df, comp)
     openxlsx::addWorksheet(wb, sheet_name)
     openxlsx::writeData(wb, sheet_name, df, withFilter = nrow(df) > 0, headerStyle = header_style)
     openxlsx::freezePane(wb, sheet_name, firstRow = TRUE)
