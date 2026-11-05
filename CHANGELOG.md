@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.5.2
+
+- Fixed the Ambiguous peak review header-to-column alignment by using one DataTable with native horizontal scrolling rather than separate scrollX header/body tables.
+- Made per-record FASTA files the default export layout so files and headers carry the full assigned Final_Name. Combined and per-isolate/locus exports remain available for grouping.
+- Sequence export now prefers explicit read-assignment Final_Name over a stale isolate-only rename-map value (e.g., 320_TEF_R rather than 320), and disambiguates sanitized filename collisions.
+- Added regression coverage for table alignment structure, per-read FASTA ZIP output and headers, grouped behavior, and stale legacy rename maps.
+
 ## 3.5.1
 
 - Added a per-assay Locus name / Assay display name choice for generated read and sequence names. Existing profiles default to locus naming.
