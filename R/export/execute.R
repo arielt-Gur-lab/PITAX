@@ -183,7 +183,10 @@ pitax_export_execute <- function(snap, plan, dest_zip) {
   pitax_export_write_run_info(run_info_path, snap, plan, written, failures)
   written[[length(written) + 1L]] <- pitax_export_planned_file("RUN_INFO.txt", "run_info", kind = "text")
 
-  files <- list.files(temp_dir, recursive = TRUE, full.names = TRUE)
+  # zip::zipr(root=...) expects file paths RELATIVE to root. Absolute paths
+  # silently add an unwanted temporary parent directory to the archive,
+  # making downloaded FASTA files appear in an unexpected nested folder.
+  files <- list.files(temp_dir, recursive = TRUE, full.names = FALSE)
   if (!length(files)) stop("Export produced no files.", call. = FALSE)
   phase <- "ZIP packaging"
   zip::zipr(dest_zip, files, root = temp_dir)
