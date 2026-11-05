@@ -48,4 +48,47 @@ config$values$Experiment[] <- ""
 config$values$Seq_Date[] <- ""
 rendered <- pitax_header_apply_to_records(records, "qc_trimmed_sequences", config)
 stopifnot(identical(rendered[["S18"]]$custom_header, "ISO18_TEF_R organism=En"))
-cat("Base-R FASTA export and empty-table smoke passed (18 records).\n")
+# Active template controls the visible table fields; old saved templates do not
+# force Experiment into newly saved profiles that omit it.
+config$draft_template <- ">{Final_Name} organism={Organism}"
+asgs <- data.frame(Source_ID = paste0("S", seq_len(18L)),
+                   Isolate = paste0("ISO", seq_len(18L)),
+                   Locus = rep("TEF", 18L),
+                   Direction = rep("Reverse", 18L),
+                   Final_Name = paste0("ISO", seq_len(18L), "_TEF_R"),
+                   stringsAsFactors = FALSE)
+snapshot <- list(read_assignments = asgs, results = records,
+                 consensus_set = list(records = list()),
+                 multilocus_profile = list())
+display <- pitax_header_active_edit_table(snapshot, config)
+stopifnot(nrow(display) == 18L,
+          !("Experiment" %in% names(display)),
+          !("Seq_Date" %in% names(display)),
+          "Organism" %in% names(display),
+          identical(pitax_header_active_metadata_fields(config), "Organism"))
+config$templates[["Without Experiment"]] <- config$draft_template
+config$active_template <- "Without Experiment"
+restored <- pitax_header_coerce_config(unserialize(serialize(config, NULL)))
+stopifnot(identical(pitax_header_active_metadata_fields(restored), "Organism"))
+
+# The former plan builder assessed EVERY component, so a broken unrelated
+# taxonomy table could abort even a FASTA-only export.
+fake_assessor <- function(id, snap, selection) {
+  if (identical(id, "taxonomy_team_summary")) {
+    broken <- data.frame()
+    broken$unexpected <- seq_len(18L)
+  }
+  pitax_export_status("available", record_count = 18L)
+}
+component_status <- pitax_export_assess_all(
+  snapshot, list(), component_ids = c("qc_trimmed_sequences", "taxonomy_team_summary"),
+  assessor = fake_assessor
+)
+stopifnot(identical(component_status$qc_trimmed_sequences$status, "available"),
+          identical(component_status$taxonomy_team_summary$status, "blocked"),
+          grepl("replacement has 18 rows, data has 0",
+                component_status$taxonomy_team_summary$reason, fixed = TRUE),
+          grepl("taxonomy_team_summary",
+                component_status$taxonomy_team_summary$reason, fixed = TRUE))
+
+cat("Base-R FASTA plan isolation, optional template fields and empty-table smoke passed (18 records).\n")
