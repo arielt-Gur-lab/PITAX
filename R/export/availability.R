@@ -74,15 +74,22 @@ pitax_export_filter_scope_ids <- function(snap, selection) {
 `%||%` <- function(a, b) if (is.null(a) || (length(a) == 1 && is.na(a))) b else a
 
 pitax_export_final_name <- function(snap, source_id) {
-  if (is.data.frame(snap$rename) && nrow(snap$rename) && "Original_name" %in% names(snap$rename)) {
-    idx <- match(source_id, snap$rename$Original_name)
-    if (!is.na(idx)) return(as.character(snap$rename$New_name[idx]))
+  # Explicit read identity is authoritative; the rename map is a legacy mirror
+  # and can be stale or contain only the isolate code in restored projects.
+  asg <- snap$read_assignments
+  if (is.data.frame(asg) && nrow(asg) && all(c("Source_ID", "Final_Name") %in% names(asg))) {
+    idx <- match(source_id, asg$Source_ID)
+    if (!is.na(idx)) {
+      nm <- as.character(asg$Final_Name[idx])
+      if (!is.na(nm) && nzchar(trimws(nm))) return(nm)
+    }
   }
-  if (is.data.frame(snap$read_assignments) && nrow(snap$read_assignments)) {
-    idx <- match(source_id, snap$read_assignments$Source_ID)
-    if (!is.na(idx) && "Final_Name" %in% names(snap$read_assignments)) {
-      nm <- as.character(snap$read_assignments$Final_Name[idx])
-      if (nzchar(nm)) return(nm)
+  ren <- snap$rename
+  if (is.data.frame(ren) && nrow(ren) && all(c("Original_name", "New_name") %in% names(ren))) {
+    idx <- match(source_id, ren$Original_name)
+    if (!is.na(idx)) {
+      nm <- as.character(ren$New_name[idx])
+      if (!is.na(nm) && nzchar(trimws(nm))) return(nm)
     }
   }
   as.character(source_id)

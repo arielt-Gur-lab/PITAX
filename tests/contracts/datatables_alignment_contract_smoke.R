@@ -5,6 +5,8 @@ app_text <- pitax_read_app_contract()
 app_lines <- strsplit(app_text, "\n", fixed = TRUE)[[1]]
 css_text <- pitax_read_text("www", "pitax.css")
 blast_text <- pitax_read_text("R", "server", "stages", "90_blast.R")
+peak_text <- pitax_read_text("R", "server", "stages", "50_evidence_review.R")
+ui_text <- pitax_read_text("R", "ui", "app_ui.R")
 
 assert_true <- function(value, message) if (!isTRUE(value)) stop(message, call. = FALSE)
 must_contain <- function(marker) {
@@ -19,6 +21,14 @@ must_contain("shown.bs.tab")
 must_contain("init.dt draw.dt")
 must_contain("scroll.pitaxAlignment")
 must_contain(".dataTables_scrollBody table.dataTable { box-sizing:border-box; }")
+
+# Ambiguous-peak table deliberately avoids scrollX's separate header and body.
+assert_true(grepl('div(class = "peak-review-table-scroll", DTOutput("ambiguous_peak_table"))', ui_text, fixed = TRUE),
+            "Peak review needs a native overflow wrapper around a single table.")
+assert_true(grepl('scrollX = FALSE, autoWidth = TRUE, dom = "tip"', peak_text, fixed = TRUE),
+            "Peak review must not create misaligned split header/body tables.")
+assert_true(grepl(".peak-review-table-scroll table.dataTable { min-width:", css_text, fixed = TRUE),
+            "Peak review must keep its wide columns readable during native scrolling.")
 
 # BLAST jobs table: autoWidth=FALSE is intentional; CSS keeps scrollX header/body aligned.
 assert_true(grepl("#blast_jobs_table .dataTables_scrollHeadInner", css_text, fixed = TRUE),

@@ -197,7 +197,8 @@ ui <- fluidPage(
             actionButton("save_assignment_edits", "Apply table changes", icon = icon("check"), class = "btn-primary"),
             div(class = "compact-hint", icon("info-circle"), span("The table stays stable while you edit; generated names update after Apply."))
           ),
-          uiOutput("rename_validation")
+          uiOutput("rename_validation"),
+          div(class = "compact-hint", "FASTA sequence files become available after Trim & QC. In Export, choose one FASTA per read to use each full final read name as the filename.")
         ),
         div(class = "panel-box stage2-assignment-card",
           card_title("Stage 2 | Architecture preview", "Built directly from the explicit identity fields. Project mode determines whether matching Forward/Reverse reads will later be merged or remain independent.", "sitemap"),
@@ -284,7 +285,7 @@ ui <- fluidPage(
             )
           ),
           uiOutput("ambiguous_peak_summary"),
-          DTOutput("ambiguous_peak_table")
+          div(class = "peak-review-table-scroll", DTOutput("ambiguous_peak_table"))
         ),
         div(class = "panel-box",
           card_title("QC signal metrics", "Called-base signal and called-peak / second-peak ratio. These plots are retained in QC exports.", "area-chart"),
