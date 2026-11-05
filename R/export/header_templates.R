@@ -26,7 +26,7 @@ pitax_header_validate_field <- function(field, existing = character()) {
   if (is.na(field) || !grepl("^[A-Za-z][A-Za-z0-9_]*$", field)) {
     stop("Metadata field names must start with a letter and contain only letters, digits or underscores.", call. = FALSE)
   }
-  if (tolower(field) %in% tolower(c(pitax_header_builtin_fields(), existing))) {
+  if (tolower(field) %in% tolower(c(pitax_header_builtin_fields(), "Record_Key", existing))) {
     stop(paste0("Metadata field is reserved or already exists: ", field), call. = FALSE)
   }
   field
@@ -38,7 +38,7 @@ pitax_header_coerce_config <- function(config) {
   fields <- as.character(config$fields %||% default$fields)
   if (length(fields) > 40L || anyNA(fields) || anyDuplicated(tolower(fields)) ||
       any(!grepl("^[A-Za-z][A-Za-z0-9_]*$", fields)) ||
-      any(tolower(fields) %in% tolower(pitax_header_builtin_fields()))) {
+      any(tolower(fields) %in% tolower(c(pitax_header_builtin_fields(), "Record_Key")))) {
     stop("Invalid custom FASTA metadata field definitions.", call. = FALSE)
   }
   values <- config$values
