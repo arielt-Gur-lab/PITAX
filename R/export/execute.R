@@ -202,6 +202,24 @@ pitax_export_execute <- function(snap, plan, dest_zip) {
   })
 }
 
+pitax_export_transfer_prepared_zip <- function(prepared_zip, destination) {
+  if (is.null(prepared_zip) || length(prepared_zip) != 1L ||
+      !file.exists(prepared_zip) || is.na(file.info(prepared_zip)$size) ||
+      file.info(prepared_zip)$size <= 0L) {
+    stop("Prepared ZIP is missing or empty. Prepare the export again.", call. = FALSE)
+  }
+  # downloadHandler() supplies a new temporary destination. It must contain
+  # the complete ZIP bytes, not a path string or a Shiny render result.
+  if (!isTRUE(file.copy(prepared_zip, destination, overwrite = TRUE))) {
+    stop("Could not transfer the prepared ZIP to the download response.", call. = FALSE)
+  }
+  if (!file.exists(destination) ||
+      !identical(unname(file.info(destination)$size), unname(file.info(prepared_zip)$size))) {
+    stop("Transferred ZIP size mismatch.", call. = FALSE)
+  }
+  invisible(destination)
+}
+
 pitax_export_package_filename <- function(snap, selection = list()) {
   stem <- "PITAX_export"
   if (is.list(snap$architecture) && is.data.frame(snap$architecture$loci) && "Locus" %in% names(snap$architecture$loci)) {

@@ -2,6 +2,15 @@
 # Shared export dialog UI helpers
 # ============================================================
 
+# Native Shiny download link, created only after a verified ZIP exists.
+# This helper is also exercised in a headless-browser integration test.
+pitax_export_prepared_download_button <- function(path) {
+  if (is.null(path) || length(path) != 1L || !file.exists(path)) return(NULL)
+  if (is.na(file.info(path)$size) || file.info(path)$size < 1L) return(NULL)
+  shiny::downloadButton("download_export_package", "2. Download ready ZIP",
+                        class = "btn-success", icon = shiny::icon("download"))
+}
+
 pitax_export_dialog_ui <- function(stage_id = "export", availability = list(),
                                    default_ids = character(), preview = NULL,
                                    file_plan = list(), warnings = character(),
@@ -61,12 +70,11 @@ pitax_export_dialog_ui <- function(stage_id = "export", availability = list(),
     easyClose = TRUE,
     footer = tagList(
       modalButton("Cancel"),
-      # Build/validate on the active Shiny session before browser navigation.
-      # The actual download link is triggered only after a ZIP has been written.
-      actionButton("export_prepare_download", "Download ZIP package", class = "btn-primary",
-                   icon = icon("download")),
-      tags$span(style = "display:none;",
-                downloadButton("download_export_package", "Prepared ZIP", class = "btn-default"))
+      # A two-step download is deliberate: Shiny suspends hidden download links.
+      # Never depend on a synthetic click after the server replies.
+      actionButton("export_prepare_download", "1. Prepare ZIP", class = "btn-primary",
+                   icon = icon("cog")),
+      uiOutput("export_prepared_download_ui", inline = TRUE)
     ),
     div(
       class = "export-dialog",

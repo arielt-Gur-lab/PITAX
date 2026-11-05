@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.6.5 — Reliable browser ZIP download after preparation
+
+- Fixed silent non-starting downloads after ZIP preparation: the v3.6.1 two-phase download used a `downloadButton` nested under `display:none` and triggered an asynchronous JavaScript synthetic click. Shiny suspends hidden download handlers by default, and browser security can suppress synthetic downloads.
+- Export dialog now has explicit, accessible steps: **1. Prepare ZIP** and, once successfully created, a visible native Shiny **2. Download ready ZIP** button. No download link is rendered before the file exists.
+- Set `suspendWhenHidden = FALSE` for the registered ZIP download handler and removed the fragile synthetic-click code.
+- Reset/clean up previously prepared ZIPs when the export dialog is reopened or a new package is prepared, preventing stale downloads.
+- Added a byte-for-byte prepared ZIP transfer test and a full headless Chromium test of the same visible download-button helper plus actual Shiny downloadHandler HTTP delivery.
+
+
 ## 3.6.4 — FASTA template activation and export-plan isolation
 
 - Fixed the reproduced export-plan crash: recursive `modifyList()` tried to merge an 18-row `header_config$values` table into the default zero-row table, triggering `replacement has 18 rows, data has 0`. Selection settings now use a top-level merge and preserve the complete metadata table. Additional per-component availability isolation prevents unrelated extractor failures from blocking valid exports.

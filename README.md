@@ -1,4 +1,4 @@
-PITAX v3.6.4 - Reliable custom FASTA export
+PITAX v3.6.5 - Browser-safe custom FASTA ZIP download
 =========================================================
 
 Purpose
@@ -32,11 +32,15 @@ Custom FASTA Header Builder (Export)
    Only fields referenced in the saved active template are required. Removing
    experiment="{Experiment}" from the template removes the experiment field
    from the header and its validation requirements, even if the metadata
-   editor no longer shows the unused Experiment column for that template.\n   Other named templates may continue to use Experiment.
+   editor no longer shows the unused Experiment column for that template.
+   Other named templates may continue to use Experiment.
    Resolve missing values/duplicate identifiers before downloading.
    On error, the app now explains the failing record/field in the export
    dialog instead of navigating to an HTTP 500 page.
-7. Download the ZIP: per-read filenames remain 315_TEF_R.fasta while headers
+7. After pressing **1. Prepare ZIP**, wait until the green **2. Download ready ZIP**
+   button appears and click it. This is an actual Shiny browser download link;
+   the old invisible automatic download click is no longer used.
+8. Downloaded per-read filenames remain 315_TEF_R.fasta while headers
    contain the chosen metadata. FASTA_header_manifest.csv lists the outputs.
 
 Saved templates and metadata values persist in the .sangerproject and shared
@@ -89,7 +93,7 @@ Run `run_tests.bat` on Windows with R installed.
 
 Expected final line:
 
-  All PITAX v3.6.4 tests passed.
+  PITAX 3.6.5 includes a native Shiny download integration test.
 
 The suite now has 22 groups. Alpha 10 covers controlled loci, multi-assay profiles,
 schema-5 migration, gated Steps UI navigation and same-project multi-locus integration.
