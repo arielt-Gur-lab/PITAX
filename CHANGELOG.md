@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.6.4 — FASTA template activation and export-plan isolation
+
+- Fixed a key export-planning failure: plan building assessed every export component; one failing unrelated component (including malformed 0-row/18-value tables) aborted even FASTA-only exports. Availability checks now isolate errors by component and mark only that component blocked, preserving other valid exports and surfacing its exact identity.
+- The FASTA metadata editor now shows only fields referenced in the active header template; removing `experiment="{Experiment}"` removes that column from the active editor and from export requirements. Other saved templates may still use the shared `Experiment` metadata definition.
+- Save reads the actual edited template text; the active export template is shown explicitly to verify exactly what is selected for export.
+- Added R regression tests with 18 records, a simulated unrelated component 18-rows-to-0 error, an actual 18-read FASTA export plan, and Save/Load field visibility.
+
+
 ## 3.6.3 — Export zero-row robustness and diagnostic hotfix
 
 - Hardened Excel export of empty tables: zero-row data frames (including tables with column names but no records) are replaced with a single explanatory row, avoiding downstream data-frame row-count failures.
