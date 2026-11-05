@@ -161,7 +161,7 @@ pitax_export_dialog_ui <- function(stage_id = "export", availability = list(),
           div(class = "compact-hint",
               "The table lists available metadata columns, not mandatory values. ",
               "Only tokens actually present in the active template are required. ",
-              "Remove experiment=\"{Experiment}\" from the template to omit it entirely.")
+              "Remove experiment=\"{Experiment}\" from the template to omit it entirely."),
           div(class = "subsection-title", "Per-record metadata | double-click a metadata cell to edit"),
           div(class = "button-row",
             textInput("export_header_new_field", "New metadata field (e.g. Fungicide)", value = ""),
