@@ -1,4 +1,4 @@
-PITAX v3.6.4 - Reliable custom FASTA export
+PITAX v3.6.5 - Browser-safe custom FASTA ZIP download
 =========================================================
 
 Purpose
@@ -36,6 +36,9 @@ Custom FASTA Header Builder (Export)
    Resolve missing values/duplicate identifiers before downloading.
    On error, the app now explains the failing record/field in the export
    dialog instead of navigating to an HTTP 500 page.
+7. After pressing **1. Prepare ZIP**, wait until the green **2. Download ready ZIP**
+   button appears and click it. This is an actual Shiny browser download link;
+   the old invisible automatic download click is no longer used.
 7. Download the ZIP: per-read filenames remain 315_TEF_R.fasta while headers
    contain the chosen metadata. FASTA_header_manifest.csv lists the outputs.
 
@@ -89,7 +92,7 @@ Run `run_tests.bat` on Windows with R installed.
 
 Expected final line:
 
-  All PITAX v3.6.4 tests passed.
+  PITAX 3.6.5 includes a native Shiny download integration test.
 
 The suite now has 22 groups. Alpha 10 covers controlled loci, multi-assay profiles,
 schema-5 migration, gated Steps UI navigation and same-project multi-locus integration.
