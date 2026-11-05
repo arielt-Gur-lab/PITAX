@@ -145,7 +145,7 @@ pitax_export_write_fasta_records <- function(path, records, header_mode = c("sho
     used <- c(used, header_id)
     header <- if (identical(header_mode, "custom")) {
       custom <- as.character(rec$custom_header %||% "")[1]
-      if (is.na(custom) || !nzchar(custom) || grepl("[\\r\\n>]", custom)) {
+      if (is.na(custom) || !nzchar(custom) || grepl("[\r\n>]", custom)) {
         stop(paste0("Invalid or missing custom FASTA header for ", nm), call. = FALSE)
       }
       paste0(">", custom)

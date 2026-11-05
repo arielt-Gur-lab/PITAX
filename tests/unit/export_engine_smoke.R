@@ -249,6 +249,40 @@ check(identical(custom_records$S2$custom_header,
       "Compiled header must expand every placeholder without changing Final_Name")
 check(identical(pitax_header_validate_template(">{Isolate} | {Experiment}", conf$fields),
                 "{Isolate} | {Experiment}"), "Leading '>' must not be duplicated")
+
+# A field is required ONLY if it remains in the active template. Stale
+# Experiment/Seq_Date table columns must never cause export failures.
+without_experiment <- conf
+without_experiment$draft_template <- '>{Final_Name} organism={Organism} isolate={Isolate} locus={Locus}'
+without_experiment$values$Experiment <- ""
+without_experiment$values$Seq_Date <- ""
+check(identical(pitax_header_referenced_fields(without_experiment$draft_template,
+                                              without_experiment$fields),
+                c("Final_Name", "Organism", "Isolate", "Locus")),
+      "Template fields must be derived from the active template, not metadata table columns")
+no_exp <- pitax_header_apply_to_records(
+  pitax_export_extract_qc_trimmed_sequences(snap_qc), "qc_trimmed_sequences", without_experiment)
+check(identical(no_exp$S2$custom_header, "ISO1_ITS_R organism=E_necator isolate=ISO1 locus=ITS"),
+      "Removed Experiment/Seq_Date tokens cannot continue to require values")
+no_exp_fasta <- tempfile(fileext = ".fasta")
+pitax_export_write_fasta_records(no_exp_fasta, no_exp, "custom")
+check(identical(readLines(no_exp_fasta, n = 1L),
+                ">ISO1_ITS_F organism=E_necator isolate=ISO1 locus=ITS"),
+      "FASTA writer must accept normal letters r/n (regression: HTTP 500 on custom headers)")
+# The complete study template supplied by the user must compile without
+# requiring a literal leading FASTA '>' or reordering the fields.
+study_config <- conf
+study_config$draft_template <- paste0(
+  '>{Final_Name} organism={Organism} isolate={Isolate} locus={Locus}',
+  ' direction={Direction} molecule=DNA role=consensus',
+  ' experiment="{Experiment}" date={Seq_Date}'
+)
+study <- pitax_header_render(custom_records$S2, "qc_trimmed_sequences", "S2", study_config)
+check(identical(study, paste0(
+  'ISO1_ITS_R organism=E_necator isolate=ISO1 locus=ITS direction=Reverse',
+  ' molecule=DNA role=consensus experiment="Fungicide resistance X" date=2026-10-28')),
+  "Custom study template should expand all labels with one leading > added by writer")
+
 err_field <- tryCatch({pitax_header_validate_field("Isolate", conf$fields); NULL},
                       error = function(e) conditionMessage(e))
 check(!is.null(err_field), "Reserved biological identity columns cannot become custom fields")
@@ -423,6 +457,12 @@ if (requireNamespace("shiny", quietly = TRUE)) {
     av_qc <- export_dialog_state$plan$availability$qc_summary
     stopifnot(!is.null(av_qc))
     stopifnot(identical(av_qc$status, "not_created"))
+    # Invalid preparation must become an inline error, never a bare download 500.
+    session$setInputs(export_prepare_download = 1L)
+    session$flushReact()
+    stopifnot(grepl("Export not downloaded:", export_dialog_state$last_result_message, fixed = TRUE))
+    stopifnot(is.null(export_dialog_state$prepared_zip))
+
     # UI interactions must update the same project state saved by Save/Share.
     session$setInputs(export_header_new_field = "Fungicide")
     session$setInputs(export_header_add_field = 1L)

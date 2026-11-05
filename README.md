@@ -1,4 +1,4 @@
-PITAX v3.6.0 - Custom FASTA Header Builder
+PITAX v3.6.1 - Custom FASTA Header Builder export hotfix
 =========================================================
 
 Purpose
@@ -28,8 +28,14 @@ Custom FASTA Header Builder (Export)
 5. Add custom fields (e.g. Fungicide or Location) and use {Fungicide}
    in the template. Built-ins are Final_Name, Isolate, Locus, Direction,
    Source_ID and Record_ID.
-6. Review the live header preview; missing tokens and duplicate primary
-   FASTA sequence identifiers must be resolved before custom export.
+6. Review the live preview of the FASTA components actually selected.
+   Only fields referenced in the saved active template are required. Removing
+   experiment="{Experiment}" from the template removes the experiment field
+   from the header and its validation requirements, even if the metadata
+   editor still has an unused Experiment column.
+   Resolve missing values/duplicate identifiers before downloading.
+   On error, the app now explains the failing record/field in the export
+   dialog instead of navigating to an HTTP 500 page.
 7. Download the ZIP: per-read filenames remain 315_TEF_R.fasta while headers
    contain the chosen metadata. FASTA_header_manifest.csv lists the outputs.
 
@@ -83,7 +89,7 @@ Run `run_tests.bat` on Windows with R installed.
 
 Expected final line:
 
-  All PITAX v3.6.0 tests passed.
+  All PITAX v3.6.1 tests passed.
 
 The suite now has 22 groups. Alpha 10 covers controlled loci, multi-assay profiles,
 schema-5 migration, gated Steps UI navigation and same-project multi-locus integration.

@@ -91,6 +91,13 @@ pitax_header_validate_template <- function(template, fields) {
   template
 }
 
+pitax_header_referenced_fields <- function(template, fields) {
+  validated <- pitax_header_validate_template(template, fields)
+  tokens <- regmatches(validated, gregexpr("\\{[A-Za-z][A-Za-z0-9_]*\\}", validated, perl = TRUE))[[1]]
+  if (!length(tokens)) return(character())
+  unique(substring(tokens, 2, nchar(tokens) - 1L))
+}
+
 pitax_header_catalog <- function(snap) {
   rows <- list()
   push <- function(key, final_name, isolate = "", locus = "", direction = "", source = "", record = "") {
@@ -187,7 +194,10 @@ pitax_header_render <- function(rec, component_id, record_id, config) {
     values[field] <- if (is.na(idx)) "" else config$values[[field]][idx]
   }
   matches <- gregexpr("\\{[A-Za-z][A-Za-z0-9_]*\\}", template, perl = TRUE)[[1]]
-  if (identical(matches[1], -1L)) return(template)
+  if (identical(matches[1], -1L)) {
+    if (!nzchar(trimws(template))) stop("Empty FASTA header.", call. = FALSE)
+    return(template)
+  }
   lengths <- attr(matches, "match.length")
   parts <- character()
   cursor <- 1L

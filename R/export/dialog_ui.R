@@ -61,11 +61,17 @@ pitax_export_dialog_ui <- function(stage_id = "export", availability = list(),
     easyClose = TRUE,
     footer = tagList(
       modalButton("Cancel"),
-      downloadButton("download_export_package", "Download ZIP package", class = "btn-primary")
+      # Build/validate on the active Shiny session before browser navigation.
+      # The actual download link is triggered only after a ZIP has been written.
+      actionButton("export_prepare_download", "Download ZIP package", class = "btn-primary",
+                   icon = icon("download")),
+      tags$span(style = "display:none;",
+                downloadButton("download_export_package", "Prepared ZIP", class = "btn-default"))
     ),
     div(
       class = "export-dialog",
       if (length(warnings)) div(class = "status-warning", lapply(warnings, tags$p)),
+      div(class = "compact-hint", textOutput("export_download_status")),
       radioButtons(
         "export_scope_mode", "Data scope",
         choices = c(
@@ -152,6 +158,10 @@ pitax_export_dialog_ui <- function(stage_id = "export", availability = list(),
               "Custom defaults: {Organism}, {Experiment}, {Seq_Date}. ",
               "Include {Final_Name} for unique identifiers. Date of sequencing is user-supplied, never inferred from export time."),
           textOutput("export_header_validation"),
+          div(class = "compact-hint",
+              "The table lists available metadata columns, not mandatory values. ",
+              "Only tokens actually present in the active template are required. ",
+              "Remove experiment=\"{Experiment}\" from the template to omit it entirely.")
           div(class = "subsection-title", "Per-record metadata | double-click a metadata cell to edit"),
           div(class = "button-row",
             textInput("export_header_new_field", "New metadata field (e.g. Fungicide)", value = ""),

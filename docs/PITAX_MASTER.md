@@ -1,7 +1,7 @@
 # PITAX — מסמך מאסטר להמשך הפיתוח
 
-גרסת מסמך: 1.3
-בסיס קוד נוכחי: `3.6.0`
+גרסת מסמך: 1.4
+בסיס קוד נוכחי: `3.6.1`
 סכמת פרויקט נוכחית: `6`
 השלב הפעיל: `Alpha 10` — Schema 6; Share Project יוצר snapshot בלתי משתנה בשרת עם קישור `?share=TOKEN` (תפוגה 1/3/7 ימים). Export הוא מנגנון חבילה משותף לכל השלבים עם קטלוג רכיבים מפורש ו-`RUN_INFO.txt`. אין שיתוף סשן חי ואין עריכה משותפת. מגבלות marker נקבעות על ידי המשתמש; scheduler NCBI גלובלי בין sessions נשאר לחובת Stage 5 לפני stable.
 
@@ -199,6 +199,8 @@ AB1
 - `blast_jobs`, `blast_raw`, `blast_hits`.
 - `taxonomy_summary`, `taxonomy_hits`, `taxonomy_counts`.
 - `multilocus_profile`.
+
+ב־3.6.1 תיקון Hotfix ל־Custom FASTA Headers: רק משתנים שמופיעים בתבנית הפעילה מחייבים ערך, ואין חובה למלא Experiment או Seq_Date כאשר אינם כלולים בתבנית. תצוגה מקדימה מוגבלת לרצפים שנבחרו לייצוא. לאחר כתיבת ZIP מוצלחת, הקישור מופעל; כשיש שגיאה מוצגת הודעה בתוך Shiny ולא HTTP 500. תיקון בדיקת תווי בקרה בכותרת מונע פסילת אותיות רגילות r/n.
 
 ב־3.6.0 מנגנון Custom FASTA Headers פועל בשכבת Export בלבד: הוא מרחיב משתנים כגון {Final_Name}, {Isolate}, {Locus}, {Organism}, {Experiment} ו־{Seq_Date} לכותרת FASTA. ערכי metadata ניתנים לעריכה לכל Read או Analysis record ולהחלה קבוצתית, אך אינם קובעים זהות ביולוגית ואינם משנים שם קובץ, רצף, BLAST או revision. Template וערכים נכללים ב־Save/Load/Share; ניתן להעביר תבניות בין פרויקטים באמצעות CSV. קובץ `FASTA_header_manifest.csv` מתעד את הכותרות שיוצאו. שם מזהה כפול או משתנה נדרש חסר חוסמים ייצוא מותאם.
 
