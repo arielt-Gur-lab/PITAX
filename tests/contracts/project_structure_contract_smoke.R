@@ -20,6 +20,8 @@ required_files <- c(
   file.path("R", "export", "catalog.R"),
   file.path("R", "export", "snapshot.R"),
   file.path("R", "export", "availability.R"),
+  file.path("R", "export", "header_templates.R"),
+  file.path("R", "server", "stages", "85_fasta_header_builder.R"),
   file.path("R", "export", "plan.R"),
   file.path("R", "export", "writers.R"),
   file.path("R", "export", "execute.R"),
@@ -83,7 +85,8 @@ if (grepl('encoding = "UTF-8"', bootstrap_text, fixed = TRUE) || grepl('encoding
 expected_modules <- file.path(
   "R", "server", "stages",
   c("00_state.R", "05_workflow.R", "10_project.R", "20_upload.R", "30_trimming.R", "40_qc_summary.R",
-    "50_evidence_review.R", "60_assignment.R", "70_consensus.R", "80_export.R", "90_blast.R",
+    "50_evidence_review.R", "60_assignment.R", "70_consensus.R", "80_export.R",
+    "85_fasta_header_builder.R", "90_blast.R",
     "100_taxonomy.R", "110_multilocus.R", "120_reset.R")
 )
 if (!identical(server_env$PITAX_SERVER_MODULES, expected_modules)) stop("Server stage order changed unexpectedly.", call. = FALSE)
