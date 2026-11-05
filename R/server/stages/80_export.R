@@ -251,11 +251,7 @@
   })
 
   output$export_prepared_download_ui <- renderUI({
-    path <- export_dialog_state$prepared_zip
-    if (is.null(path) || !length(path) || !file.exists(path)) return(NULL)
-    if (is.na(file.info(path)$size) || file.info(path)$size < 1L) return(NULL)
-    downloadButton("download_export_package", "2. Download ready ZIP",
-                   class = "btn-success", icon = icon("download"))
+    pitax_export_prepared_download_button(export_dialog_state$prepared_zip)
   })
 
   observeEvent(input$export_prepare_download, {
