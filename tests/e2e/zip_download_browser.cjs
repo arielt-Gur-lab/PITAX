@@ -1,10 +1,13 @@
 // Real browser integration: click visible Shiny download link after preparing.
-const { chromium } = require('playwright');
+const browsers = require('playwright');
+const engine = process.env.PITAX_BROWSER || 'chromium';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 (async () => {
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+  assert.ok(['chromium', 'firefox'].includes(engine), 'Unsupported test browser');
+  const browser = await browsers[engine].launch({ headless: true,
+    args: engine === 'chromium' ? ['--no-sandbox'] : [] });
   const context = await browser.newContext({ acceptDownloads: true });
   const page = await context.newPage();
   try {
@@ -25,7 +28,7 @@ const fs = require('node:fs');
     const content = fs.readFileSync(downloadedPath);
     assert.ok(content.length > 100, 'ZIP should contain real bytes');
     assert.equal(content.toString('ascii', 0, 2), 'PK');
-    console.log('PASS: visible download button triggered a real browser ZIP download', content.length, 'bytes');
+    console.log('PASS:', engine, 'visible download button triggered a real browser ZIP download', content.length, 'bytes');
   } finally {
     await browser.close();
   }
