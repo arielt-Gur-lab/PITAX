@@ -18,7 +18,14 @@
   }
   header_builder_sync_template <- function(config) {
     config <- pitax_header_coerce_config(config)
-    header_template_pending_update(config$draft_template)
+    current <- isolate(input$export_header_template %||% NULL)
+    if (length(current) && identical(as.character(current)[1], config$draft_template)) {
+      # No UI change is required; pending must not remain set indefinitely
+      # when Shiny suppresses a no-op value update.
+      header_template_pending_update(NULL)
+    } else {
+      header_template_pending_update(config$draft_template)
+    }
     header_builder_store(config)
     updateTextAreaInput(session, "export_header_template", value = config$draft_template)
     invisible(config)
