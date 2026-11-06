@@ -72,6 +72,51 @@ config$active_template <- "Without Experiment"
 restored <- pitax_header_coerce_config(unserialize(serialize(config, NULL)))
 stopifnot(identical(pitax_header_active_metadata_fields(restored), "Organism"))
 
+# Metadata lifecycle: creating a field must make it visible and editable
+# immediately; reusing it must not create duplicates; inactive fields remain
+# discoverable and can be reactivated without changing other saved templates.
+lifecycle <- pitax_header_default_config()
+lifecycle$draft_template <- "{Final_Name} organism={Organism}"
+lifecycle$templates[["Minimal"]] <- lifecycle$draft_template
+step1 <- pitax_header_register_field(lifecycle, "Collection_Site")
+stopifnot(isTRUE(step1$created),
+          "Collection_Site" %in% step1$config$fields,
+          "Collection_Site" %in% pitax_header_active_metadata_fields(step1$config),
+          grepl("collection_site={Collection_Site}", step1$config$draft_template, fixed = TRUE),
+          !grepl("{Experiment}", step1$config$draft_template, fixed = TRUE),
+          !grepl("{Collection_Site}", step1$config$templates[["Minimal"]], fixed = TRUE))
+visible <- pitax_header_active_edit_table(snapshot, step1$config)
+stopifnot("Collection_Site" %in% names(visible),
+          !"Experiment" %in% names(visible))
+registered <- pitax_header_registered_field_table(step1$config)
+stopifnot("Collection_Site" %in% registered$Field,
+          identical(registered$Status[match("Collection_Site", registered$Field)],
+                    "In active header"),
+          identical(registered$Status[match("Experiment", registered$Field)],
+                    "Available (not in header)"))
+step2 <- pitax_header_register_field(step1$config, "collection_site")
+stopifnot(!step2$created,
+          sum(tolower(step2$config$fields) == "collection_site") == 1L,
+          length(gregexpr("\\{Collection_Site\\}", step2$config$draft_template, perl = TRUE)[[1]]) == 1L)
+# Make field inactive without destroying it; reactivation is idempotent.
+step2$config$draft_template <- "{Final_Name} organism={Organism}"
+stopifnot(!"Collection_Site" %in% names(pitax_header_active_edit_table(snapshot, step2$config)),
+          "Collection_Site" %in% pitax_header_registered_field_table(step2$config)$Field)
+step3 <- pitax_header_activate_field(step2$config, "collection_site")
+stopifnot("Collection_Site" %in% names(pitax_header_active_edit_table(snapshot, step3)))
+step3 <- pitax_header_activate_field(step3, "Collection_Site")
+stopifnot(length(gregexpr("\\{Collection_Site\\}", step3$draft_template, perl = TRUE)[[1]]) == 1L)
+stopifnot(inherits(try(pitax_header_register_field(step3, "Final_Name"), silent = TRUE), "try-error"),
+          inherits(try(pitax_header_register_field(step3, "1invalid"), silent = TRUE), "try-error"))
+step3 <- pitax_header_set_value(step3, "read::S1", "Collection_Site", "Golan")
+step3$templates[["Site"]] <- step3$draft_template
+step3$active_template <- "Site"
+reloaded <- pitax_header_coerce_config(unserialize(serialize(step3, NULL)))
+stopifnot(identical(reloaded$templates[["Site"]], step3$draft_template),
+          identical(reloaded$values$Collection_Site[
+            match("read::S1", reloaded$values$Record_Key)], "Golan"),
+          "Collection_Site" %in% pitax_header_active_metadata_fields(reloaded))
+
 # The former plan builder assessed EVERY component, so a broken unrelated
 # taxonomy table could abort even a FASTA-only export.
 fake_assessor <- function(id, snap, selection) {

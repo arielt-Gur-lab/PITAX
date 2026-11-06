@@ -65,6 +65,53 @@ pitax_header_coerce_config <- function(config) {
        active_template = active, draft_template = draft)
 }
 
+# All registered custom metadata fields are project-scoped, even when unused by
+# the active FASTA template. Activating one changes only the current draft.
+pitax_header_register_field <- function(config, field, activate = TRUE) {
+  config <- pitax_header_coerce_config(config)
+  field <- trimws(as.character(field)[1])
+  if (is.na(field) || !grepl("^[A-Za-z][A-Za-z0-9_]*$", field)) {
+    stop("Metadata field names must start with a letter and contain only letters, digits or underscores.", call. = FALSE)
+  }
+  if (tolower(field) %in% tolower(c(pitax_header_builtin_fields(), "Record_Key"))) {
+    stop(paste0("Reserved FASTA header field: ", field), call. = FALSE)
+  }
+  existing <- match(tolower(field), tolower(config$fields))
+  created <- is.na(existing)
+  if (created) {
+    if (length(config$fields) >= 40L) stop("Maximum 40 custom fields per project.", call. = FALSE)
+    config$fields <- c(config$fields, field)
+    config$values[[field]] <- rep("", nrow(config$values))
+  } else {
+    field <- config$fields[existing]
+  }
+  if (isTRUE(activate)) config <- pitax_header_activate_field(config, field)
+  list(config = pitax_header_coerce_config(config), field = field, created = created)
+}
+
+pitax_header_activate_field <- function(config, field) {
+  config <- pitax_header_coerce_config(config)
+  field <- trimws(as.character(field)[1])
+  matched <- match(tolower(field), tolower(config$fields))
+  if (is.na(matched)) stop(paste0("Unknown metadata field: ", field), call. = FALSE)
+  field <- config$fields[matched]
+  used <- pitax_header_referenced_fields(config$draft_template, config$fields)
+  if (!field %in% used) {
+    # No mutation of saved named templates. The user can Save to commit a draft.
+    config$draft_template <- paste0(trimws(config$draft_template),
+                                    " ", tolower(field), "={", field, "}")
+  }
+  pitax_header_coerce_config(config)
+}
+
+pitax_header_registered_field_table <- function(config) {
+  config <- pitax_header_coerce_config(config)
+  active <- pitax_header_active_metadata_fields(config)
+  data.frame(Field = config$fields,
+             Status = ifelse(config$fields %in% active, "In active header", "Available (not in header)"),
+             stringsAsFactors = FALSE)
+}
+
 pitax_header_record_key <- function(component_id, record_id) {
   component_id <- as.character(component_id)[1]
   namespace <- if (identical(component_id, "qc_trimmed_sequences")) "read" else

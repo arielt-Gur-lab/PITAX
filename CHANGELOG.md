@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.6.6 — FASTA metadata field lifecycle and editor consistency
+
+- Fixed an inconsistent field lifecycle: v3.6.4 made the metadata editor active-template-only, but adding a new field registered it without activating it. The field was silently hidden while a second attempt failed as duplicate.
+- Creating a metadata field now automatically inserts a matching token into the active draft, immediately enabling that field in the per-record editor and bulk field selector.
+- Added a permanent **all registered fields** list (active/inactive status), plus an explicit **Use selected field in header** control. Removing a token from the header hides its editable column but never silently deletes a field or values stored for other templates.
+- Re-entering an existing field (case-insensitive) reuses and activates it instead of generating a confusing duplicate-field error; reserved names remain prohibited.
+- Guarded reactive Shiny textarea updates from overwriting programmatically changed drafts during Add/Load/Save and synchronized the selected draft when Export is reopened.
+- Added (1) pure-R metadata lifecycle/serialization tests, (2) existing 18-read full ZIP regression, and (3) Chromium browser end-to-end tests executing the actual Shiny header-builder stage for creation, metadata editing, activation, duplicate reuse and named Save/Load.
+
+
 ## 3.6.5 — Reliable browser ZIP download after preparation
 
 - Fixed silent non-starting downloads after ZIP preparation: the v3.6.1 two-phase download used a `downloadButton` nested under `display:none` and triggered an asynchronous JavaScript synthetic click. Shiny suspends hidden download handlers by default, and browser security can suppress synthetic downloads.
