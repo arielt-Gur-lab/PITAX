@@ -65,7 +65,7 @@ pitax_export_dialog_ui <- function(stage_id = "export", availability = list(),
   }
 
   modalDialog(
-    title = paste0("Export | source stage: ", stage_id),
+    title = paste0("PITAX v", trimws(readLines("VERSION.txt", n = 1L)), " | Export | source stage: ", stage_id),
     size = "l",
     easyClose = TRUE,
     footer = tagList(
@@ -186,7 +186,11 @@ pitax_export_dialog_ui <- function(stage_id = "export", availability = list(),
             selectInput("export_header_existing_field", "All registered metadata fields",
                         choices = header_config$fields),
             actionButton("export_header_activate_field", "Use selected field in header",
-                         icon = icon("check"))
+                         icon = icon("check")),
+            actionButton("export_header_remove_from_header", "Remove from active header",
+                         icon = icon("minus")),
+            actionButton("export_header_delete_field", "Delete field permanently",
+                         class = "btn-danger", icon = icon("trash"))
           ),
           div(class = "form-grid-3",
             selectInput("export_header_bulk_field", "Field to set",
