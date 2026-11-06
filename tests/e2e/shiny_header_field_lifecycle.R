@@ -4,6 +4,10 @@ suppressPackageStartupMessages(library(shiny))
 suppressPackageStartupMessages(library(DT))
 source("R/export/availability.R", local = FALSE)
 source("R/export/header_templates.R", local = FALSE)
+# shinyApp(ui, server) has no appDir, so ./www is NOT served automatically.
+# Explicitly serve the same production JavaScript through a test-only prefix.
+stopifnot(file.exists("www/pitax-header-profiles.js"))
+shiny::addResourcePath("pitaxassets", normalizePath("www"))
 
 e2e_snap <- list(
   read_assignments = data.frame(
@@ -17,7 +21,7 @@ e2e_snap <- list(
 )
 
 ui <- fluidPage(
-  tags$head(tags$script(src = "pitax-header-profiles.js")),
+  tags$head(tags$script(src = "pitaxassets/pitax-header-profiles.js")),
   titlePanel("PITAX metadata editor integration"),
   textAreaInput("export_header_template", "Header template",
                 value = pitax_header_default_template(), width = "100%"),
