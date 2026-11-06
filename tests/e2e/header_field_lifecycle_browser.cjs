@@ -169,8 +169,20 @@ async function chooseShinySelect(page, id, value) {
       .includes('Collection_Site [active]'));
     const restored = await page.locator('#export_header_persistence_status').innerText();
     assert.match(restored, /Restored.*named template/);
+    // A second tab runs a separate Shiny session but shares browser storage.
+    const secondTab = await page.context().newPage();
+    try {
+      await secondTab.goto('http://127.0.0.1:47778', { waitUntil: 'domcontentloaded' });
+      await secondTab.waitForFunction(() => {
+        const names = document.querySelector('#e2e_saved_templates')?.textContent || '';
+        const fields = document.querySelector('#e2e_persisted_fields')?.textContent || '';
+        return names.includes('Field profile') && fields.includes('Collection_Site');
+      });
+    } finally {
+      await secondTab.close();
+    }
     assert.deepEqual(errors, [], 'Uncaught Shiny browser errors');
-    console.log('PASS: FASTA field profile saved to browser localStorage and restored after full page reload');
+    console.log('PASS: FASTA profile survives refresh and opens in a separate Shiny browser tab');
   } finally {
     await browser.close();
   }
