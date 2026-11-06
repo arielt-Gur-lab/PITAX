@@ -159,6 +159,9 @@
       current_sample = snap$current_sample,
       header_config = export_header_state$config
     ))
+    # Reconcile the textarea with the actual saved project configuration on
+    # every reopen; a stale DOM input from the previous modal must not win.
+    header_builder_sync_template(export_header_state$config)
   }
 
   observeEvent(input$export_select_fasta_only, {
