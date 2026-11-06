@@ -1,4 +1,4 @@
-PITAX v3.6.5 - Browser-safe custom FASTA ZIP download
+PITAX v3.6.6 - Reliable FASTA metadata field management
 =========================================================
 
 Purpose
@@ -25,9 +25,14 @@ Custom FASTA Header Builder (Export)
    {Final_Name} organism={Organism} experiment="{Experiment}" date={Seq_Date}
 4. Double-click metadata cells for individual records, or select rows and
    use bulk field/value updates; use All records for global experiment values.
-5. Add custom fields (e.g. Fungicide or Location) and use {Fungicide}
-   in the template. Built-ins are Final_Name, Isolate, Locus, Direction,
-   Source_ID and Record_ID.
+5. Click **Create and use field** to register a custom field (e.g. Location)
+   and automatically add location={Location} to the current header draft.
+   The newly created field appears immediately in the editable table and
+   bulk field selector. Save the template to retain its new header layout.
+   **All registered metadata fields** always shows every stored field, including
+   fields not currently used; **Use selected field in header** reactivates one.
+   Re-entering an existing field name simply activates it without duplication.
+   Built-ins are Final_Name, Isolate, Locus, Direction, Source_ID, Record_ID.
 6. Review the live preview of the FASTA components actually selected.
    Only fields referenced in the saved active template are required. Removing
    experiment="{Experiment}" from the template removes the experiment field
