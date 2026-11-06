@@ -1,4 +1,4 @@
-PITAX v3.6.6 - Reliable FASTA metadata field management
+PITAX v3.6.8 - Persistent FASTA header profiles and field layouts
 =========================================================
 
 Purpose
@@ -19,6 +19,17 @@ The authoritative guide for continuing development is:
 
 Custom FASTA Header Builder (Export)
 ------------------------------------
+**Save profile in this browser** stores the named template and custom field
+definitions in this browser's localStorage and restores them after refresh or
+a new Shiny session. Wait for the success status below the Save button.
+This is not cloud sync: another device/browser or cleared site data will not
+have those saved profiles. For portable profile backup use Export templates CSV.
+
+**Per-record metadata values** (Organism, Experiment, Location, etc. for each
+read) are not saved by the profile button. They are included in the project
+file when clicking **Save project** in the top bar; download the
+.sangerproject and load that file to restore the full project and values.
+
 1. Open Export from any stage after read assignments/sequence processing.
 2. Under FASTA headers, select "Custom FASTA headers".
 3. Edit the one-line token template, e.g.:

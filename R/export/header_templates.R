@@ -152,6 +152,64 @@ pitax_header_registered_field_table <- function(config) {
              stringsAsFactors = FALSE)
 }
 
+# Browser storage contains ONLY portable named templates and their field
+# definitions. Record-specific metadata values belong in the saved project
+# (.sangerproject) and are deliberately never written to localStorage.
+pitax_header_browser_payload <- function(config) {
+  config <- pitax_header_coerce_config(config)
+  list(
+    schema = 1L,
+    fields = unname(config$fields),
+    templates = lapply(names(config$templates), function(name) {
+      list(name = name, template = unname(config$templates[[name]]))
+    }),
+    active_template = config$active_template
+  )
+}
+
+pitax_header_restore_browser_profiles <- function(config, payload, project_loaded = FALSE) {
+  config <- pitax_header_coerce_config(config)
+  if (!is.list(payload) || !identical(suppressWarnings(as.integer(payload$schema)), 1L)) {
+    return(config)
+  }
+  new_fields <- as.character(unlist(payload$fields, use.names = FALSE))
+  if (length(new_fields) > 40L || anyNA(new_fields) ||
+      any(!grepl("^[A-Za-z][A-Za-z0-9_]*$", new_fields)) ||
+      anyDuplicated(tolower(new_fields)) ||
+      any(tolower(new_fields) %in% tolower(c(pitax_header_builtin_fields(), "Record_Key")))) {
+    return(config)
+  }
+  for (field in new_fields) {
+    if (tolower(field) %in% tolower(config$fields)) next
+    if (length(config$fields) >= 40L) break
+    config <- pitax_header_register_field(config, field, activate = FALSE)$config
+  }
+  available <- config$fields
+  rows <- payload$templates
+  if (!is.list(rows) || length(rows) > 100L) return(config)
+  for (entry in rows) {
+    if (!is.list(entry) || !is.character(entry$name) || length(entry$name) != 1L ||
+        !is.character(entry$template) || length(entry$template) != 1L) next
+    name <- trimws(entry$name)
+    if (is.na(name) || is.na(entry$template) || !nzchar(name) || nchar(name) > 80L) next
+    valid <- tryCatch(pitax_header_validate_template(entry$template, available),
+                      error = function(e) NULL)
+    if (is.null(valid)) next
+    # A manually loaded project is authoritative; supplement only with
+    # browser profiles whose names do not already exist.
+    if (!isTRUE(project_loaded) || !name %in% names(config$templates)) {
+      config$templates[[name]] <- valid
+    }
+  }
+  preferred <- as.character(payload$active_template %||% "")[1]
+  if (!isTRUE(project_loaded) && !is.na(preferred) &&
+      preferred %in% names(config$templates)) {
+    config$active_template <- preferred
+    config$draft_template <- config$templates[[preferred]]
+  }
+  pitax_header_coerce_config(config)
+}
+
 pitax_header_record_key <- function(component_id, record_id) {
   component_id <- as.character(component_id)[1]
   namespace <- if (identical(component_id, "qc_trimmed_sequences")) "read" else

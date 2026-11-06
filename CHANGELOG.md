@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.6.8 — Persistent named FASTA metadata profiles across sessions
+
+- Fixed misleading **Save / update template** semantics: previously it changed only the running Shiny session; closing/reloading the page lost named profiles unless Save project was downloaded and reloaded.
+- **Save profile in this browser** now writes named header layouts and registered custom field definitions to browser localStorage. A success notification appears only after the browser confirms the value was saved; blocked storage is reported explicitly.
+- Restore saved profiles and their field definitions automatically when Shiny reconnects or the page reloads. A manually loaded .sangerproject keeps priority over browser templates with identical names; browser-only names supplement it.
+- Explicitly distinguish portable layout definitions (browser-local profiles and template CSV) from per-record biological metadata values, which are stored in .sangerproject via **Save project** and never silently written to browser storage.
+- Add regression tests for browser persistence payload, collision precedence, project-file metadata roundtrip, and a real Chromium hard-page-refresh restoring saved named templates and custom fields.
+- Clarify this browser's storage is not cross-device/cloud synced and can be removed by private mode or clearing site data.
+
+
 ## 3.6.7 — Explicit metadata removal and deployment version visibility
 
 - Display the live application version in the Export dialog title, so deployment mismatch is immediately apparent.
