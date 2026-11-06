@@ -116,6 +116,31 @@ async function chooseShinySelect(page, id, value) {
     assert.ok((await registry.innerText()).includes('Collection_Site [active]'));
     assert.ok((await active.innerText()).includes('Collection_Site'));
 
+    // Explicitly remove Experiment from the active header, preserving its
+    // registered definition and avoiding accidental deletion of older templates.
+    await chooseShinySelect(page, 'export_header_existing_field', 'Experiment');
+    await page.locator('#export_header_activate_field').click();
+    await page.waitForFunction(() =>
+      document.querySelector('#export_header_template')?.value.includes('{Experiment}'));
+    await page.locator('#export_header_remove_from_header').click();
+    await page.waitForFunction(() =>
+      !document.querySelector('#export_header_template')?.value.includes('{Experiment}'));
+    assert.ok((await registry.innerText()).includes('Experiment [available]'));
+
+    // Delete a new unsaved field: draft token, registry entry and values
+    // must be removed, without touching the other registered fields.
+    await page.locator('#export_header_new_field').fill('Temporary_Field');
+    await page.locator('#export_header_add_field').click();
+    await page.waitForFunction(() =>
+      document.querySelector('#export_header_template')?.value.includes('{Temporary_Field}'));
+    await chooseShinySelect(page, 'export_header_existing_field', 'Temporary_Field');
+    await page.locator('#export_header_delete_field').click();
+    await page.waitForFunction(() => {
+      const reg = document.querySelector('#export_header_registered_fields')?.textContent || '';
+      const tmpl = document.querySelector('#export_header_template')?.value || '';
+      return !reg.includes('Temporary_Field') && !tmpl.includes('{Temporary_Field}');
+    });
+    assert.ok((await registry.innerText()).includes('Experiment [available]'));
     assert.deepEqual(errors, [], 'Uncaught Shiny browser errors');
     console.log('PASS: create/activate/edit/reuse/save/load metadata field through real Shiny UI');
   } finally {
