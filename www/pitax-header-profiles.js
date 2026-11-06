@@ -26,7 +26,12 @@
     }, { priority: 'event' });
   }
 
-  if (window.Shiny && typeof Shiny.addCustomMessageHandler === 'function') {
+  var saveHandlerRegistered = false;
+  var restoreSent = false;
+
+  function ensureSaveHandler() {
+    if (saveHandlerRegistered) return true;
+    if (!window.Shiny || typeof Shiny.addCustomMessageHandler !== 'function') return false;
     Shiny.addCustomMessageHandler('pitaxStoreHeaderProfiles', function (payload) {
       var name = payload && payload.active_template || '';
       try {
@@ -44,13 +49,44 @@
         report(name, false, 'Could not save to this browser: ' + String(e.message || e));
       }
     });
+    saveHandlerRegistered = true;
+    return true;
   }
 
-  // Shiny fires this jQuery event when each new browser session connects.
-  // It runs again on page reload; no server-side persistence is assumed.
-  if (window.jQuery) {
-    window.jQuery(document).on('shiny:connected', restore);
-  } else {
-    document.addEventListener('shiny:connected', restore);
+  function onConnected() {
+    if (!ensureSaveHandler() || restoreSent) return;
+    restoreSent = true;
+    restore();
   }
+
+  function installConnectionHooks() {
+    if (window.jQuery) {
+      window.jQuery(document).on('shiny:connected', onConnected);
+      window.jQuery(document).on('shiny:disconnected', function () {
+        restoreSent = false;
+      });
+    } else {
+      document.addEventListener('shiny:connected', onConnected);
+      document.addEventListener('shiny:disconnected', function () {
+        restoreSent = false;
+      });
+    }
+  }
+
+  installConnectionHooks();
+  // Custom scripts can load before Shiny finishes initializing. Registering
+  // only at script-evaluation time silently loses the save message handler.
+  // Wait for the Shiny API, then restore once its websocket is connected.
+  var attempts = 0;
+  var bootTimer = window.setInterval(function () {
+    attempts += 1;
+    if (ensureSaveHandler()) {
+      var app = window.Shiny && window.Shiny.shinyapp;
+      var connected = app && app.$socket && app.$socket.readyState === 1;
+      if (connected) onConnected();
+    }
+    if ((saveHandlerRegistered && restoreSent) || attempts > 300) {
+      window.clearInterval(bootTimer);
+    }
+  }, 100);
 })();
