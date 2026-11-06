@@ -1,6 +1,9 @@
 # Custom FASTA header builder: only active in the shared export dialog.
 # Values are linked to immutable read/analysis IDs rather than parsing filenames.
   export_header_state <- reactiveValues(config = pitax_header_default_config())
+  # Programmatic updates (Add / Activate / Load) must not be overwritten by
+  # stale textarea input while Shiny synchronizes the browser.
+  header_template_pending_update <- reactiveVal(NULL)
 
   header_builder_config <- function() {
     # Single source of truth: the saved/current configuration, not stale
@@ -12,6 +15,22 @@
     export_header_state$config <- config
     rv$fasta_header_config <- config
     invisible(config)
+  }
+  header_builder_sync_template <- function(config) {
+    config <- pitax_header_coerce_config(config)
+    header_template_pending_update(config$draft_template)
+    header_builder_store(config)
+    updateTextAreaInput(session, "export_header_template", value = config$draft_template)
+    invisible(config)
+  }
+  header_builder_latest_draft <- function() {
+    config <- header_builder_config()
+    # A programmatically changed draft takes precedence over an old textarea.
+    if (is.null(header_template_pending_update()) &&
+        !is.null(input$export_header_template)) {
+      config$draft_template <- as.character(input$export_header_template)[1]
+    }
+    config
   }
 
   output$export_header_values_table <- DT::renderDT({
@@ -44,32 +63,78 @@
     header_builder_store(ans)
   }, ignoreInit = TRUE)
 
+  # Two distinct concepts: (a) project-level registered fields, and
+  # (b) fields referenced by the currently edited FASTA template.
+  output$export_header_registered_fields <- renderText({
+    config <- header_builder_config()
+    registry <- pitax_header_registered_field_table(config)
+    paste0("Registered metadata: ",
+           paste(paste0(registry$Field,
+                        ifelse(registry$Status == "In active header",
+                               " [active]", " [available]")), collapse = ", "))
+  })
+
+  observe({
+    config <- header_builder_config()
+    previous <- isolate(input$export_header_existing_field %||% "")
+    if (!length(previous) || !previous %in% config$fields) {
+      previous <- if (length(config$fields)) config$fields[1] else character()
+    }
+    updateSelectInput(session, "export_header_existing_field",
+                      choices = config$fields, selected = previous)
+  })
+
   observeEvent(input$export_header_add_field, {
-    config <- pitax_header_coerce_config(export_header_state$config)
-    field <- tryCatch(pitax_header_validate_field(input$export_header_new_field, config$fields),
-                      error = function(e) e)
-    if (inherits(field, "error")) {
-      showNotification(conditionMessage(field), type = "error", duration = 8)
+    config <- header_builder_latest_draft()
+    result <- tryCatch(
+      pitax_header_register_field(config, input$export_header_new_field, activate = TRUE),
+      error = function(e) e
+    )
+    if (inherits(result, "error")) {
+      showNotification(conditionMessage(result), type = "error", duration = 8)
       return()
     }
-    if (length(config$fields) >= 40L) {
-      showNotification("Maximum 40 custom fields per project.", type = "error")
-      return()
-    }
-    config$fields <- c(config$fields, field)
-    config$values[[field]] <- rep("", nrow(config$values))
-    header_builder_store(config)
+    header_builder_sync_template(result$config)
     updateTextInput(session, "export_header_new_field", value = "")
+    updateSelectInput(session, "export_header_existing_field",
+                      choices = result$config$fields, selected = result$field)
+    updateSelectInput(session, "export_header_bulk_field",
+                      choices = pitax_header_active_metadata_fields(result$config),
+                      selected = result$field)
+    showNotification(
+      paste0(if (result$created) "Created" else "Reused existing",
+             " metadata field {", result$field,
+             "}; it is now in the active header and the editable table.",
+             " Save / update template to retain this header layout."),
+      type = "message", duration = 9
+    )
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$export_header_activate_field, {
+    config <- header_builder_latest_draft()
+    field <- as.character(input$export_header_existing_field %||% "")[1]
+    result <- tryCatch(pitax_header_activate_field(config, field),
+                       error = function(e) e)
+    if (inherits(result, "error")) {
+      showNotification(conditionMessage(result), type = "error", duration = 8)
+      return()
+    }
+    header_builder_sync_template(result)
+    updateSelectInput(session, "export_header_bulk_field",
+                      choices = pitax_header_active_metadata_fields(result),
+                      selected = result$fields[match(tolower(field), tolower(result$fields))])
     showNotification(paste0("Added {", field,
-                            "}. Insert this token into the header template to edit its values."),
+                            "} to the active header. Save / update template to retain this layout."),
                      type = "message", duration = 7)
   }, ignoreInit = TRUE)
 
   observe({
-    config <- pitax_header_coerce_config(export_header_state$config)
+    config <- header_builder_config()
     active <- pitax_header_active_metadata_fields(config)
-    selected <- input$export_header_bulk_field %||% ""
-    if (!selected %in% active) selected <- if (length(active)) active[1] else character()
+    selected <- isolate(input$export_header_bulk_field %||% "")
+    if (!length(selected) || !selected %in% active) {
+      selected <- if (length(active)) active[1] else character()
+    }
     updateSelectInput(session, "export_header_bulk_field",
                       choices = active, selected = selected)
   })
@@ -99,20 +164,22 @@
   }, ignoreInit = TRUE)
 
   observeEvent(input$export_header_template, {
-    config <- pitax_header_coerce_config(export_header_state$config)
     template <- as.character(input$export_header_template)[1]
     if (is.na(template)) return()
-    config$draft_template <- template
-    header_builder_store(config)
+    expected <- header_template_pending_update()
+    if (!is.null(expected)) {
+      if (!identical(template, expected)) return()
+      header_template_pending_update(NULL)
+    }
+    config <- header_builder_config()
+    if (!identical(config$draft_template, template)) {
+      config$draft_template <- template
+      header_builder_store(config)
+    }
   }, ignoreInit = TRUE)
 
   observeEvent(input$export_header_save_template, {
-    config <- header_builder_config()
-    # Read current editor text directly when Save is clicked. Relying solely on
-    # a separate asynchronous input observer can save an older draft.
-    if (!is.null(input$export_header_template)) {
-      config$draft_template <- as.character(input$export_header_template)[1]
-    }
+    config <- header_builder_latest_draft()
     name <- trimws(as.character(input$export_header_template_name %||% "")[1])
     if (is.na(name) || !nzchar(name) || nchar(name) > 80L) {
       showNotification("Enter a template name (1-80 characters).", type = "error")
@@ -139,9 +206,8 @@
     if (!name %in% names(config$templates)) return()
     config$active_template <- name
     config$draft_template <- config$templates[[name]]
-    header_builder_store(config)
+    header_builder_sync_template(config)
     updateTextInput(session, "export_header_template_name", value = name)
-    updateTextAreaInput(session, "export_header_template", value = config$draft_template)
   }, ignoreInit = TRUE)
 
   output$export_header_active_template <- renderText({
