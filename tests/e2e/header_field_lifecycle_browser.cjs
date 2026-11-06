@@ -86,9 +86,24 @@ async function chooseShinySelect(page, id, value) {
       document.querySelector('#e2e_saved_templates')?.textContent?.includes('Field profile'));
     // This must not be a session-only Save success notification: ensure an
     // actual localStorage acknowledgement and saved portable profile layout.
-    await page.waitForFunction(() =>
-      document.querySelector('#export_header_persistence_status')?.textContent?.includes(
-        "saved in this browser"));
+    try {
+      await page.waitForFunction(() =>
+        document.querySelector('#export_header_persistence_status')?.textContent?.includes(
+          "saved in this browser"), null, { timeout: 12000 });
+    } catch (e) {
+      console.error('PERSISTENCE DIAGNOSTIC', {
+        status: await page.locator('#export_header_persistence_status').innerText(),
+        storage: await page.evaluate(() => localStorage.getItem('PITAX_FASTA_HEADER_PROFILES_V1')),
+        ShinyReady: await page.evaluate(() => !!window.Shiny && !!Shiny.shinyapp),
+        handlers: await page.evaluate(() => {
+          const handlers = window.Shiny && Shiny.shinyapp && Shiny.shinyapp.$socket;
+          return { connected: !!handlers, path: location.href };
+        }),
+        savedNames: await page.locator('#e2e_saved_templates').innerText(),
+        pageErrors: errors
+      });
+      throw e;
+    }
     const stored = await page.evaluate(() =>
       JSON.parse(localStorage.getItem('PITAX_FASTA_HEADER_PROFILES_V1')));
     assert.equal(stored.schema, 1);
