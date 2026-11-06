@@ -146,6 +146,33 @@
                       choices = active, selected = selected)
   })
 
+  observeEvent(input$export_header_remove_from_header, {
+    field <- input$export_header_existing_field %||% ""
+    ans <- tryCatch(pitax_header_remove_from_draft(header_builder_latest_draft(), field),
+                    error = function(e) e)
+    if (inherits(ans, "error")) {
+      showNotification(conditionMessage(ans), type = "error", duration = 10)
+      return()
+    }
+    header_builder_sync_template(ans)
+    showNotification(paste0("Removed {", field,
+                            "} from active draft. Save template to keep this change."),
+                     type = "message", duration = 7)
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$export_header_delete_field, {
+    field <- input$export_header_existing_field %||% ""
+    ans <- tryCatch(pitax_header_delete_custom_field(header_builder_latest_draft(), field),
+                    error = function(e) e)
+    if (inherits(ans, "error")) {
+      showNotification(conditionMessage(ans), type = "error", duration = 15)
+      return()
+    }
+    header_builder_sync_template(ans)
+    showNotification(paste0("Deleted custom field {", field, "} and its metadata values."),
+                     type = "warning", duration = 10)
+  }, ignoreInit = TRUE)
+
   observeEvent(input$export_header_apply_bulk, {
     config <- pitax_header_coerce_config(export_header_state$config)
     df <- pitax_header_active_edit_table(export_dialog_state$snap, config)

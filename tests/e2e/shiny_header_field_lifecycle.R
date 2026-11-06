@@ -30,6 +30,8 @@ ui <- fluidPage(
   selectInput("export_header_existing_field", "All registered metadata fields",
               choices = c("Organism", "Experiment", "Seq_Date")),
   actionButton("export_header_activate_field", "Use selected field in header"),
+  actionButton("export_header_remove_from_header", "Remove from active header"),
+  actionButton("export_header_delete_field", "Delete field permanently"),
   selectInput("export_header_bulk_field", "Field to set", choices = "Organism"),
   textInput("export_header_bulk_value", "Value", value = ""),
   selectInput("export_header_bulk_scope", "Apply to",

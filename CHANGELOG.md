@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.6.7 — Explicit metadata removal and deployment version visibility
+
+- Display the live application version in the Export dialog title, so deployment mismatch is immediately apparent.
+- Add separate Remove from active header and Delete field permanently actions. Removing a token preserves metadata; permanent deletion is blocked when a saved template still references the field.
+- Add regression tests for removing Experiment, preserving fields and preventing deletion of referenced fields.
+
+
 ## 3.6.6 — FASTA metadata field lifecycle and editor consistency
 
 - Fixed an inconsistent field lifecycle: v3.6.4 made the metadata editor active-template-only, but adding a new field registered it without activating it. The field was silently hidden while a second attempt failed as duplicate.
