@@ -39,6 +39,7 @@ ui <- fluidPage(
               choices = c("All records" = "all", "Selected" = "selected"), selected = "all"),
   actionButton("export_header_apply_bulk", "Apply metadata value"),
   textOutput("export_header_active_template"),
+  textOutput("export_header_persistence_status"),
   textOutput("export_header_validation"),
   textOutput("e2e_active_columns"),
   textOutput("e2e_persisted_fields"),
