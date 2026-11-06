@@ -134,6 +134,45 @@ stopifnot(!"Location" %in% deleted$fields,
           !grepl("{Location}", deleted$draft_template, fixed = TRUE),
           "Experiment" %in% deleted$fields)
 
+# Explicit profile persistence contract: browser stores field definitions and
+# named layouts, NOT biological per-record values; .sangerproject stores both.
+browser_profile <- pitax_header_browser_payload(reloaded)
+stopifnot(identical(browser_profile$schema, 1L),
+          is.null(browser_profile$values),
+          "Collection_Site" %in% browser_profile$fields,
+          any(vapply(browser_profile$templates, function(x) {
+            identical(x$name, "Site") && identical(x$template, step3$draft_template)
+          }, logical(1))))
+fresh <- pitax_header_restore_browser_profiles(pitax_header_default_config(),
+                                               browser_profile)
+stopifnot("Collection_Site" %in% fresh$fields,
+          identical(fresh$templates[["Site"]], step3$draft_template),
+          identical(fresh$active_template, "Site"),
+          nrow(fresh$values) == 0L)
+# An explicit project load retains its saved profile on name collision.
+project_cfg <- pitax_header_default_config()
+project_cfg$templates[["Site"]] <- "{Final_Name} isolate={Isolate}"
+project_cfg$active_template <- "Site"
+project_cfg$draft_template <- project_cfg$templates[["Site"]]
+project_restored <- pitax_header_restore_browser_profiles(
+  project_cfg, browser_profile, project_loaded = TRUE)
+stopifnot(identical(project_restored$templates[["Site"]],
+                    "{Final_Name} isolate={Isolate}"))
+# File-backed project save/read preserves both named template and per-record
+# metadata, including fields that are not in the active template.
+project_file <- tempfile(fileext = ".sangerproject")
+saveRDS(list(state = list(fasta_header_config = reloaded)), project_file)
+disk_config <- pitax_header_coerce_config(readRDS(project_file)$state$fasta_header_config)
+stopifnot(identical(disk_config$templates, reloaded$templates),
+          identical(disk_config$values, reloaded$values))
+# Invalid imported profiles must not override a valid session.
+invalid_browser <- browser_profile
+invalid_browser$fields <- c("Final_Name", "Collection_Site")
+stopifnot(identical(
+  pitax_header_restore_browser_profiles(project_cfg, invalid_browser, TRUE),
+  project_cfg
+))
+
 # The former plan builder assessed EVERY component, so a broken unrelated
 # taxonomy table could abort even a FASTA-only export.
 fake_assessor <- function(id, snap, selection) {
