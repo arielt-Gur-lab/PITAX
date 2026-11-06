@@ -104,6 +104,46 @@ pitax_header_activate_field <- function(config, field) {
   pitax_header_coerce_config(config)
 }
 
+pitax_header_remove_from_draft <- function(config, field) {
+  config <- pitax_header_coerce_config(config)
+  idx <- match(tolower(trimws(as.character(field)[1])), tolower(config$fields))
+  if (is.na(idx)) stop("Select an existing custom field.", call. = FALSE)
+  field <- config$fields[idx]
+  token <- paste0("{", field, "}")
+  if (!grepl(token, config$draft_template, fixed = TRUE)) return(config)
+  # Remove a complete key=value annotation, including quoted values, whenever
+  # possible. Do not remove the primary FASTA identifier or neighboring tokens.
+  escaped <- gsub("([][{}()+*^$|\\\\?.])", "\\\\\\1", field)
+  pattern <- paste0("[[:space:]]+[A-Za-z][A-Za-z0-9_]*[[:space:]]*=[[:space:]]*(?:\"", "\\{", escaped, "\\}", "\"|'\\{", escaped, "\\}'|\\{", escaped, "\\})")
+  updated <- gsub(pattern, "", config$draft_template, perl = TRUE)
+  if (grepl(token, updated, fixed = TRUE)) {
+    updated <- gsub(token, "", updated, fixed = TRUE)
+  }
+  config$draft_template <- trimws(updated)
+  pitax_header_validate_template(config$draft_template, config$fields)
+  pitax_header_coerce_config(config)
+}
+
+pitax_header_delete_custom_field <- function(config, field) {
+  config <- pitax_header_coerce_config(config)
+  idx <- match(tolower(trimws(as.character(field)[1])), tolower(config$fields))
+  if (is.na(idx)) stop("Select an existing custom field.", call. = FALSE)
+  field <- config$fields[idx]
+  used_by <- names(config$templates)[vapply(config$templates, function(template) {
+    grepl(paste0("{", field, "}"), template, fixed = TRUE)
+  }, logical(1))]
+  if (length(used_by)) {
+    stop(paste0("Cannot delete {", field, "}: saved template(s) still use it: ",
+                paste(used_by, collapse = ", "),
+                ". Remove it from those templates and save them first."),
+         call. = FALSE)
+  }
+  config <- pitax_header_remove_from_draft(config, field)
+  config$fields <- config$fields[-idx]
+  config$values[[field]] <- NULL
+  pitax_header_coerce_config(config)
+}
+
 pitax_header_registered_field_table <- function(config) {
   config <- pitax_header_coerce_config(config)
   active <- pitax_header_active_metadata_fields(config)
