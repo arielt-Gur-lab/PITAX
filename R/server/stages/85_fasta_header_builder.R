@@ -40,6 +40,51 @@
     config
   }
 
+  header_browser_storage_status <- reactiveVal(
+    "Template profiles stay in this session until browser storage is confirmed. Record values require Save project."
+  )
+  output$export_header_persistence_status <- renderText({
+    header_browser_storage_status()
+  })
+
+  observeEvent(input$pitax_header_browser_save_result, {
+    ack <- input$pitax_header_browser_save_result
+    if (isTRUE(ack$ok)) {
+      msg <- paste0("Profile '", as.character(ack$name %||% "")[1],
+                    "' saved in this browser. Record-specific metadata values require Save project.")
+      header_browser_storage_status(msg)
+      showNotification(msg, type = "message", duration = 12)
+    } else {
+      msg <- paste0(as.character(ack$error %||% "Browser storage failed.")[1],
+                    " Use Export templates CSV and Save project to avoid losing your work.")
+      header_browser_storage_status(msg)
+      showNotification(msg, type = "error", duration = 18)
+    }
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$pitax_header_browser_profiles_restore, {
+    payload <- input$pitax_header_browser_profiles_restore$data
+    if (is.null(payload)) return()
+    # Loading a .sangerproject makes that project's named profiles authoritative.
+    has_project <- nzchar(as.character(rv$project_loaded_name %||% "")[1])
+    before <- pitax_header_coerce_config(rv$fasta_header_config)
+    after <- pitax_header_restore_browser_profiles(before, payload,
+                                                   project_loaded = has_project)
+    if (identical(before, after)) return()
+    rv$fasta_header_config <- after
+    export_header_state$config <- after
+    if (!is.null(export_dialog_state$snap)) {
+      header_builder_sync_template(after)
+      updateSelectInput(session, "export_header_saved_template",
+                        choices = names(after$templates), selected = after$active_template)
+      updateTextInput(session, "export_header_template_name", value = after$active_template)
+    }
+    header_browser_storage_status(paste0(
+      "Restored ", length(after$templates), " named template(s) from this browser. ",
+      "Record-specific metadata values still require Save project."
+    ))
+  }, ignoreInit = TRUE)
+
   output$export_header_values_table <- DT::renderDT({
     req(export_dialog_state$snap)
     config <- pitax_header_coerce_config(export_header_state$config)
@@ -229,9 +274,10 @@
     config$active_template <- name
     header_builder_store(config)
     updateSelectInput(session, "export_header_saved_template", choices = names(config$templates), selected = name)
-    showNotification(paste0("Saved template: ", name, ". Active header: >",
-                            pitax_header_validate_template(config$draft_template, config$fields)),
-                     type = "message", duration = 8)
+    header_browser_storage_status(paste0("Saving profile '", name, "' in this browser..."))
+    # Do not claim persistence until JavaScript confirms the localStorage write.
+    session$sendCustomMessage("pitaxStoreHeaderProfiles",
+                              pitax_header_browser_payload(config))
   }, ignoreInit = TRUE)
 
   observeEvent(input$export_header_load_template, {
