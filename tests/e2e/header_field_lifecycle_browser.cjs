@@ -34,13 +34,26 @@ const assert = require('node:assert/strict');
     await page.waitForFunction(() =>
       document.querySelector('#export_header_template')?.value.includes(
         'collection_site={Collection_Site}'));
-    await page.waitForFunction(() => {
-      const cols = document.querySelector('#e2e_active_columns')?.textContent || '';
-      const reg = document.querySelector('#export_header_registered_fields')?.textContent || '';
-      const option = document.querySelector('#export_header_bulk_field option[value="Collection_Site"]');
-      return cols.includes('Collection_Site') &&
-        reg.includes('Collection_Site [active]') && Boolean(option);
-    });
+    try {
+      await page.waitForFunction(() => {
+        const cols = document.querySelector('#e2e_active_columns')?.textContent || '';
+        const reg = document.querySelector('#export_header_registered_fields')?.textContent || '';
+        const option = document.querySelector('#export_header_bulk_field option[value="Collection_Site"]');
+        return cols.includes('Collection_Site') &&
+          reg.includes('Collection_Site [active]') && Boolean(option);
+      }, null, { timeout: 12000 });
+    } catch (e) {
+      console.error('FIELD DIAGNOSTIC', {
+        template: await template.inputValue(),
+        cols: await active.innerText(),
+        registry: await registry.innerText(),
+        bulkOptions: await page.locator('#export_header_bulk_field option').allTextContents(),
+        existingOptions: await page.locator('#export_header_existing_field option').allTextContents(),
+        persistedFields: await page.locator('#e2e_persisted_fields').innerText(),
+        pageErrors: errors
+      });
+      throw e;
+    }
     assert.ok(!(await active.innerText()).includes('Experiment'),
       'Adding a new field must not reactivate an unwanted Experiment');
 
