@@ -17,6 +17,7 @@ e2e_snap <- list(
 )
 
 ui <- fluidPage(
+  tags$head(tags$script(src = "pitax-header-profiles.js")),
   titlePanel("PITAX metadata editor integration"),
   textAreaInput("export_header_template", "Header template",
                 value = pitax_header_default_template(), width = "100%"),
