@@ -117,6 +117,23 @@ stopifnot(identical(reloaded$templates[["Site"]], step3$draft_template),
             match("read::S1", reloaded$values$Record_Key)], "Golan"),
           "Collection_Site" %in% pitax_header_active_metadata_fields(reloaded))
 
+# Removing from active draft must not erase data or old named templates.
+removal <- pitax_header_register_field(pitax_header_default_config(), "Location")$config
+removal$draft_template <- '{Final_Name} organism={Organism} experiment="{Experiment}" location={Location}'
+no_experiment <- pitax_header_remove_from_draft(removal, "Experiment")
+stopifnot(!grepl("experiment=", no_experiment$draft_template, fixed = TRUE),
+          "Experiment" %in% no_experiment$fields,
+          "Experiment" %in% names(no_experiment$values))
+# Permanent deletion must reject any field referenced by saved templates.
+protected <- try(pitax_header_delete_custom_field(removal, "Experiment"), silent = TRUE)
+stopifnot(inherits(protected, "try-error"))
+# Field with no saved references may be deleted without disturbing other fields.
+deleted <- pitax_header_delete_custom_field(no_experiment, "Location")
+stopifnot(!"Location" %in% deleted$fields,
+          !"Location" %in% names(deleted$values),
+          !grepl("{Location}", deleted$draft_template, fixed = TRUE),
+          "Experiment" %in% deleted$fields)
+
 # The former plan builder assessed EVERY component, so a broken unrelated
 # taxonomy table could abort even a FASTA-only export.
 fake_assessor <- function(id, snap, selection) {
