@@ -84,6 +84,19 @@ async function chooseShinySelect(page, id, value) {
     await page.locator('#export_header_save_template').click();
     await page.waitForFunction(() =>
       document.querySelector('#e2e_saved_templates')?.textContent?.includes('Field profile'));
+    // This must not be a session-only Save success notification: ensure an
+    // actual localStorage acknowledgement and saved portable profile layout.
+    await page.waitForFunction(() =>
+      document.querySelector('#export_header_persistence_status')?.textContent?.includes(
+        "saved in this browser"));
+    const stored = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('PITAX_FASTA_HEADER_PROFILES_V1')));
+    assert.equal(stored.schema, 1);
+    assert.ok(stored.fields.includes('Collection_Site'));
+    assert.ok(stored.templates.some(p => p.name === 'Field profile' &&
+      p.template.includes('{Collection_Site}')));
+    assert.equal(stored.values, undefined, 'Per-record values must not leak into localStorage');
+
 
     await template.fill('{Final_Name} organism={Organism}');
     await template.press('Tab');
@@ -141,8 +154,23 @@ async function chooseShinySelect(page, id, value) {
       return !reg.includes('Temporary_Field') && !tmpl.includes('{Temporary_Field}');
     });
     assert.ok((await registry.innerText()).includes('Experiment [available]'));
+    // Hard browser refresh destroys the entire Shiny server session.
+    // Named profile + custom field definitions must nonetheless be restored.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => {
+      const names = document.querySelector('#e2e_saved_templates')?.textContent || '';
+      const fields = document.querySelector('#e2e_persisted_fields')?.textContent || '';
+      const current = document.querySelector('#export_header_template')?.value || '';
+      return names.includes('Field profile') &&
+        fields.includes('Collection_Site') &&
+        current.includes('collection_site={Collection_Site}');
+    });
+    assert.ok((await page.locator('#export_header_registered_fields').innerText())
+      .includes('Collection_Site [active]'));
+    const restored = await page.locator('#export_header_persistence_status').innerText();
+    assert.match(restored, /Restored.*named template/);
     assert.deepEqual(errors, [], 'Uncaught Shiny browser errors');
-    console.log('PASS: create/activate/edit/reuse/save/load metadata field through real Shiny UI');
+    console.log('PASS: FASTA field profile saved to browser localStorage and restored after full page reload');
   } finally {
     await browser.close();
   }
