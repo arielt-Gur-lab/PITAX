@@ -24,6 +24,11 @@ async function chooseShinySelect(page, id, value) {
   const template = page.locator('#export_header_template');
   try {
     await page.goto('http://127.0.0.1:47778', { waitUntil: 'domcontentloaded' });
+    const scriptResponse = await page.request.get(
+      'http://127.0.0.1:47778/pitaxassets/pitax-header-profiles.js');
+    assert.equal(scriptResponse.status(), 200,
+      'Production browser persistence JavaScript must be served to Shiny');
+    assert.ok((await scriptResponse.text()).includes('pitaxStoreHeaderProfiles'));
     await registry.waitFor({ state: 'visible' });
 
     // Case 1: old Experiment removed -> no column but still registered.
