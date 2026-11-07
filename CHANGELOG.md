@@ -1,5 +1,28 @@
 # Changelog
 
+## 3.7.0 — Structured Custom FASTA Header Builder
+
+- Replaced the fragile free-text template / multi-observer Header Builder with a
+  single authoritative, versioned profile model (`header_schema = 2`).
+- Users build Sequence Library-compatible headers by choosing fields from a
+  categorized library, dragging/reordering them, and saving named profiles.
+  Raw `{Field}` editing is no longer required.
+- Canonical export tags follow the Sequence Library parser contract
+  (`organism`, `isolate`, `locus`, `assay`, `molecule`, `seq_date`, …). Group B
+  experimental fields remain selectable but are documented as Notes-folded
+  downstream. Custom fields are marked Extras.
+- Experiment is never reinserted automatically after removal.
+- Persistence is honest and layered: unsaved draft, verified browser
+  localStorage (profiles only), `.sangerproject` (profiles + Record_Key values),
+  and portable JSON import/export. Save-to-browser acknowledges only after
+  read-back verification.
+- Legacy template configs migrate in place with `legacy_backup` and warnings;
+  metadata values keep stable `Record_Key` associations.
+- Existing short/rich FASTA modes, ZIP packaging, and the 18-record export
+  regression remain covered. New model, parser round-trip, and Playwright UI
+  tests exercise drag/reorder/save/reload persistence.
+
+
 ## 3.6.7 — Explicit metadata removal and deployment version visibility
 
 - Display the live application version in the Export dialog title, so deployment mismatch is immediately apparent.

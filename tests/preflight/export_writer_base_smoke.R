@@ -17,10 +17,9 @@ stopifnot(identical(pitax_export_prepare_sheet_data(
   data.frame(), NULL, list())$Message, "No rows available for this selection"))
 
 config <- pitax_header_default_config()
-config$draft_template <- paste0(
-  ">{Final_Name} organism={Organism} isolate={Isolate} locus={Locus}",
-  ' direction={Direction} molecule=DNA experiment="{Experiment}" date={Seq_Date}'
-)
+config$draft$ordered_fields <- c("organism", "isolate", "locus", "direction",
+                                 "molecule", "experiment", "seq_date")
+config <- pitax_header_refresh_derived(config)
 records <- list()
 for (i in seq_len(18L)) {
   rid <- paste0("S", i)
@@ -28,8 +27,8 @@ for (i in seq_len(18L)) {
                          sequence = "ACTGCATG", direction = "Reverse",
                          isolate = paste0("ISO", i), locus = "TEF", missing = FALSE)
   key <- pitax_header_record_key("qc_trimmed_sequences", rid)
-  for (pair in list(c("Organism", "En"), c("Experiment", "Resistance_X"),
-                    c("Seq_Date", "2026-11-05"))) {
+  for (pair in list(c("organism", "En"), c("experiment", "Resistance_X"),
+                    c("seq_date", "2026-11-05"))) {
     config <- pitax_header_set_value(config, key, pair[1], pair[2])
   }
 }
@@ -41,17 +40,17 @@ lines <- readLines(out, warn = FALSE)
 stopifnot(sum(startsWith(lines, ">")) == 18L,
           identical(lines[1], paste0(
             '>ISO1_TEF_R organism=En isolate=ISO1 locus=TEF',
-            ' direction=Reverse molecule=DNA experiment="Resistance_X" date=2026-11-05')))
+            ' direction=R molecule=DNA experiment=Resistance_X seq_date=2026-11-05')))
 
-# Removed tokens must not require stored values.
-config$draft_template <- ">{Final_Name} organism={Organism}"
-config$values$Experiment[] <- ""
-config$values$Seq_Date[] <- ""
+# Removed fields must not require stored values; experiment stays out unless selected.
+config <- pitax_header_profile_remove_field(config, "experiment")
+config <- pitax_header_profile_remove_field(config, "seq_date")
+config <- pitax_header_profile_remove_field(config, "isolate")
+config <- pitax_header_profile_remove_field(config, "locus")
+config <- pitax_header_profile_remove_field(config, "direction")
+config <- pitax_header_profile_remove_field(config, "molecule")
 rendered <- pitax_header_apply_to_records(records, "qc_trimmed_sequences", config)
 stopifnot(identical(rendered[["S18"]]$custom_header, "ISO18_TEF_R organism=En"))
-# Active template controls the visible table fields; old saved templates do not
-# force Experiment into newly saved profiles that omit it.
-config$draft_template <- ">{Final_Name} organism={Organism}"
 asgs <- data.frame(Source_ID = paste0("S", seq_len(18L)),
                    Isolate = paste0("ISO", seq_len(18L)),
                    Locus = rep("TEF", 18L),
@@ -63,76 +62,66 @@ snapshot <- list(read_assignments = asgs, results = records,
                  multilocus_profile = list())
 display <- pitax_header_active_edit_table(snapshot, config)
 stopifnot(nrow(display) == 18L,
-          !("Experiment" %in% names(display)),
-          !("Seq_Date" %in% names(display)),
-          "Organism" %in% names(display),
-          identical(pitax_header_active_metadata_fields(config), "Organism"))
-config$templates[["Without Experiment"]] <- config$draft_template
-config$active_template <- "Without Experiment"
+          !("experiment" %in% names(display)),
+          !("seq_date" %in% names(display)),
+          "organism" %in% names(display),
+          identical(pitax_header_active_metadata_fields(config), "organism"))
+config <- pitax_header_save_profile(config, "Without Experiment")
 restored <- pitax_header_coerce_config(unserialize(serialize(config, NULL)))
-stopifnot(identical(pitax_header_active_metadata_fields(restored), "Organism"))
+stopifnot(identical(pitax_header_active_metadata_fields(restored), "organism"))
 
-# Metadata lifecycle: creating a field must make it visible and editable
-# immediately; reusing it must not create duplicates; inactive fields remain
-# discoverable and can be reactivated without changing other saved templates.
+# Metadata lifecycle under the structured profile model.
 lifecycle <- pitax_header_default_config()
-lifecycle$draft_template <- "{Final_Name} organism={Organism}"
-lifecycle$templates[["Minimal"]] <- lifecycle$draft_template
+lifecycle$draft$ordered_fields <- c("organism")
+lifecycle <- pitax_header_save_profile(lifecycle, "Minimal")
 step1 <- pitax_header_register_field(lifecycle, "Collection_Site")
 stopifnot(isTRUE(step1$created),
-          "Collection_Site" %in% step1$config$fields,
-          "Collection_Site" %in% pitax_header_active_metadata_fields(step1$config),
-          grepl("collection_site={Collection_Site}", step1$config$draft_template, fixed = TRUE),
-          !grepl("{Experiment}", step1$config$draft_template, fixed = TRUE),
-          !grepl("{Collection_Site}", step1$config$templates[["Minimal"]], fixed = TRUE))
+          "collection_site" %in% pitax_header_active_metadata_fields(step1$config),
+          grepl("collection_site={collection_site}", step1$config$draft_template, fixed = TRUE),
+          !grepl("experiment=", step1$config$draft_template, fixed = TRUE),
+          !grepl("collection_site", step1$config$templates[["Minimal"]], fixed = TRUE))
 visible <- pitax_header_active_edit_table(snapshot, step1$config)
-stopifnot("Collection_Site" %in% names(visible),
-          !"Experiment" %in% names(visible))
+stopifnot("collection_site" %in% names(visible),
+          !"experiment" %in% names(visible))
 registered <- pitax_header_registered_field_table(step1$config)
 stopifnot("Collection_Site" %in% registered$Field,
           identical(registered$Status[match("Collection_Site", registered$Field)],
-                    "In active header"),
-          identical(registered$Status[match("Experiment", registered$Field)],
-                    "Available (not in header)"))
+                    "In active header"))
 step2 <- pitax_header_register_field(step1$config, "collection_site")
 stopifnot(!step2$created,
-          sum(tolower(step2$config$fields) == "collection_site") == 1L,
-          length(gregexpr("\\{Collection_Site\\}", step2$config$draft_template, perl = TRUE)[[1]]) == 1L)
-# Make field inactive without destroying it; reactivation is idempotent.
-step2$config$draft_template <- "{Final_Name} organism={Organism}"
-stopifnot(!"Collection_Site" %in% names(pitax_header_active_edit_table(snapshot, step2$config)),
-          "Collection_Site" %in% pitax_header_registered_field_table(step2$config)$Field)
-step3 <- pitax_header_activate_field(step2$config, "collection_site")
-stopifnot("Collection_Site" %in% names(pitax_header_active_edit_table(snapshot, step3)))
+          sum(names(step2$config$custom_fields) == "collection_site") == 1L)
+step2 <- pitax_header_profile_remove_field(step2$config, "collection_site")
+stopifnot(!"collection_site" %in% names(pitax_header_active_edit_table(snapshot, step2)),
+          "Collection_Site" %in% pitax_header_registered_field_table(step2)$Field)
+step3 <- pitax_header_activate_field(step2, "collection_site")
+stopifnot("collection_site" %in% names(pitax_header_active_edit_table(snapshot, step3)))
 step3 <- pitax_header_activate_field(step3, "Collection_Site")
-stopifnot(length(gregexpr("\\{Collection_Site\\}", step3$draft_template, perl = TRUE)[[1]]) == 1L)
+stopifnot(sum(step3$draft$ordered_fields == "collection_site") == 1L)
 stopifnot(inherits(try(pitax_header_register_field(step3, "Final_Name"), silent = TRUE), "try-error"),
           inherits(try(pitax_header_register_field(step3, "1invalid"), silent = TRUE), "try-error"))
-step3 <- pitax_header_set_value(step3, "read::S1", "Collection_Site", "Golan")
-step3$templates[["Site"]] <- step3$draft_template
-step3$active_template <- "Site"
+step3 <- pitax_header_set_value(step3, "read::S1", "collection_site", "Golan")
+step3 <- pitax_header_save_profile(step3, "Site")
 reloaded <- pitax_header_coerce_config(unserialize(serialize(step3, NULL)))
-stopifnot(identical(reloaded$templates[["Site"]], step3$draft_template),
-          identical(reloaded$values$Collection_Site[
+stopifnot(identical(reloaded$values$collection_site[
             match("read::S1", reloaded$values$Record_Key)], "Golan"),
-          "Collection_Site" %in% pitax_header_active_metadata_fields(reloaded))
+          "collection_site" %in% pitax_header_active_metadata_fields(reloaded))
 
-# Removing from active draft must not erase data or old named templates.
-removal <- pitax_header_register_field(pitax_header_default_config(), "Location")$config
-removal$draft_template <- '{Final_Name} organism={Organism} experiment="{Experiment}" location={Location}'
-no_experiment <- pitax_header_remove_from_draft(removal, "Experiment")
+# Removing from active draft must not erase data; builtin experiment is not a deletable custom field.
+removal <- pitax_header_profile_add_field(pitax_header_default_config(), "organism")
+removal <- pitax_header_profile_add_field(removal, "experiment")
+removal <- pitax_header_profile_add_field(removal, "location")
+removal <- pitax_header_set_value(removal, "read::S1", "experiment", "keep")
+no_experiment <- pitax_header_remove_from_draft(removal, "experiment")
 stopifnot(!grepl("experiment=", no_experiment$draft_template, fixed = TRUE),
-          "Experiment" %in% no_experiment$fields,
-          "Experiment" %in% names(no_experiment$values))
-# Permanent deletion must reject any field referenced by saved templates.
-protected <- try(pitax_header_delete_custom_field(removal, "Experiment"), silent = TRUE)
+          "experiment" %in% names(no_experiment$values))
+protected <- try(pitax_header_delete_custom_field(removal, "experiment"), silent = TRUE)
 stopifnot(inherits(protected, "try-error"))
-# Field with no saved references may be deleted without disturbing other fields.
-deleted <- pitax_header_delete_custom_field(no_experiment, "Location")
-stopifnot(!"Location" %in% deleted$fields,
-          !"Location" %in% names(deleted$values),
-          !grepl("{Location}", deleted$draft_template, fixed = TRUE),
-          "Experiment" %in% deleted$fields)
+# location is builtin notes-folded, not custom — delete_custom_field rejects it.
+deleted_try <- try(pitax_header_delete_custom_field(no_experiment, "location"), silent = TRUE)
+stopifnot(inherits(deleted_try, "try-error"))
+no_location <- pitax_header_remove_from_draft(no_experiment, "location")
+stopifnot(!"location" %in% no_location$draft$ordered_fields,
+          "organism" %in% no_location$draft$ordered_fields)
 
 # The former plan builder assessed EVERY component, so a broken unrelated
 # taxonomy table could abort even a FASTA-only export.

@@ -250,7 +250,9 @@ pitax_export_write_run_info <- function(path, snap, plan, written_files, failure
     paste0("sequence_layout: ", plan$selection$sequence_layout),
     paste0("sequence_header: ", plan$selection$sequence_header),
     if (identical(plan$selection$sequence_header, "custom")) paste0("fasta_header_template: ", plan$selection$header_config$draft_template) else NULL,
-    if (identical(plan$selection$sequence_header, "custom")) paste0("fasta_header_fields: ", paste(plan$selection$header_config$fields, collapse = ",")) else NULL,
+    if (identical(plan$selection$sequence_header, "custom")) paste0("fasta_header_fields: ", paste(plan$selection$header_config$draft$ordered_fields %||% plan$selection$header_config$fields, collapse = ",")) else NULL,
+    if (identical(plan$selection$sequence_header, "custom")) paste0("fasta_header_profile: ", plan$selection$header_config$draft$name %||% plan$selection$header_config$active_template) else NULL,
+    if (identical(plan$selection$sequence_header, "custom")) paste0("fasta_header_schema: ", plan$selection$header_config$header_schema %||% 1L) else NULL,
     ""
   )
   if (length(plan$omitted_components)) {

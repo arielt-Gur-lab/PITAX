@@ -47,3 +47,6 @@ rsconnect/
 
 # Server-side Share Project snapshots (immutable, possession-based links)
 data/shared/
+
+node_modules/
+tests/tmp_*

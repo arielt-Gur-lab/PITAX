@@ -327,7 +327,33 @@
     rv$locus_vocabulary <- loaded_loci
     rv$assay_profiles <- loaded_profiles
     rv$project_defaults <- assay_project_defaults_from_legacy_settings(st$project_defaults)
-    rv$fasta_header_config <- tryCatch(pitax_header_coerce_config(st$fasta_header_config), error = function(e) pitax_header_default_config())
+    header_loaded <- tryCatch(
+      pitax_header_coerce_config(st$fasta_header_config),
+      error = function(e) {
+        fallback <- pitax_header_default_config()
+        fallback$legacy_backup <- st$fasta_header_config
+        fallback$migration_warnings <- c(
+          fallback$migration_warnings,
+          paste0("Header config could not be fully migrated: ", conditionMessage(e),
+                 ". Defaults installed; original payload preserved in legacy_backup.")
+        )
+        fallback
+      }
+    )
+    header_loaded$persistence$from_project <- TRUE
+    header_loaded$persistence$project_included <- TRUE
+    header_loaded$persistence$last_status <- "Loaded from project (.sangerproject)"
+    rv$fasta_header_config <- header_loaded
+    if (exists("export_header_state", inherits = TRUE)) {
+      export_header_state$config <- header_loaded
+    }
+    if (length(header_loaded$migration_warnings)) {
+      warn <- paste(header_loaded$migration_warnings, collapse = " | ")
+      rv$project_migration_log <- paste(
+        c(stage2_scalar_text(rv$project_migration_log), warn), collapse = "\n"
+      )
+      if (notify) showNotification(warn, type = "warning", duration = 14)
+    }
     rv$project_mode <- if (!is.null(st$project_mode) && st$project_mode %in% c("simple", "paired_consensus")) st$project_mode else "paired_consensus"
     rv$read_assignments <- loaded_assignments
     rv$assignment_signature <- assignment_state_signature(loaded_assignments)

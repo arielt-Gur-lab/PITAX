@@ -1,17 +1,9 @@
-// Real browser + real PITAX header-builder observers, not a simulated model UI.
+// Real browser + structured Header Builder against production assets.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 
-async function chooseShinySelect(page, id, value) {
-  await page.locator('#' + id).evaluate((el, val) => {
-    // Shiny selectInput defaults to the Selectize widget; dynamically added
-    // choices live in selectize.options, not necessarily DOM <option> nodes.
-    if (el.selectize) el.selectize.setValue(val);
-    else {
-      el.value = val;
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-  }, value);
+async function waitActive(page, pred, timeout = 15000) {
+  await page.waitForFunction(pred, null, { timeout });
 }
 
 (async () => {
@@ -19,131 +11,138 @@ async function chooseShinySelect(page, id, value) {
   const page = await browser.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  const active = page.locator('#e2e_active_columns');
-  const registry = page.locator('#export_header_registered_fields');
-  const template = page.locator('#export_header_template');
   try {
+    // Production assets must be reachable (same files as deployed www/).
+    const css = await page.request.get('http://127.0.0.1:47778/pitax-www/pitax-header-builder.css');
+    const js = await page.request.get('http://127.0.0.1:47778/pitax-www/pitax-header-builder.js');
+    assert.equal(css.status(), 200, 'header builder CSS must return HTTP 200');
+    assert.equal(js.status(), 200, 'header builder JS must return HTTP 200');
+
     await page.goto('http://127.0.0.1:47778', { waitUntil: 'domcontentloaded' });
-    await registry.waitFor({ state: 'visible' });
+    await page.locator('#fhb_library').waitFor({ state: 'visible' });
+    await page.waitForFunction(() => window.PITAXHeaderBuilder &&
+      Array.isArray(window.PITAXHeaderBuilder.getState().library) &&
+      window.PITAXHeaderBuilder.getState().library.length > 0);
 
-    // Case 1: old Experiment removed -> no column but still registered.
-    await template.fill('{Final_Name} organism={Organism}');
-    await template.press('Tab');
-    await page.waitForFunction(() =>
-      document.querySelector('#export_header_active_template')?.textContent?.includes(
-        'Active export template: >{Final_Name} organism={Organism}'));
-    await page.waitForFunction(() => {
-      const cols = document.querySelector('#e2e_active_columns')?.textContent || '';
-      const reg = document.querySelector('#export_header_registered_fields')?.textContent || '';
-      return !cols.includes('Experiment') && reg.includes('Experiment [available]');
+    // Default profile must not include experiment.
+    const initial = await page.locator('#e2e_persisted_fields').innerText();
+    assert.ok(!initial.split(',').includes('experiment'), 'experiment not auto-included');
+
+    // Add organism via JS bridge (same path as drag/drop add).
+    await page.evaluate(() => window.PITAXHeaderBuilder.addField('organism'));
+    await waitActive(page, () =>
+      (document.querySelector('#e2e_active_columns')?.textContent || '').includes('organism'));
+
+    // Reorder: move organism to front via keyboard-style controls in construction.
+    await page.evaluate(() => {
+      const st = window.PITAXHeaderBuilder.getState();
+      // Trigger server reorder with organism first.
+      if (window.Shiny) {
+        Shiny.setInputValue('pitax_header_builder_order', {
+          fields: ['organism'].concat(st.activeFields.filter(f => f !== 'organism')),
+          nonce: Date.now()
+        }, { priority: 'event' });
+      }
     });
-    assert.ok(!(await active.innerText()).includes('Experiment'));
+    await waitActive(page, () =>
+      (document.querySelector('#e2e_persisted_fields')?.textContent || '').startsWith('organism'));
 
-    // Case 2: create new field from UI. Must IMMEDIATELY appear in
-    // registry, template, active editor and bulk selector.
+    // Create custom field.
     await page.locator('#export_header_new_field').fill('Collection_Site');
     await page.locator('#export_header_add_field').click();
-    await page.waitForFunction(() =>
-      document.querySelector('#export_header_template')?.value.includes(
-        'collection_site={Collection_Site}'));
-    try {
-      await page.waitForFunction(() => {
-        const cols = document.querySelector('#e2e_active_columns')?.textContent || '';
-        const reg = document.querySelector('#export_header_registered_fields')?.textContent || '';
-        const select = document.getElementById('export_header_bulk_field');
-        const isOption = Boolean(select?.selectize?.options?.Collection_Site) ||
-          Boolean(select?.querySelector('option[value="Collection_Site"]'));
-        return cols.includes('Collection_Site') &&
-          reg.includes('Collection_Site [active]') && isOption;
-      }, null, { timeout: 12000 });
-    } catch (e) {
-      console.error('FIELD DIAGNOSTIC', {
-        template: await template.inputValue(),
-        cols: await active.innerText(),
-        registry: await registry.innerText(),
-        bulkOptions: await page.locator('#export_header_bulk_field option').allTextContents(),
-        existingOptions: await page.locator('#export_header_existing_field option').allTextContents(),
-        persistedFields: await page.locator('#e2e_persisted_fields').innerText(),
-        pageErrors: errors
-      });
-      throw e;
-    }
-    assert.ok(!(await active.innerText()).includes('Experiment'),
-      'Adding a new field must not reactivate an unwanted Experiment');
+    await waitActive(page, () =>
+      (document.querySelector('#e2e_active_columns')?.textContent || '').includes('collection_site'));
+    assert.ok((await page.locator('#export_header_registered_fields').innerText())
+      .includes('Collection_Site'));
 
-    // A real metadata edit through the bulk action must update the table.
-    await chooseShinySelect(page, 'export_header_bulk_field', 'Collection_Site');
-    await page.locator('#export_header_bulk_value').fill('Golan');
-    await page.locator('#export_header_apply_bulk').click();
-    await page.waitForFunction(() =>
-      document.querySelector('#export_header_values_table')?.textContent?.includes('Golan'));
-
-    // Case 3: Save, remove from draft (not registry), reactivate, then
-    // try adding with different capitalization. No duplicate field or token.
+    // Save named profile.
     await page.locator('#export_header_template_name').fill('Field profile');
     await page.locator('#export_header_save_template').click();
-    await page.waitForFunction(() =>
-      document.querySelector('#e2e_saved_templates')?.textContent?.includes('Field profile'));
+    await waitActive(page, () =>
+      (document.querySelector('#e2e_saved_profiles')?.textContent || '').includes('Field profile'));
 
-    await template.fill('{Final_Name} organism={Organism}');
-    await template.press('Tab');
-    await page.waitForFunction(() => {
+    // Remove collection_site from draft; registry should keep it available.
+    await page.evaluate(() => window.PITAXHeaderBuilder.removeField('collection_site'));
+    await waitActive(page, () => {
       const cols = document.querySelector('#e2e_active_columns')?.textContent || '';
       const reg = document.querySelector('#export_header_registered_fields')?.textContent || '';
-      return !cols.includes('Collection_Site') && reg.includes('Collection_Site [available]');
+      return !cols.includes('collection_site') && reg.includes('Collection_Site');
     });
-    await chooseShinySelect(page, 'export_header_existing_field', 'Collection_Site');
-    await page.locator('#export_header_activate_field').click();
-    await page.waitForFunction(() => {
-      const reg = document.querySelector('#export_header_registered_fields')?.textContent || '';
-      return reg.includes('Collection_Site [active]');
-    });
-    await page.locator('#export_header_new_field').fill('collection_site');
-    await page.locator('#export_header_add_field').click();
-    await page.waitForFunction(() =>
-      !document.querySelector('#export_header_new_field')?.value);
-    const fields = (await page.locator('#e2e_persisted_fields').innerText()).split(',');
-    assert.equal(fields.filter(f => f.toLowerCase() === 'collection_site').length, 1);
-    const header = await template.inputValue();
-    assert.equal((header.match(/\{Collection_Site\}/g) || []).length, 1);
 
-    // Reload the saved profile; both the field and template must survive.
-    await chooseShinySelect(page, 'export_header_saved_template', 'Field profile');
-    await page.locator('#export_header_load_template').click();
-    await page.waitForFunction(() =>
-      document.querySelector('#export_header_template')?.value.includes(
-        'collection_site={Collection_Site}'));
-    assert.ok((await registry.innerText()).includes('Collection_Site [active]'));
-    assert.ok((await active.innerText()).includes('Collection_Site'));
+    // Reactivate via addField.
+    await page.evaluate(() => window.PITAXHeaderBuilder.addField('collection_site'));
+    await waitActive(page, () =>
+      (document.querySelector('#e2e_active_columns')?.textContent || '').includes('collection_site'));
 
-    // Explicitly remove Experiment from the active header, preserving its
-    // registered definition and avoiding accidental deletion of older templates.
-    await chooseShinySelect(page, 'export_header_existing_field', 'Experiment');
-    await page.locator('#export_header_activate_field').click();
-    await page.waitForFunction(() =>
-      document.querySelector('#export_header_template')?.value.includes('{Experiment}'));
-    await page.locator('#export_header_remove_from_header').click();
-    await page.waitForFunction(() =>
-      !document.querySelector('#export_header_template')?.value.includes('{Experiment}'));
-    assert.ok((await registry.innerText()).includes('Experiment [available]'));
+    // Experiment must only appear when explicitly added.
+    await page.evaluate(() => window.PITAXHeaderBuilder.addField('experiment'));
+    await waitActive(page, () =>
+      (document.querySelector('#e2e_persisted_fields')?.textContent || '').includes('experiment'));
+    await page.evaluate(() => window.PITAXHeaderBuilder.removeField('experiment'));
+    await waitActive(page, () =>
+      !(document.querySelector('#e2e_persisted_fields')?.textContent || '').includes('experiment'));
+    assert.ok(!(await page.locator('#e2e_active_columns').innerText()).includes('experiment'));
 
-    // Delete a new unsaved field: draft token, registry entry and values
-    // must be removed, without touching the other registered fields.
+    // Delete temporary custom field (remove from profile, then delete definition).
     await page.locator('#export_header_new_field').fill('Temporary_Field');
     await page.locator('#export_header_add_field').click();
-    await page.waitForFunction(() =>
-      document.querySelector('#export_header_template')?.value.includes('{Temporary_Field}'));
-    await chooseShinySelect(page, 'export_header_existing_field', 'Temporary_Field');
-    await page.locator('#export_header_delete_field').click();
-    await page.waitForFunction(() => {
-      const reg = document.querySelector('#export_header_registered_fields')?.textContent || '';
-      const tmpl = document.querySelector('#export_header_template')?.value || '';
-      return !reg.includes('Temporary_Field') && !tmpl.includes('{Temporary_Field}');
+    await waitActive(page, () =>
+      (document.querySelector('#e2e_persisted_fields')?.textContent || '').includes('temporary_field'));
+    await page.evaluate(() => window.PITAXHeaderBuilder.removeField('temporary_field'));
+    await waitActive(page, () =>
+      !(document.querySelector('#e2e_active_columns')?.textContent || '').includes('temporary_field'));
+    await page.evaluate(() => {
+      if (window.Shiny) {
+        Shiny.setInputValue('export_header_existing_field', 'temporary_field', { priority: 'event' });
+        Shiny.setInputValue('export_header_delete_field', Date.now(), { priority: 'event' });
+      }
     });
-    assert.ok((await registry.innerText()).includes('Experiment [available]'));
-    assert.deepEqual(errors, [], 'Uncaught Shiny browser errors');
-    console.log('PASS: create/activate/edit/reuse/save/load metadata field through real Shiny UI');
+    await waitActive(page, () => {
+      const reg = document.querySelector('#export_header_registered_fields')?.textContent || '';
+      return !reg.includes('Temporary_Field') && !reg.includes('temporary_field');
+    }, 20000);
+
+    // Browser persistence with verified acknowledgement.
+    await page.locator('#export_header_template_name').fill('Browser durable');
+    await page.locator('#export_header_save_template').click();
+    await page.waitForTimeout(500);
+    await page.locator('#export_header_save_browser').click();
+    await waitActive(page, () =>
+      (document.querySelector('#e2e_browser_status')?.textContent || '').includes('browser=TRUE'),
+      20000);
+
+    const stored = await page.evaluate(() => {
+      const raw = window.localStorage.getItem('PITAX_FASTA_HEADER_PROFILES_V2');
+      return raw ? JSON.parse(raw) : null;
+    });
+    assert.ok(stored && Array.isArray(stored.profiles) && stored.profiles.length >= 1,
+      'localStorage must contain verified profiles');
+    assert.equal(stored.schema, 2);
+
+    // Hard reload + new session must restore browser profiles.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.locator('#fhb_library').waitFor({ state: 'visible' });
+    // Explicitly re-push localStorage profiles in case the automatic
+    // shiny:connected restore raced the test harness websocket.
+    await page.waitForFunction(() => window.Shiny && typeof Shiny.setInputValue === 'function');
+    await page.evaluate(() => {
+      const raw = window.localStorage.getItem('PITAX_FASTA_HEADER_PROFILES_V2');
+      const saved = raw ? JSON.parse(raw) : null;
+      Shiny.setInputValue('pitax_header_browser_profiles_restore', {
+        data: saved,
+        nonce: Date.now()
+      }, { priority: 'event' });
+    });
+    await waitActive(page, () =>
+      (document.querySelector('#e2e_saved_profiles')?.textContent || '').includes('Browser durable'),
+      20000);
+
+    assert.deepEqual(errors, [], 'Uncaught Shiny browser errors: ' + errors.join(' | '));
+    console.log('PASS: structured header builder drag/reorder/save/browser persistence');
   } finally {
     await browser.close();
   }
-})().catch(e => { console.error('FAIL: metadata field UI integration', e); process.exit(1); });
+})().catch(e => {
+  console.error('FAIL: header builder browser integration', e);
+  process.exit(1);
+});

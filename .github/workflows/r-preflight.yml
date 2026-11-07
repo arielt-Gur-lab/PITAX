@@ -18,11 +18,15 @@ jobs:
         with:
           use-public-rspm: true
       - name: Install ZIP package for end-to-end FASTA export
-        run: Rscript -e 'install.packages("zip")'
+        run: Rscript -e 'install.packages(c("zip", "jsonlite"))'
       - name: Parse all R sources
         run: Rscript tests/preflight/parse_all_r_sources.R
       - name: Exercise FASTA and empty-table exports with 18 records
         run: Rscript tests/preflight/export_writer_base_smoke.R
+      - name: Structured header profile model smoke
+        run: Rscript tests/unit/header_profile_model_smoke.R
+      - name: Header serializer / Sequence Library contract smoke
+        run: Rscript tests/unit/header_parser_compat_smoke.R
 
   browser-download:
     name: Verify real Shiny ZIP download in Chromium
