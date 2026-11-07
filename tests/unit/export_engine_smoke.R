@@ -244,63 +244,58 @@ check(identical(pitax_export_final_name(snap_legacy, "S2"), "320_TEF_R"),
 check(identical(pitax_export_extract_qc_trimmed_sequences(snap_legacy, "S2")$S2$final_name, "320_TEF_R"),
       "Read sequence export must inherit the full explicit final name")
 
-# --- Reusable, per-record custom FASTA headers -------------------------------
+# --- Structured profile-based custom FASTA headers ---------------------------
 conf <- pitax_header_default_config()
-check(identical(pitax_header_coerce_config(NULL)$fields, c("Organism", "Experiment", "Seq_Date")),
-      "Legacy schema-6 projects must safely default custom header metadata")
+check(identical(pitax_header_coerce_config(NULL)$header_schema, 2L),
+      "Missing header config must install schema-2 defaults")
+check(!"experiment" %in% pitax_header_coerce_config(NULL)$draft$ordered_fields,
+      "Defaults must not force Experiment into new profiles")
 check(identical(pitax_header_record_key("blast_query_sequences", "ISO1_ITS"),
                 pitax_header_record_key("consensus_analysis_sequences", "ISO1_ITS")),
       "BLAST and analysis exports of one record must share its annotation key")
+conf$draft$ordered_fields <- c("organism", "experiment", "seq_date")
+conf <- pitax_header_refresh_derived(conf)
 for (key in c("read::S1", "read::S2", "analysis::ISO1_ITS")) {
-  conf <- pitax_header_set_value(conf, key, "Organism", "E_necator")
-  conf <- pitax_header_set_value(conf, key, "Experiment", "Fungicide resistance X")
-  conf <- pitax_header_set_value(conf, key, "Seq_Date", "2026-10-28")
+  conf <- pitax_header_set_value(conf, key, "organism", "E_necator")
+  conf <- pitax_header_set_value(conf, key, "experiment", "Fungicide resistance X")
+  conf <- pitax_header_set_value(conf, key, "seq_date", "2026-10-28")
 }
 rows <- pitax_header_edit_table(snap_qc, conf)
 check(all(c("read::S1", "read::S2", "analysis::ISO1_ITS") %in% rows$Record_Key),
       "Header editor must enumerate stable read and consensus keys")
-check(identical(rows$Experiment[rows$Record_Key == "read::S2"], "Fungicide resistance X"),
+check(identical(rows$experiment[rows$Record_Key == "read::S2"], "Fungicide resistance X"),
       "Metadata must be associated with the exact read key")
 custom_records <- pitax_header_apply_to_records(
   pitax_export_extract_qc_trimmed_sequences(snap_qc), "qc_trimmed_sequences", conf)
 check(identical(custom_records$S2$custom_header,
-                'ISO1_ITS_R organism=E_necator experiment="Fungicide resistance X" date=2026-10-28'),
-      "Compiled header must expand every placeholder without changing Final_Name")
-check(identical(pitax_header_validate_template(">{Isolate} | {Experiment}", conf$fields),
-                "{Isolate} | {Experiment}"), "Leading '>' must not be duplicated")
+                'ISO1_ITS_R organism=E_necator experiment="Fungicide resistance X" seq_date=2026-10-28'),
+      "Compiled header must expand profile fields without changing Final_Name")
 
-# A field is required ONLY if it remains in the active template. Stale
-# Experiment/Seq_Date table columns must never cause export failures.
-without_experiment <- conf
-without_experiment$draft_template <- '>{Final_Name} organism={Organism} isolate={Isolate} locus={Locus}'
-without_experiment$values$Experiment <- ""
-without_experiment$values$Seq_Date <- ""
-check(identical(pitax_header_referenced_fields(without_experiment$draft_template,
-                                              without_experiment$fields),
-                c("Final_Name", "Organism", "Isolate", "Locus")),
-      "Template fields must be derived from the active template, not metadata table columns")
+# Optional fields omitted from the profile must not require stored values.
+without_experiment <- pitax_header_profile_remove_field(conf, "experiment")
+without_experiment <- pitax_header_profile_remove_field(without_experiment, "seq_date")
+without_experiment <- pitax_header_profile_add_field(without_experiment, "isolate")
+without_experiment <- pitax_header_profile_add_field(without_experiment, "locus")
 no_exp <- pitax_header_apply_to_records(
   pitax_export_extract_qc_trimmed_sequences(snap_qc), "qc_trimmed_sequences", without_experiment)
 check(identical(no_exp$S2$custom_header, "ISO1_ITS_R organism=E_necator isolate=ISO1 locus=ITS"),
-      "Removed Experiment/Seq_Date tokens cannot continue to require values")
+      "Removed experiment/seq_date cannot continue to require values")
 no_exp_fasta <- tempfile(fileext = ".fasta")
 pitax_export_write_fasta_records(no_exp_fasta, no_exp, "custom")
 check(identical(readLines(no_exp_fasta, n = 1L),
                 ">ISO1_ITS_F organism=E_necator isolate=ISO1 locus=ITS"),
       "FASTA writer must accept normal letters r/n (regression: HTTP 500 on custom headers)")
-# The complete study template supplied by the user must compile without
-# requiring a literal leading FASTA '>' or reordering the fields.
+
 study_config <- conf
-study_config$draft_template <- paste0(
-  '>{Final_Name} organism={Organism} isolate={Isolate} locus={Locus}',
-  ' direction={Direction} molecule=DNA role=consensus',
-  ' experiment="{Experiment}" date={Seq_Date}'
-)
+study_config$draft$ordered_fields <- c("organism", "isolate", "locus", "direction",
+                                       "molecule", "role", "experiment", "seq_date")
+study_config <- pitax_header_set_value(study_config, "read::S2", "role", "consensus")
+study_config <- pitax_header_refresh_derived(study_config)
 study <- pitax_header_render(custom_records$S2, "qc_trimmed_sequences", "S2", study_config)
 check(identical(study, paste0(
-  'ISO1_ITS_R organism=E_necator isolate=ISO1 locus=ITS direction=Reverse',
-  ' molecule=DNA role=consensus experiment="Fungicide resistance X" date=2026-10-28')),
-  "Custom study template should expand all labels with one leading > added by writer")
+  'ISO1_ITS_R organism=E_necator isolate=ISO1 locus=ITS direction=R',
+  ' molecule=DNA role=consensus experiment="Fungicide resistance X" seq_date=2026-10-28')),
+  "Study profile should expand all selected labels with one leading > added by writer")
 
 err_field <- tryCatch({pitax_header_validate_field("Isolate", conf$fields); NULL},
                       error = function(e) conditionMessage(e))
@@ -308,13 +303,18 @@ check(!is.null(err_field), "Reserved biological identity columns cannot become c
 err_unknown <- tryCatch({pitax_header_validate_template("{Oops}", conf$fields); NULL},
                         error = function(e) conditionMessage(e))
 check(!is.null(err_unknown), "Unknown custom-header tokens must fail visibly")
-err_line <- tryCatch({pitax_header_set_value(conf, "read::S1", "Experiment", "bad\n>record"); NULL},
+err_line <- tryCatch({pitax_header_set_value(conf, "read::S1", "experiment", "bad\n>record"); NULL},
                      error = function(e) conditionMessage(e))
 check(!is.null(err_line), "Metadata must not allow newline/FASTA injection")
+req_conf <- conf
+req_conf$draft$required <- "organism"
+req_conf$values$organism[req_conf$values$Record_Key == "read::S2"] <- ""
+req_conf <- pitax_header_refresh_derived(req_conf)
 err_missing <- tryCatch({
-  pitax_header_render(custom_records$S2, "qc_trimmed_sequences", "S42", conf); NULL
+  pitax_header_render(custom_records$S2, "qc_trimmed_sequences", "S2", req_conf); NULL
 }, error = function(e) conditionMessage(e))
-check(!is.null(err_missing), "A missing metadata row must not silently export empty required values")
+check(!is.null(err_missing) && grepl("Missing required \\{organism\\}", err_missing),
+      "A missing required metadata value must fail with a precise field error")
 
 custom_sel <- pitax_export_default_selection("qc", "stage")
 custom_sel$component_ids <- "qc_trimmed_sequences"
@@ -331,7 +331,7 @@ utils::unzip(custom_zip, exdir = custom_dir)
 custom_fasta <- file.path(custom_dir, "sequences", "qc_trimmed_sequences", "ISO1_ITS_R.fasta")
 check(file.exists(custom_fasta), "Custom export must preserve normal full-name FASTA filenames")
 check(identical(readLines(custom_fasta, n = 1L),
-                '>ISO1_ITS_R organism=E_necator experiment="Fungicide resistance X" date=2026-10-28'),
+                '>ISO1_ITS_R organism=E_necator experiment="Fungicide resistance X" seq_date=2026-10-28'),
       "Custom FASTA contents must have the rendered header exactly once")
 manifest <- utils::read.csv(file.path(custom_dir, "sequences", "FASTA_header_manifest.csv"),
                             stringsAsFactors = FALSE)
@@ -340,11 +340,11 @@ check(nrow(manifest) == 2L && "Header" %in% names(manifest),
 run_custom <- paste(readLines(file.path(custom_dir, "RUN_INFO.txt")), collapse = "\n")
 check(grepl("fasta_header_template:", run_custom, fixed = TRUE),
       "Custom header template must be preserved in export provenance")
+check(grepl("fasta_header_schema: 2", run_custom, fixed = TRUE),
+      "Header schema version must appear in RUN_INFO")
 
 broken_selection <- custom_sel
-broken_selection$header_config <- conf
-broken_selection$header_config$values$Experiment[
-  broken_selection$header_config$values$Record_Key == "read::S2"] <- ""
+broken_selection$header_config <- req_conf
 broken_plan <- pitax_export_build_plan(snap_qc, broken_selection)
 broken_error <- tryCatch({
   pitax_export_execute(snap_qc, broken_plan, tempfile(fileext = ".zip"))
@@ -352,18 +352,20 @@ broken_error <- tryCatch({
 }, error = function(e) conditionMessage(e))
 check(!is.null(broken_error) &&
       grepl("Export phase [FASTA component qc_trimmed_sequences", broken_error, fixed = TRUE) &&
-      grepl("Missing {Experiment}", broken_error, fixed = TRUE),
+      grepl("Missing required {organism}", broken_error, fixed = TRUE),
       "Invalid custom-header export must identify the exact failing component and field")
-
 
 paired_recs <- pitax_export_extract_consensus_analysis_sequences(snap_qc)
 check(identical(pitax_header_apply_to_records(
   paired_recs, "consensus_analysis_sequences", conf)$ISO1_ITS$custom_header,
-  'ISO1_ITS organism=E_necator experiment="Fungicide resistance X" date=2026-10-28'),
-  "The same template must work for consensus FASTA exports")
+  'ISO1_ITS organism=E_necator experiment="Fungicide resistance X" seq_date=2026-10-28'),
+  "The same profile must work for consensus FASTA exports")
 
 dup <- conf
-dup$draft_template <- "{Isolate} organism={Organism}"
+dup$draft$primary_identifier <- "name"
+dup <- pitax_header_set_value(dup, "read::S1", "name", "SAME")
+dup <- pitax_header_set_value(dup, "read::S2", "name", "SAME")
+dup <- pitax_header_refresh_derived(dup)
 dup_err <- tryCatch({
   pitax_header_apply_to_records(
     pitax_export_extract_qc_trimmed_sequences(snap_qc), "qc_trimmed_sequences", dup)
@@ -372,13 +374,34 @@ dup_err <- tryCatch({
 check(!is.null(dup_err) && grepl("Duplicate", dup_err),
       "Non-unique primary FASTA identifiers must fail instead of silently colliding")
 
-# Save/Load serialization must retain the user template and metadata table.
+# Save/Load serialization must retain profiles and metadata values.
 serialized <- tempfile(fileext = ".rds")
 saveRDS(conf, serialized)
 reloaded <- pitax_header_coerce_config(readRDS(serialized))
 check(identical(reloaded$values, conf$values) &&
-      identical(reloaded$draft_template, conf$draft_template),
+      identical(reloaded$draft$ordered_fields, conf$draft$ordered_fields),
       "FASTA header configuration must survive a project RDS round-trip")
+
+# Legacy project configs migrate without discarding values.
+legacy <- list(
+  fields = c("Organism", "Experiment", "Seq_Date"),
+  values = conf$values,
+  templates = list("Research metadata" =
+                     '{Final_Name} organism={Organism} experiment="{Experiment}" date={Seq_Date}'),
+  active_template = "Research metadata",
+  draft_template = '{Final_Name} organism={Organism} experiment="{Experiment}" date={Seq_Date}'
+)
+# Use Organism-shaped values for legacy migrate path.
+legacy$values <- data.frame(
+  Record_Key = conf$values$Record_Key,
+  Organism = conf$values$organism,
+  Experiment = conf$values$experiment,
+  Seq_Date = conf$values$seq_date,
+  stringsAsFactors = FALSE
+)
+migrated <- pitax_header_migrate_legacy_config(legacy)
+check(!is.null(migrated$legacy_backup), "legacy backup retained during migration")
+check("organism" %in% migrated$draft$ordered_fields, "legacy tokens map to canonical fields")
 
 # --- BLAST partial / waiting / failed / stale --------------------------------
 state_blast <- state_qc
@@ -494,35 +517,34 @@ if (requireNamespace("shiny", quietly = TRUE)) {
     # Invalid preparation must become an inline error, never a bare download 500.
     session$setInputs(export_prepare_download = 1L)
     session$flushReact()
-    stopifnot(grepl("Export not downloaded:", export_dialog_state$last_result_message, fixed = TRUE))
+    stopifnot(grepl("Export not downloaded [", export_dialog_state$last_result_message, fixed = TRUE))
     stopifnot(is.null(export_dialog_state$prepared_zip))
 
     # UI interactions must update the same project state saved by Save/Share.
-    session$setInputs(export_header_new_field = "Fungicide")
-    session$setInputs(export_header_add_field = 1L)
-    stopifnot("Fungicide" %in% rv$fasta_header_config$fields)
+    session$setInputs(pitax_header_builder_add = list(field_id = "fungicide", nonce = 1))
+    session$flushReact()
+    stopifnot("fungicide" %in% rv$fasta_header_config$draft$ordered_fields)
     session$setInputs(export_header_template_name = "Fungicide study")
-    session$setInputs(export_header_template = "{Final_Name} fungicide={Fungicide}")
     session$setInputs(export_header_save_template = 1L)
-    stopifnot(identical(rv$fasta_header_config$templates[["Fungicide study"]],
-                        "{Final_Name} fungicide={Fungicide}"))
+    session$flushReact()
+    stopifnot(any(vapply(rv$fasta_header_config$profiles, function(p) {
+      identical(p$name, "Fungicide study") && "fungicide" %in% p$ordered_fields
+    }, logical(1))))
     bundle <- make_project_bundle()
-    stopifnot(identical(bundle$state$fasta_header_config$templates[["Fungicide study"]],
-                        "{Final_Name} fungicide={Fungicide}"))
+    stopifnot(any(vapply(bundle$state$fasta_header_config$profiles, function(p) {
+      identical(p$name, "Fungicide study")
+    }, logical(1))))
 
-    # Save a new header profile without Experiment, reload it and verify
-    # that neither validation nor the active metadata editor requires it.
-    session$setInputs(export_header_template = "{Final_Name} organism={Organism}")
+    # Save a profile without Experiment and verify the editor omits it.
+    session$setInputs(pitax_header_builder_add = list(field_id = "organism", nonce = 2))
+    session$setInputs(pitax_header_builder_remove = list(field_id = "fungicide", nonce = 3))
     session$setInputs(export_header_template_name = "Minimal isolate")
     session$setInputs(export_header_save_template = 2L)
-    stopifnot(identical(rv$fasta_header_config$templates[["Minimal isolate"]],
-                        "{Final_Name} organism={Organism}"))
-    session$setInputs(export_header_saved_template = "Minimal isolate")
-    session$setInputs(export_header_load_template = 1L)
     session$flushReact()
     cfg <- pitax_header_coerce_config(rv$fasta_header_config)
-    stopifnot(identical(cfg$draft_template, "{Final_Name} organism={Organism}"))
-    stopifnot(!"Experiment" %in% names(pitax_header_active_edit_table(
+    stopifnot("organism" %in% cfg$draft$ordered_fields)
+    stopifnot(!"experiment" %in% cfg$draft$ordered_fields)
+    stopifnot(!"experiment" %in% names(pitax_header_active_edit_table(
       export_dialog_state$snap, cfg)))
 
 

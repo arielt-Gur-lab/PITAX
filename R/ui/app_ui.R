@@ -2,7 +2,9 @@ ui <- fluidPage(
   tags$head(
     tags$title("PITAX - Taxonomic Identification Tool"),
     tags$link(rel = "stylesheet", type = "text/css", href = "pitax.css"),
-    tags$script(src = "pitax.js")
+    tags$link(rel = "stylesheet", type = "text/css", href = "pitax-header-builder.css"),
+    tags$script(src = "pitax.js"),
+    tags$script(src = "pitax-header-builder.js")
   ),
 
   div(id = "shiny_activity_bar", `aria-hidden` = "true"),

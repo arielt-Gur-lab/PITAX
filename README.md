@@ -1,5 +1,5 @@
-PITAX v3.6.6 - Reliable FASTA metadata field management
-=========================================================
+PITAX v3.7.0 - Structured Custom FASTA Header Builder
+=====================================================
 
 Purpose
 -------
@@ -19,40 +19,31 @@ The authoritative guide for continuing development is:
 
 Custom FASTA Header Builder (Export)
 ------------------------------------
-1. Open Export from any stage after read assignments/sequence processing.
-2. Under FASTA headers, select "Custom FASTA headers".
-3. Edit the one-line token template, e.g.:
-   {Final_Name} organism={Organism} experiment="{Experiment}" date={Seq_Date}
-4. Double-click metadata cells for individual records, or select rows and
-   use bulk field/value updates; use All records for global experiment values.
-5. Click **Create and use field** to register a custom field (e.g. Location)
-   and automatically add location={Location} to the current header draft.
-   The newly created field appears immediately in the editable table and
-   bulk field selector. Save the template to retain its new header layout.
-   **All registered metadata fields** always shows every stored field, including
-   fields not currently used; **Use selected field in header** reactivates one.
-   Re-entering an existing field name simply activates it without duplication.
-   Built-ins are Final_Name, Isolate, Locus, Direction, Source_ID, Record_ID.
-6. Review the live preview of the FASTA components actually selected.
-   Only fields referenced in the saved active template are required. Removing
-   experiment="{Experiment}" from the template removes the experiment field
-   from the header and its validation requirements, even if the metadata
-   editor no longer shows the unused Experiment column for that template.
-   Other named templates may continue to use Experiment.
-   Resolve missing values/duplicate identifiers before downloading.
-   On error, the app now explains the failing record/field in the export
-   dialog instead of navigating to an HTTP 500 page.
-7. After pressing **1. Prepare ZIP**, wait until the green **2. Download ready ZIP**
-   button appears and click it. This is an actual Shiny browser download link;
-   the old invisible automatic download click is no longer used.
-8. Downloaded per-read filenames remain 315_TEF_R.fasta while headers
-   contain the chosen metadata. FASTA_header_manifest.csv lists the outputs.
+Intended workflow: **Choose fields → Drag and reorder → Save profile →
+Populate isolate metadata → Preview → Export compatible FASTA.**
 
-Saved templates and metadata values persist in the .sangerproject and shared
-snapshots. Template CSV export/import transfers reusable templates and their
-field names between projects; per-record values do not transfer automatically.
-Sequencing dates are entered by the user, not guessed from the export date.
-These headers never change the authoritative read/analysis identity or BLAST.
+1. Open Export and select **Custom FASTA headers (profile builder)**.
+2. From the field library (Group A first-class, Group B Notes-folded,
+   Group C Custom/Extras), drag fields into the construction area or press
+   Enter on a focused card. Reorder with drag or ↑/↓; remove with ×.
+3. Name the profile and **Save profile** (project state). Optionally
+   **Save to this browser** (verified localStorage of layouts only) or
+   export/import portable JSON. Legacy CSV import remains available.
+4. Populate metadata for fields in the active profile only. System-derived
+   values (isolate, locus, direction, molecule, assay, pitax_id) fill
+   automatically when known; overrides apply only to export annotations.
+   Isolate-level edits that are locus-specific require an isolate+locus filter.
+5. Review the live structural preview and the per-record header preview.
+   Empty optional tags are omitted (`fungicide=` is never emitted). Required
+   missing values and duplicate primary identifiers block export with a precise
+   message. Assay requires locus.
+6. Prepare ZIP, then download. Headers use bare `key=value` by default
+   (optional bracket style). Canonical tags match the Sequence Library parser.
+
+Profiles and Record_Key metadata values round-trip in `.sangerproject`.
+Browser storage never holds per-record biological values. Experiment is never
+reinserted after you remove it. Headers never change sequences, QC, assignments,
+or original identifiers.
 
 Stage 4 workflow
 ----------------
