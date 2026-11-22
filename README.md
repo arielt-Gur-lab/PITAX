@@ -1,4 +1,4 @@
-PITAX v3.7.0 - Structured Custom FASTA Header Builder
+PITAX v3.8.0 - Guided local QC peak review
 =====================================================
 
 Purpose

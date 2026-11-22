@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.8.0 — Guided local QC peak review
+
+- Ambiguous-peak curation now opens a guided local-review panel from a table
+  row, chromatogram marker, or the Review next action.
+- The panel shows a local chromatogram (~4 bases on each side) with a dashed
+  marker on the selected position, plus position metrics beside it.
+- Primary actions: Continue (mark reviewed and advance), Change base (confirm
+  edit and advance), and Flag & continue (keep Active, defer for the current
+  pass, and advance).
+- Advanced trim actions remain available in the panel; sequence edits still
+  require explicit confirmation and stay in the curation audit log.
+
+
 ## 3.7.0 — Structured Custom FASTA Header Builder
 
 - Replaced the fragile free-text template / multi-observer Header Builder with a
