@@ -240,7 +240,7 @@ ui <- fluidPage(
               uiOutput("expected_amplicon_note")
             ),
             div(class = "panel-box chromatogram-card",
-              card_title("Chromatogram", "X axis = raw called-base position. Zoom, pan, or click a flagged position to inspect it.", "line-chart"),
+              card_title("Chromatogram", "X axis = raw called-base position. Zoom, pan, or click a flagged position to open guided local review.", "line-chart"),
               plotly::plotlyOutput("chromatogram_plot", height = "540px")
             )
           )
@@ -268,7 +268,7 @@ ui <- fluidPage(
           )
         ),
         div(class = "panel-box peak-review-card",
-          card_title("Ambiguous peak review", "Flags identify channel competition or locally non-dominant calls. Left-click centers the trace; right-click opens curation actions.", "flag"),
+          card_title("Ambiguous peak review", "Flags identify channel competition or locally non-dominant calls. Click a row, a chromatogram marker, or Review next to open the guided local-review panel.", "flag"),
           div(class = "curation-toolbar",
             radioButtons(
               "peak_flag_scope", "Positions",
@@ -278,6 +278,8 @@ ui <- fluidPage(
             checkboxInput("show_peak_flags", "Show markers", value = TRUE),
             checkboxInput("show_reviewed_flags", "Show reviewed", value = FALSE),
             div(class = "curation-actions",
+              actionButton("peak_review_start", "Review next", icon = icon("play"), class = "btn-primary",
+                           title = "Open a guided local review starting at the first active flagged position."),
               actionButton("auto_correct_preview", "Auto-correct high-confidence", icon = icon("magic"), title = "Preview positions that meet the current auto-correction criteria. No base is changed before confirmation."),
               actionButton("auto_correct_settings", "Criteria", icon = icon("cog"), title = "Edit the thresholds used to propose automatic base corrections."),
               actionButton("curation_undo", "Undo", icon = icon("undo"), title = "Undo the most recent curation transaction for this sample."),
@@ -684,14 +686,14 @@ ui <- fluidPage(
                   div(h4("Ambiguous peak review"),
                       p("The app flags individual called-base positions where another A/C/G/T dye channel competes strongly with the current call, where the current call is not locally dominant, or where the call is ambiguous."),
                       p("The comparison uses a narrow trace window around each called peak and suppresses weak-signal competition using a run-specific signal baseline. By default, a called/competitor peak ratio <=1.25 is Strong and <=1.75 is Moderate; the local signal must be at least 20% of the retained-region median called signal. These are application review heuristics, not biological diagnoses."),
-                      p("Flags are review targets. Left-click centers the chromatogram; right-click opens manual curation actions. No sequence-changing action is applied without an explicit confirmation step."))
+                      p("Flags are review targets. Click a table row, a chromatogram marker, or Review next to open the guided local-review panel (about four bases on each side, with a dashed marker on the selected position). Continue marks the call reviewed and advances; Change base confirms an edit and advances; Flag & continue keeps the position active for later while advancing through the current pass. No sequence-changing action is applied without an explicit confirmation step."))
                 ),
                 div(class="method-step",
                   div(class="method-num", "6"),
                   div(h4("Manual curation and provenance"),
                       p("The raw AB1 trace and original automatic base calls are never overwritten. The app maintains a curated sequence layer on top of the automatic trim. A user can change a base, set a two-base IUPAC ambiguity code, trim from either side through a flagged position, or mark the call as reviewed and unchanged."),
                       p("Every confirmed action is written to the Manual Curation audit log with sample, raw base position, before/after values, method, chromatogram evidence, timestamp, transaction ID and revision. Undo and redo are logged as well. Automatic trim boundaries are retained separately so the curated result can always be compared with the automatic result."),
-                      p("For a flagged position inside the retained read, the curation menu shows both left- and right-trim actions. A directional recommendation is displayed only when the flag is near a current trim edge: within 15% of the retained length, bounded to 8-40 bases. The recommendation never performs a trim by itself and still requires explicit confirmation."))
+                      p("For a flagged position inside the retained read, the guided review panel still exposes left- and right-trim actions as advanced options. A directional recommendation is displayed only when the flag is near a current trim edge: within 15% of the retained length, bounded to 8-40 bases. The recommendation never performs a trim by itself and still requires explicit confirmation."))
                 ),
                 div(class="method-step",
                   div(class="method-num", "7"),
@@ -703,7 +705,7 @@ ui <- fluidPage(
               div(class="help-card",
                 h3("QC evidence"),
                 p(strong("QC"), " means Quality Control. Called-base signal and peak-ratio plots are retained in checkpoint/final ZIP exports."),
-                p("The ambiguous-peak table links directly to the interactive chromatogram. Right-clicking a row opens the curation actions, while the History view exposes the complete per-sample audit trail."),
+                p("The ambiguous-peak table links directly to the interactive chromatogram. Clicking a row or marker opens the guided local-review panel; History exposes the complete per-sample audit trail."),
                 p("If a curated sequence is changed after BLAST has already been run, the previous BLAST/taxonomic result for that sample is marked stale and removed from active interpretation until BLAST is rerun on the new curated sequence.")
               )
             ),

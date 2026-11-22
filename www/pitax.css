@@ -759,6 +759,59 @@
       .chromatogram-card { padding-bottom:14px; }
       .peak-review-card .curation-toolbar { background:#f8fafc; border:1px solid #e5ebf2; border-radius:10px; padding:9px 11px; }
       .peak-review-card .curation-toolbar .form-group { margin-bottom:0; }
+      .peak-review-modal-grid {
+        display:grid;
+        grid-template-columns:minmax(0,1.35fr) minmax(240px,.85fr);
+        gap:16px;
+        align-items:start;
+        margin-bottom:12px;
+      }
+      .peak-review-modal-plot {
+        min-width:0;
+        background:#fbfcfe;
+        border:1px solid #e5ebf2;
+        border-radius:10px;
+        padding:8px;
+      }
+      .peak-review-modal-side { min-width:0; }
+      .peak-review-callout {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:10px;
+        margin-bottom:10px;
+        padding:10px 12px;
+        border:1px solid #e5ebf2;
+        border-radius:10px;
+        background:#f8fafc;
+      }
+      .peak-review-metrics {
+        display:grid;
+        grid-template-columns:1fr;
+        gap:6px;
+        margin-bottom:12px;
+      }
+      .peak-review-metric {
+        display:flex;
+        justify-content:space-between;
+        gap:12px;
+        padding:5px 0;
+        border-bottom:1px solid #eef2f7;
+        font-size:12.5px;
+      }
+      .peak-review-metric-label { color:#64748b; }
+      .peak-review-metric-value { color:#1e293b; font-weight:650; text-align:right; }
+      .peak-review-primary-actions {
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px;
+        align-items:center;
+        margin-top:4px;
+      }
+      .peak-review-primary-actions .btn { margin:0; }
+      @media (max-width: 900px) {
+        .peak-review-modal-grid { grid-template-columns:1fr; }
+      }
       .sequence-preview-card textarea { background:#fbfcfe; border-color:#dfe6ef !important; }
       .checkpoint-modern { display:flex; align-items:center; gap:18px; justify-content:space-between; background:#fffdf7; }
       .checkpoint-modern .card-title-row { margin-bottom:0; }

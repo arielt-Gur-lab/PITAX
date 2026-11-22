@@ -875,7 +875,7 @@ pitax_empty_plotly <- function(title = "") {
 # Build the complete chromatogram once and let Plotly perform zoom/pan/range-slider
 # interactions in the browser. This avoids a Shiny server round-trip for every
 # horizontal movement and keeps the X axis in called-base coordinates.
-make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags = TRUE) {
+make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags = TRUE, plotly_source = NULL) {
   trace <- result$trace
   peak_pos <- as.integer(result$peak_pos)
   cmap <- result$channel_map
@@ -907,7 +907,11 @@ make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags 
 
   # Use conventional chromatogram colors. The lines are WebGL traces, so zooming
   # and panning occur in the browser without repeatedly rendering PNG images.
-  p <- plotly::plot_ly()
+  p <- if (!is.null(plotly_source) && nzchar(as.character(plotly_source)[1])) {
+    plotly::plot_ly(source = as.character(plotly_source)[1])
+  } else {
+    plotly::plot_ly()
+  }
   colors <- c(A = "#2ca02c", C = "#1f77b4", G = "#111111", T = "#d62728")
   for (base in c("A", "C", "G", "T")) {
     p <- plotly::add_trace(
@@ -1062,7 +1066,10 @@ make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags 
   )
 }
 
-make_chromatogram_focus_plot <- function(result, settings, raw_position, title, window = 12L) {
+# Local chromatogram around one raw base position. QC guided review uses a
+# narrow window (~4 bases each side); consensus conflict review keeps a wider view.
+make_chromatogram_focus_plot <- function(result, settings, raw_position, title, window = 12L,
+                                         marker_color = "#64748b", marker_width = 1.25) {
   position <- suppressWarnings(as.integer(raw_position[1]))
   if (!is.list(result) || !length(position) || !is.finite(position[1])) {
     return(pitax_empty_plotly(list(text = paste0(title, " | no linked raw position"), x = 0)))
@@ -1070,17 +1077,47 @@ make_chromatogram_focus_plot <- function(result, settings, raw_position, title, 
   focused <- result
   focused$display_name <- title
   p <- make_chromatogram_plotly(focused, settings, flags = NULL, show_flags = FALSE)
-  left <- max(1L, position - as.integer(window))
-  right <- position + as.integer(window)
+  half <- max(1L, as.integer(window)[1])
+  left <- max(1L, position - half)
+  right <- position + half
+  existing_shapes <- p$x$layout$shapes
+  if (is.null(existing_shapes)) existing_shapes <- list()
   plotly::layout(
     p,
-    xaxis = list(title = "Raw called-base position", range = c(left, right), rangeslider = list(visible = FALSE)),
+    title = list(text = as.character(title)[1], x = 0, font = list(size = 13)),
+    margin = list(l = 55, r = 40, t = 48, b = 40),
+    xaxis = list(title = "Base position", range = c(left - 0.35, right + 0.35), rangeslider = list(visible = FALSE)),
     shapes = c(
-      p$x$layout$shapes,
-      list(list(type = "line", x0 = position, x1 = position, y0 = 0, y1 = 1, yref = "paper",
-                line = list(color = "#dc2626", width = 2, dash = "dot")))
+      existing_shapes,
+      list(list(
+        type = "line", x0 = position, x1 = position, y0 = 0, y1 = 1, yref = "paper",
+        line = list(color = marker_color, width = marker_width, dash = "dash")
+      ))
     )
   )
+}
+
+# Next Active ambiguous-peak position after current, skipping session-deferred
+# positions. Returns NA_integer_ when the guided pass has no further target.
+pitax_next_active_peak_position <- function(flag_df, current_position = NA_integer_, deferred = integer()) {
+  if (!is.data.frame(flag_df) || !nrow(flag_df) || !"Position" %in% names(flag_df)) {
+    return(NA_integer_)
+  }
+  pos <- suppressWarnings(as.integer(flag_df$Position))
+  keep <- is.finite(pos)
+  if ("Review_status" %in% names(flag_df)) {
+    keep <- keep & flag_df$Review_status == "Active"
+  }
+  active <- sort(unique(pos[keep]))
+  deferred <- unique(suppressWarnings(as.integer(deferred)))
+  deferred <- deferred[is.finite(deferred)]
+  if (length(deferred)) active <- active[!active %in% deferred]
+  if (!length(active)) return(NA_integer_)
+  current <- suppressWarnings(as.integer(current_position[1]))
+  if (!is.finite(current)) return(as.integer(active[1]))
+  later <- active[active > current]
+  if (length(later)) return(as.integer(later[1]))
+  NA_integer_
 }
 
 

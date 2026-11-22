@@ -39,6 +39,11 @@ echo [3/22] Manual curation / undo-redo smoke tests
 if errorlevel 1 goto :failed
 
 echo.
+echo [3b/22] Guided peak-review queue smoke tests
+"%RDIR%\bin\Rscript.exe" "tests\unit\peak_review_queue_smoke.R"
+if errorlevel 1 goto :failed
+
+echo.
 echo [4/22] Stage 1 AB1 evidence helper tests
 "%RDIR%\bin\Rscript.exe" "tests\unit\ab1_evidence_smoke.R"
 if errorlevel 1 goto :failed

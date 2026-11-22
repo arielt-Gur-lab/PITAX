@@ -36,6 +36,9 @@
     workflow_completed = character(0),
     context_peak_flag = NULL,
     pending_curation = NULL,
+    peak_review_deferred = integer(),
+    peak_review_advance = FALSE,
+    peak_review_open = FALSE,
     auto_correct_preview_df = data.frame()
   )
 
