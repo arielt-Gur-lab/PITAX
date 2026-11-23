@@ -395,11 +395,13 @@
   }
 
   show_peak_review_shell <- function() {
+    rv$peak_review_shell_generation <- as.integer(rv$peak_review_shell_generation) + 1L
     showModal(modalDialog(
       title = uiOutput("peak_review_modal_title"),
-      # Marker lets the browser report ESC, backdrop and X dismissals.
-      # Server-side Close already clears state; non-button dismissals did not.
-      tags$span(class = "pitax-peak-review-shell-marker", style = "display:none"),
+      # Marker lets the browser report ESC, backdrop and X dismissals,
+      # with a generation token so delayed events cannot close newer shells.
+      tags$span(class = "pitax-peak-review-shell-marker", style = "display:none",
+                `data-generation` = rv$peak_review_shell_generation),
       easyClose = TRUE, size = "l",
       div(class = "peak-review-modal-grid",
           div(class = "peak-review-modal-plot",
@@ -511,9 +513,11 @@
   }, ignoreInit = TRUE)
 
   observeEvent(input$peak_review_modal_dismissed, {
-    # easyClose = TRUE permits closing without the Close button. In that case
-    # reset the same server flags as an explicit Close, or the next click
-    # silently updates an invisible modal.
+    # easyClose = TRUE permits closing without the Close button. Reject a
+    # delayed dismissal from an older shell if a fresh click already reopened.
+    generation <- suppressWarnings(as.integer(input$peak_review_modal_dismissed$generation[1]))
+    if (!length(generation) || !is.finite(generation) ||
+        !identical(generation, isolate(as.integer(rv$peak_review_shell_generation)))) return()
     rv$peak_review_open <- FALSE
     rv$peak_review_shell_open <- FALSE
     rv$context_peak_flag <- NULL
