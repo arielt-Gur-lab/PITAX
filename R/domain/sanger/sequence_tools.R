@@ -961,6 +961,45 @@ ambiguous_peak_flags <- function(result, scope = c("trimmed", "raw"), params = a
   out[order(out$Position), , drop = FALSE]
 }
 
+# Cached peak evidence for the active read in guided QC. Mark-reviewed and
+# "keep call" transactions change only reviewed_positions/revision/audit; the
+# underlying trace, edited calls and trim window are unchanged. Recomputing
+# every peak (including N peak-shape diagnostics) after each such click is
+# unnecessary. Retain just ONE read per session to bound memory usage.
+pitax_cached_peak_flags <- function(cache, sample_id, result, scope = "trimmed",
+                                    params = ambiguous_peak_defaults()) {
+  if (!is.environment(cache)) stop("Peak flag cache must be a session-local environment.")
+  result <- ensure_curation_state(result)
+  state <- list(
+    sample_id = as.character(sample_id)[1],
+    scope = as.character(scope)[1],
+    params = params,
+    raw_seq = result$raw_seq,
+    peak_pos = result$peak_pos,
+    trace = result$trace,
+    channel_map = result$channel_map,
+    metrics = result$metrics,
+    ab1_evidence = result$ab1_evidence,
+    trim_start = result$summary$trim_start,
+    trim_end = result$summary$trim_end,
+    base_edits = result$curation$base_edits
+  )
+  if (!identical(cache$evidence_state, state) || !is.data.frame(cache$flags)) {
+    cache$flags <- ambiguous_peak_flags(result, scope = scope, params = params)
+    cache$evidence_state <- state
+    # Visible in unit tests / troubleshooting, not exported or persisted.
+    cache$compute_count <- if (is.null(cache$compute_count)) 1L else cache$compute_count + 1L
+  }
+  flags <- cache$flags
+  if (nrow(flags)) {
+    reviewed <- as.integer(result$curation$reviewed_positions)
+    flags$Review_status <- ifelse(flags$Position %in% reviewed, "Reviewed", "Active")
+  } else {
+    flags$Review_status <- character()
+  }
+  flags
+}
+
 high_confidence_autocorrections <- function(result, settings = NULL) {
   flags <- ambiguous_peak_flags(result, scope = "trimmed", params = ambiguous_peak_params_from_settings(settings))
   if (!nrow(flags)) return(flags[0, , drop = FALSE])
