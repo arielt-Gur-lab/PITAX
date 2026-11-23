@@ -12,8 +12,17 @@ source(file.path(root, "R", "domain", "consensus", "stage3_consensus.R"))
 stopifnot(setequal(pitax_iupac_call_codes(),
                    c("A", "C", "G", "T", "N", "R", "Y", "S", "W", "K", "M", "B", "D", "H", "V")))
 choices <- pitax_iupac_ambiguity_choices()
-stopifnot(identical(unname(choices["M — A/C"]), "M"))
-stopifnot(identical(unname(choices["V — A/C/G"]), "V"))
+stopifnot(identical(unname(choices["M (A/C)"]), "M"))
+stopifnot(identical(unname(choices["V (A/C/G)"]), "V"))
+# Regression: R locales on Posit Connect may stringify Unicode punctuation
+# as literal UTF-8 bytes, e.g. <e2><80><94>, in HTML select labels.
+# Verify both dropdowns contain ASCII-only labels and unchanged DNA values.
+all_options <- pitax_iupac_confirmation_choices()
+stopifnot(identical(unname(all_options["G (guanine)"]), "G"))
+stopifnot(identical(unname(all_options["N (unresolved A/C/G/T)"]), "N"))
+stopifnot(setequal(unname(all_options), pitax_iupac_call_codes()))
+stopifnot(all(vapply(names(choices), function(x) all(as.integer(charToRaw(x)) < 128L), logical(1))))
+stopifnot(all(vapply(names(all_options), function(x) all(as.integer(charToRaw(x)) < 128L), logical(1))))
 stopifnot(setequal(unname(choices), c("R", "Y", "S", "W", "K", "M", "B", "D", "H", "V")))
 stopifnot(identical(unname(iupac_for_pair("A", "C")), "M"))
 stopifnot(identical(stage3_reverse_complement("M"), "K"))
