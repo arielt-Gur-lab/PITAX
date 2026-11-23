@@ -39,6 +39,11 @@ echo [2b/22] N-rich trim-window regression tests
 if errorlevel 1 goto :failed
 
 echo.
+echo [2c/22] N-call evidence and peak-separation tests
+"%RDIR%\bin\Rscript.exe" "tests\unit\n_call_evidence_smoke.R"
+if errorlevel 1 goto :failed
+
+echo.
 echo [3/22] Manual curation / undo-redo smoke tests
 "%RDIR%\bin\Rscript.exe" "tests\unit\manual_curation_smoke.R"
 if errorlevel 1 goto :failed
@@ -116,6 +121,11 @@ if errorlevel 1 goto :failed
 echo.
 echo [17/22] BLAST RTOE auto-poll unit tests
 "%RDIR%\bin\Rscript.exe" "tests\unit\blast_polling_smoke.R"
+if errorlevel 1 goto :failed
+
+echo.
+echo [17b/22] BLAST compact batch status tests
+"%RDIR%\bin\Rscript.exe" "tests\unit\blast_batch_summary_smoke.R"
 if errorlevel 1 goto :failed
 
 echo.
