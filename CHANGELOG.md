@@ -14,6 +14,10 @@
   with a light static raw-trace preview (the main full-read Plotly remains
   interactive). Suspend expensive main Plotly redraws while reviewing and
   refresh once upon leaving the guided editor.
+- Cache the currently inspected read's per-base flag and N-peak diagnostics
+  across review-only actions; only an actual base edit, trim change, scope or
+  evidence/settings change triggers recomputation. Cache holds one read per
+  session, not all 50 chromatograms.
 - Update only the changed read's QC summary on curation rather than
   rebuilding all stored chromatograms. Incrementally rebuild the affected
   Stage 3 analysis group (one simple read or one Forward/Reverse pair)
