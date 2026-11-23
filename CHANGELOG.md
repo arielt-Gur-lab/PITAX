@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.8.7 — Fix IUPAC dropdown character encoding
+
+- Replace Unicode em dashes in manual base and IUPAC ambiguity selectInput labels with ASCII-safe parentheses, preventing visible UTF-8 byte sequences (e.g. `<e2><80><94>`) on Posit Connect instances with non-UTF-8 R locales.
+- Retain exactly the same selectable nucleotide/IUPAC values, manual editing semantics and scientific provenance.
+- Add regression assertions that all selectInput choice labels are ASCII-only, including `G (guanine)`, `M (A/C)` and `V (A/C/G)`.
+
 ## 3.8.6 — Full manual IUPAC ambiguity + faster guided QC editing
 
 - **Guided peak review:** Preserve quick A/C/G/T/N choices and expose the
