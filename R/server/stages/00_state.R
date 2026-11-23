@@ -40,6 +40,7 @@
     peak_review_advance = FALSE,
     peak_review_open = FALSE,
     peak_review_shell_open = FALSE,
+    peak_review_shell_generation = 0L,
     auto_correct_preview_df = data.frame()
   )
 

@@ -84,6 +84,27 @@
         });
       })();
 
+      // A Shiny modal with easyClose=true can disappear via ESC, backdrop
+      // or its X control without firing the server's Close actionButton.
+      // Capture the currently open guided-review shell on hide and notify
+      // the server once the Bootstrap transition finishes. The generation
+      // token rejects late dismissals when a user quickly reopens a row.
+      (function() {
+        $(document).on('hide.bs.modal.pitaxPeakReview', '#shiny-modal', function() {
+          var marker = $(this).find('.pitax-peak-review-shell-marker').first();
+          var generation = marker.length ? Number(marker.attr('data-generation')) : NaN;
+          $(this).data('pitaxPeakReviewHideGeneration', Number.isInteger(generation) ? generation : null);
+        });
+        $(document).on('hidden.bs.modal.pitaxPeakReview', '#shiny-modal', function() {
+          var generation = $(this).data('pitaxPeakReviewHideGeneration');
+          $(this).removeData('pitaxPeakReviewHideGeneration');
+          if (!Number.isInteger(generation) || !window.Shiny || !Shiny.setInputValue) return;
+          Shiny.setInputValue('peak_review_modal_dismissed',
+            {generation: generation, nonce: Date.now() + Math.random()},
+            {priority: 'event'});
+        });
+      })();
+
       (function() {
         var loaderShownAt = 0;
         var loaderFallback = null;

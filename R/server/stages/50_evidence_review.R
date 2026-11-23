@@ -202,10 +202,11 @@
   close_peak_review_shell <- function() {
     rv$peak_review_open <- FALSE
     rv$peak_review_shell_open <- FALSE
+    rv$context_peak_flag <- NULL
     removeModal()
   }
 
-  open_peak_review_at <- function(pos, recenter = TRUE) {
+  open_peak_review_at <- function(pos, recenter = TRUE, reopen_shell = FALSE) {
     pos <- suppressWarnings(as.integer(pos[1]))
     if (!is.finite(pos)) {
       close_peak_review_shell()
@@ -220,7 +221,7 @@
       return(invisible(FALSE))
     }
     if (isTRUE(recenter)) center_chromatogram_at(pos)
-    show_peak_curation_menu(row[1, , drop = FALSE])
+    show_peak_curation_menu(row[1, , drop = FALSE], reopen_shell = reopen_shell)
     invisible(TRUE)
   }
 
@@ -301,25 +302,39 @@
     datatable(
       show,
       rownames = FALSE,
-      selection = list(mode = "single", selected = NULL, target = "row"),
+      # Explicit per-click events are required: single-row DT selection
+      # remains selected after closing a modal, so a second click on the same
+      # row does NOT emit rows_selected. Use the actual Position in row.data()
+      # (not displayed row index, which changes with sort/pagination).
+      selection = "none",
       filter = "none",
       callback = JS("
+        function openFlagRow(rowData, contextMenu) {
+          if (!rowData || rowData.length < 1) return;
+          var position = Number(rowData[0]);
+          if (!Number.isInteger(position) || position < 1) return;
+          Shiny.setInputValue(
+            contextMenu ? 'peak_flag_context' : 'peak_flag_row_click',
+            {position: position, nonce: Date.now() + Math.random()},
+            {priority: 'event'}
+          );
+        }
+        table.on('click', 'tbody tr', function(e) {
+          openFlagRow(table.row(this).data(), false);
+        });
         table.on('contextmenu', 'tbody tr', function(e) {
           e.preventDefault();
-          var row = table.row(this).data();
-          if (!row || row.length < 1) return;
-          Shiny.setInputValue('peak_flag_context', {position: row[0], nonce: Math.random()}, {priority: 'event'});
+          openFlagRow(table.row(this).data(), true);
         });
       "),
       options = list(pageLength = 10, lengthChange = FALSE, scrollX = TRUE, autoWidth = TRUE, dom = "tip", order = list(list(0, "asc")))
     )
   })
 
-  observeEvent(input$ambiguous_peak_table_rows_selected, {
-    idx <- input$ambiguous_peak_table_rows_selected
-    df <- current_peak_flags()
-    if (!length(idx) || !nrow(df) || idx[1] < 1 || idx[1] > nrow(df)) return()
-    open_peak_review_at(df$Position[idx[1]])
+  observeEvent(input$peak_flag_row_click, {
+    pos <- suppressWarnings(as.integer(input$peak_flag_row_click$position[1]))
+    if (!length(pos) || !is.finite(pos)) return()
+    open_peak_review_at(pos, reopen_shell = TRUE)
   }, ignoreInit = TRUE)
 
   flag_evidence_text <- function(flag_row) {
@@ -380,8 +395,13 @@
   }
 
   show_peak_review_shell <- function() {
+    rv$peak_review_shell_generation <- as.integer(rv$peak_review_shell_generation) + 1L
     showModal(modalDialog(
       title = uiOutput("peak_review_modal_title"),
+      # Marker lets the browser report ESC, backdrop and X dismissals,
+      # with a generation token so delayed events cannot close newer shells.
+      tags$span(class = "pitax-peak-review-shell-marker", style = "display:none",
+                `data-generation` = rv$peak_review_shell_generation),
       easyClose = TRUE, size = "l",
       div(class = "peak-review-modal-grid",
           div(class = "peak-review-modal-plot",
@@ -399,12 +419,14 @@
     ))
   }
 
-  show_peak_curation_menu <- function(flag_row) {
+  show_peak_curation_menu <- function(flag_row, reopen_shell = FALSE) {
     if (is.null(flag_row) || !nrow(flag_row)) return()
     rv$context_peak_flag <- flag_row[1, , drop = FALSE]
     rv$peak_review_open <- TRUE
     rv$peak_review_advance <- FALSE
-    if (!isTRUE(rv$peak_review_shell_open)) {
+    # A fresh user click must open the shell even if a browser-side backdrop
+    # dismissal has not yet been acknowledged by the server.
+    if (isTRUE(reopen_shell) || !isTRUE(rv$peak_review_shell_open)) {
       rv$peak_review_shell_open <- TRUE
       show_peak_review_shell()
     }
@@ -490,10 +512,22 @@
     close_peak_review_shell()
   }, ignoreInit = TRUE)
 
+  observeEvent(input$peak_review_modal_dismissed, {
+    # easyClose = TRUE permits closing without the Close button. Reject a
+    # delayed dismissal from an older shell if a fresh click already reopened.
+    generation <- suppressWarnings(as.integer(input$peak_review_modal_dismissed$generation[1]))
+    if (!length(generation) || !is.finite(generation) ||
+        !isTRUE(isolate(rv$peak_review_shell_open)) ||
+        !identical(generation, isolate(as.integer(rv$peak_review_shell_generation)))) return()
+    rv$peak_review_open <- FALSE
+    rv$peak_review_shell_open <- FALSE
+    rv$context_peak_flag <- NULL
+  }, ignoreInit = TRUE)
+
   observeEvent(input$peak_flag_context, {
     pos <- suppressWarnings(as.integer(input$peak_flag_context$position))
     if (!is.finite(pos)) return()
-    open_peak_review_at(pos)
+    open_peak_review_at(pos, reopen_shell = TRUE)
   }, ignoreInit = TRUE)
 
   observeEvent(input$peak_review_start, {
@@ -504,7 +538,7 @@
       showNotification("No active ambiguous positions to review.", type = "message", duration = 5)
       return()
     }
-    open_peak_review_at(first)
+    open_peak_review_at(first, reopen_shell = TRUE)
   }, ignoreInit = TRUE)
 
   rv$last_qc_chrom_click_key <- ""
@@ -537,7 +571,7 @@
         identical(as.integer(isolate(rv$context_peak_flag$Position[1])), pos)) {
       return()
     }
-    isolate(open_peak_review_at(pos))
+    isolate(open_peak_review_at(pos, reopen_shell = TRUE))
   })
 
   show_curation_confirmation <- function(type, position, value = NULL, advance = FALSE) {
