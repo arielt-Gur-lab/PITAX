@@ -240,7 +240,7 @@ ui <- fluidPage(
               uiOutput("expected_amplicon_note")
             ),
             div(class = "panel-box chromatogram-card",
-              card_title("Chromatogram", "X axis = raw called-base position. Zoom, pan, or click a flagged position to open guided local review.", "line-chart"),
+              card_title("Chromatogram", "X axis = raw called-base position. Base labels show original AB1 calls plus any logged manual edits. N means the basecaller did not resolve that position; a dominant dye trace alone does not justify replacing it. Zoom, pan, or click a flagged position for guided review.", "line-chart"),
               plotly::plotlyOutput("chromatogram_plot", height = "540px")
             )
           )
