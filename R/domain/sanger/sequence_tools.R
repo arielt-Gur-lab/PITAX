@@ -1066,35 +1066,101 @@ make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags 
   )
 }
 
-# Local chromatogram around one raw base position. QC guided review uses a
-# narrow window (~4 bases each side); consensus conflict review keeps a wider view.
+# Local chromatogram around one raw base position. Builds ONLY the visible
+# window (not the full read) so guided QC review stays responsive.
+# QC guided review uses ~4 bases each side; consensus conflict review keeps a wider view.
 make_chromatogram_focus_plot <- function(result, settings, raw_position, title, window = 12L,
                                          marker_color = "#64748b", marker_width = 1.25) {
   position <- suppressWarnings(as.integer(raw_position[1]))
   if (!is.list(result) || !length(position) || !is.finite(position[1])) {
     return(pitax_empty_plotly(list(text = paste0(title, " | no linked raw position"), x = 0)))
   }
-  focused <- result
-  focused$display_name <- title
-  p <- make_chromatogram_plotly(focused, settings, flags = NULL, show_flags = FALSE)
+  trace <- result$trace
+  peak_pos <- as.integer(result$peak_pos)
+  cmap <- result$channel_map
+  n <- length(peak_pos)
+  if (is.null(trace) || !nrow(trace) || n < 2 || is.null(cmap) || position < 1L || position > n) {
+    return(pitax_empty_plotly(list(text = paste0(title, " | no linked raw position"), x = 0)))
+  }
+
   half <- max(1L, as.integer(window)[1])
   left <- max(1L, position - half)
-  right <- position + half
-  existing_shapes <- p$x$layout$shapes
-  if (is.null(existing_shapes)) existing_shapes <- list()
+  right <- min(n, position + half)
+  valid_peaks <- which(is.finite(peak_pos) & peak_pos >= 1 & peak_pos <= nrow(trace))
+  local_peaks <- valid_peaks[valid_peaks >= left & valid_peaks <= right]
+  if (length(local_peaks) < 1L) {
+    return(pitax_empty_plotly(list(text = paste0(title, " | no peaks in window"), x = 0)))
+  }
+
+  pad <- 4L
+  x_from <- max(1L, min(peak_pos[local_peaks]) - pad)
+  x_to <- min(nrow(trace), max(peak_pos[local_peaks]) + pad)
+  trace_idx <- seq.int(x_from, x_to)
+  x_base <- trace_to_base_x(peak_pos, trace_idx)
+
+  channel_values <- lapply(c("A", "C", "G", "T"), function(base) {
+    col <- cmap[[base]]
+    if (is.null(col) || is.na(col)) rep(NA_real_, length(trace_idx)) else as.numeric(trace[trace_idx, col])
+  })
+  names(channel_values) <- c("A", "C", "G", "T")
+  all_vals <- unlist(channel_values, use.names = FALSE)
+  all_vals <- all_vals[is.finite(all_vals)]
+  ymax <- if (length(all_vals)) max(all_vals, na.rm = TRUE) else 1
+  if (!is.finite(ymax) || ymax <= 0) ymax <- 1
+
+  colors <- c(A = "#2ca02c", C = "#1f77b4", G = "#111111", T = "#d62728")
+  p <- plotly::plot_ly()
+  for (base in c("A", "C", "G", "T")) {
+    p <- plotly::add_trace(
+      p,
+      x = x_base,
+      y = channel_values[[base]],
+      type = "scatter",
+      mode = "lines",
+      name = base,
+      line = list(color = colors[[base]], width = 1.6),
+      hovertemplate = paste0(base, "<br>Base position: %{x:.2f}<br>Signal: %{y:.0f}<extra></extra>")
+    )
+  }
+
+  bases <- curated_raw_calls(result)
+  label_idx <- seq.int(left, right)
+  label_text <- bases[label_idx]
+  label_colors <- ifelse(label_idx == position, "#b91c1c", "#374151")
+  label_colors <- ifelse(toupper(label_text) == "N", "#7c3aed", label_colors)
+  p <- plotly::add_trace(
+    p,
+    x = label_idx,
+    y = rep(ymax * 1.08, length(label_idx)),
+    type = "scatter",
+    mode = "text",
+    text = label_text,
+    textfont = list(size = 14, color = label_colors),
+    hoverinfo = "skip",
+    showlegend = FALSE,
+    cliponaxis = FALSE
+  )
+
   plotly::layout(
     p,
     title = list(text = as.character(title)[1], x = 0, font = list(size = 13)),
+    dragmode = FALSE,
+    hovermode = "x unified",
     margin = list(l = 55, r = 40, t = 48, b = 40),
-    xaxis = list(title = "Base position", range = c(left - 0.35, right + 0.35), rangeslider = list(visible = FALSE)),
-    shapes = c(
-      existing_shapes,
-      list(list(
-        type = "line", x0 = position, x1 = position, y0 = 0, y1 = 1, yref = "paper",
-        line = list(color = marker_color, width = marker_width, dash = "dash")
-      ))
-    )
-  )
+    legend = list(orientation = "h", x = 0, y = 1.12),
+    xaxis = list(
+      title = "Base position",
+      range = c(left - 0.45, right + 0.45),
+      dtick = 1,
+      rangeslider = list(visible = FALSE)
+    ),
+    yaxis = list(title = "Signal", range = c(0, ymax * 1.22), fixedrange = TRUE),
+    shapes = list(list(
+      type = "line", x0 = position, x1 = position, y0 = 0, y1 = 1, yref = "paper",
+      line = list(color = marker_color, width = marker_width, dash = "dash")
+    ))
+  ) |>
+    plotly::config(displayModeBar = FALSE, displaylogo = FALSE)
 }
 
 # Next Active ambiguous-peak position after current, skipping session-deferred

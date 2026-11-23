@@ -1,4 +1,4 @@
-PITAX v3.8.0 - Guided local QC peak review
+PITAX v3.8.1 - Guided local QC peak review
 =====================================================
 
 Purpose

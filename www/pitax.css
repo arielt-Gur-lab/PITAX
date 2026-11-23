@@ -801,6 +801,22 @@
       }
       .peak-review-metric-label { color:#64748b; }
       .peak-review-metric-value { color:#1e293b; font-weight:650; text-align:right; }
+      .peak-review-n-call {
+        display:inline-block;
+        min-width:1.4em;
+        padding:0 6px;
+        border-radius:6px;
+        background:#f3e8ff;
+        color:#6b21a8;
+        font-weight:800;
+        text-align:center;
+      }
+      .peak-review-modal-side .shiny-options-group {
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px 14px;
+      }
+      .peak-review-modal-side .radio-inline { margin-left:0 !important; }
       .peak-review-primary-actions {
         display:flex;
         flex-wrap:wrap;

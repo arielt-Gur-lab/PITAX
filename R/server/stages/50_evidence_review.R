@@ -182,6 +182,7 @@
   observeEvent(input$inspect_sample, {
     reset_peak_review_pass()
     rv$peak_review_open <- FALSE
+    rv$peak_review_shell_open <- FALSE
   }, ignoreInit = TRUE)
 
   active_peak_flags_for_pass <- function() {
@@ -198,23 +199,27 @@
     )
   }
 
-  open_peak_review_at <- function(pos) {
+  close_peak_review_shell <- function() {
+    rv$peak_review_open <- FALSE
+    rv$peak_review_shell_open <- FALSE
+    removeModal()
+  }
+
+  open_peak_review_at <- function(pos, recenter = TRUE) {
     pos <- suppressWarnings(as.integer(pos[1]))
     if (!is.finite(pos)) {
-      rv$peak_review_open <- FALSE
-      removeModal()
+      close_peak_review_shell()
       showNotification("No more active ambiguous positions in this review pass.", type = "message", duration = 5)
       return(invisible(FALSE))
     }
     df <- all_current_peak_flags()
     row <- df[df$Position == pos, , drop = FALSE]
     if (!nrow(row)) {
-      rv$peak_review_open <- FALSE
-      removeModal()
+      close_peak_review_shell()
       showNotification("That position is no longer available for review.", type = "warning", duration = 5)
       return(invisible(FALSE))
     }
-    center_chromatogram_at(pos)
+    if (isTRUE(recenter)) center_chromatogram_at(pos)
     show_peak_curation_menu(row[1, , drop = FALSE])
     invisible(TRUE)
   }
@@ -222,12 +227,40 @@
   advance_peak_review_after <- function(current_pos) {
     nxt <- next_peak_review_position(current_pos)
     if (!is.finite(nxt)) {
-      rv$peak_review_open <- FALSE
-      removeModal()
+      close_peak_review_shell()
       showNotification("No more active ambiguous positions in this review pass.", type = "message", duration = 5)
       return(invisible(FALSE))
     }
-    open_peak_review_at(nxt)
+    # Keep the open modal shell; only swap the active position content.
+    open_peak_review_at(nxt, recenter = FALSE)
+  }
+
+  peak_review_base_choices <- function(flag_row) {
+    call <- toupper(as.character(flag_row$Call[1]))
+    comp <- as.character(flag_row$Competing_channel[1])
+    comp_candidates <- unique(strsplit(gsub("[^ACGTN/]", "", toupper(comp)), "/", fixed = TRUE)[[1]])
+    comp_candidates <- comp_candidates[comp_candidates %in% c("A", "C", "G", "T", "N")]
+    # Always expose A/C/G/T/N so N calls and free choice remain editable.
+    bases <- unique(c(comp_candidates, "A", "C", "G", "T", "N"))
+    labels <- vapply(bases, function(b) {
+      if (identical(b, call)) paste0(b, " (current)") else b
+    }, character(1))
+    selected <- if (length(comp_candidates) && !identical(comp_candidates[1], call)) {
+      comp_candidates[1]
+    } else if ("N" %in% bases && !identical(call, "N")) {
+      "N"
+    } else if (length(comp_candidates)) {
+      comp_candidates[1]
+    } else {
+      "N"
+    }
+    if (identical(call, "N") && length(comp_candidates) && comp_candidates[1] %in% c("A", "C", "G", "T")) {
+      selected <- comp_candidates[1]
+    }
+    list(choices = stats::setNames(bases, labels), selected = selected, call = call, pair_code = {
+      if (call %in% c("A", "C", "G", "T") && length(comp_candidates) && comp_candidates[1] %in% c("A", "C", "G", "T") &&
+          comp_candidates[1] != call) iupac_for_pair(call, comp_candidates[1]) else NA_character_
+    })
   }
 
   output$ambiguous_peak_summary <- renderUI({
@@ -310,13 +343,17 @@
     } else {
       "NA"
     }
+    call <- as.character(flag_row$Call[1])
+    call_value <- if (identical(toupper(call), "N")) tags$span(class = "peak-review-n-call", "N") else call
     tagList(
       div(class = "peak-review-callout",
-          tags$strong(paste0(flag_row$Call[1], "  <->  ", flag_row$Competing_channel[1])),
+          tags$strong(tagList(call_value, "  <->  ", flag_row$Competing_channel[1])),
           span(class = "peak-flag-pill", flag_row$Severity[1])),
       div(class = "peak-review-metrics",
           metric("Position", as.character(flag_row$Position[1])),
-          metric("Call", as.character(flag_row$Call[1])),
+          div(class = "peak-review-metric",
+              span(class = "peak-review-metric-label", "Call"),
+              span(class = "peak-review-metric-value", call_value)),
           metric("Competitor", as.character(flag_row$Competing_channel[1])),
           metric("Peak ratio", as.character(flag_row$Peak_ratio[1])),
           metric("Competitor / called", paste0(flag_row$Competitor_percent[1], "%")),
@@ -328,14 +365,49 @@
     )
   }
 
+  show_peak_review_shell <- function() {
+    showModal(modalDialog(
+      title = uiOutput("peak_review_modal_title"),
+      easyClose = TRUE, size = "l",
+      div(class = "peak-review-modal-grid",
+          div(class = "peak-review-modal-plot",
+              plotly::plotlyOutput("peak_review_local_plot", height = "300px")),
+          div(class = "peak-review-modal-side", uiOutput("peak_review_side_ui"))),
+      div(class = "peak-review-primary-actions",
+          actionButton("peak_review_continue", "Continue", icon = icon("arrow-right"),
+                       class = "btn-primary", title = "Mark reviewed (remove from active flags) and open the next position."),
+          actionButton("peak_review_change", "Change base", icon = icon("edit"),
+                       class = "btn-warning", title = "Choose A/C/G/T/N above, confirm the edit, then continue."),
+          actionButton("peak_review_flag", "Flag & continue", icon = icon("flag"),
+                       title = "Keep this position active, defer it for this pass, and open the next position.")),
+      uiOutput("peak_review_advanced_ui"),
+      footer = actionButton("peak_review_close", "Close", class = "btn-default")
+    ))
+  }
+
   show_peak_curation_menu <- function(flag_row) {
     if (is.null(flag_row) || !nrow(flag_row)) return()
     rv$context_peak_flag <- flag_row[1, , drop = FALSE]
     rv$peak_review_open <- TRUE
     rv$peak_review_advance <- FALSE
+    if (!isTRUE(rv$peak_review_shell_open)) {
+      rv$peak_review_shell_open <- TRUE
+      show_peak_review_shell()
+    }
+  }
+
+  output$peak_review_modal_title <- renderUI({
+    req(isTRUE(rv$peak_review_open), rv$context_peak_flag)
+    pos <- as.integer(rv$context_peak_flag$Position[1])
+    call <- as.character(rv$context_peak_flag$Call[1])
+    span(paste0("Guided review | position ", pos, " | call ", call))
+  })
+
+  output$peak_review_side_ui <- renderUI({
+    req(isTRUE(rv$peak_review_open), rv$context_peak_flag)
+    flag_row <- rv$context_peak_flag
     pos <- as.integer(flag_row$Position[1])
-    call <- as.character(flag_row$Call[1])
-    comp <- as.character(flag_row$Competing_channel[1])
+    choice <- peak_review_base_choices(flag_row)
     r <- ensure_curation_state(selected_result())
     st <- as.integer(r$summary$trim_start[1]); en <- as.integer(r$summary$trim_end[1])
     in_trim <- is.finite(st) && is.finite(en) && pos >= st && pos <= en
@@ -344,57 +416,51 @@
     recommendation <- ""
     if (in_trim) {
       dl <- pos - st; dr <- en - pos
-      if (dl <= edge_zone || dr <= edge_zone) recommendation <- if (dl <= dr) "Recommended: trim the left edge through this position." else "Recommended: trim the right edge from this position."
+      if (dl <= edge_zone || dr <= edge_zone) {
+        recommendation <- if (dl <= dr) "Recommended: trim the left edge through this position." else "Recommended: trim the right edge from this position."
+      }
     }
-    comp_candidates <- unique(strsplit(gsub("[^ACGT/]", "", comp), "/", fixed = TRUE)[[1]])
-    comp_candidates <- comp_candidates[comp_candidates %in% c("A","C","G","T")]
-    base_choices <- unique(c(comp_candidates, c("A","C","G","T","N")))
-    base_choices <- setNames(base_choices, base_choices)
-    pair_code <- if (call %in% c("A","C","G","T") && length(comp_candidates) && comp_candidates[1] != call) iupac_for_pair(call, comp_candidates[1]) else NA_character_
     remaining_note <- {
       nxt <- next_peak_review_position(pos)
       if (is.finite(nxt)) paste0("Next active after this: ", nxt) else "Last active position in this pass"
     }
+    tagList(
+      peak_review_metrics_ui(flag_row),
+      if (nzchar(recommendation)) div(class = "status-note", recommendation) else NULL,
+      div(class = "compact-hint", remaining_note),
+      radioButtons(
+        "manual_base_choice",
+        "Change current base to",
+        choices = choice$choices,
+        selected = choice$selected,
+        inline = TRUE
+      ),
+      if (!is.na(choice$pair_code)) div(class = "curation-actions",
+          actionButton("context_iupac_preview", paste0("Set ambiguity ", choice$pair_code))) else NULL
+    )
+  })
 
-    showModal(modalDialog(
-      title = paste0("Guided review | position ", pos),
-      easyClose = TRUE, size = "l",
-      div(class = "peak-review-modal-grid",
-          div(class = "peak-review-modal-plot",
-              plotly::plotlyOutput("peak_review_local_plot", height = "320px")),
-          div(class = "peak-review-modal-side",
-              peak_review_metrics_ui(flag_row),
-              if (nzchar(recommendation)) div(class = "status-note", recommendation) else NULL,
-              div(class = "compact-hint", remaining_note),
-              selectInput("manual_base_choice", "Change current base to",
-                          choices = base_choices,
-                          selected = if (length(comp_candidates)) comp_candidates[1] else "N"),
-              if (!is.na(pair_code)) div(class = "curation-actions",
-                  actionButton("context_iupac_preview", paste0("Set ambiguity ", pair_code))) else NULL)),
-      div(class = "peak-review-primary-actions",
-          actionButton("peak_review_continue", "Continue", icon = icon("arrow-right"),
-                       class = "btn-primary", title = "Mark reviewed (remove from active flags) and open the next position."),
-          actionButton("peak_review_change", "Change base", icon = icon("edit"),
-                       class = "btn-warning", title = "Confirm a base change, then continue to the next position."),
-          actionButton("peak_review_flag", "Flag & continue", icon = icon("flag"),
-                       title = "Keep this position active, defer it for this pass, and open the next position.")),
-      if (in_trim) tagList(
-        tags$hr(),
-        div(class = "compact-hint", "Advanced trim actions (require confirmation; ends guided pass after apply):"),
-        div(class = "curation-actions",
-            actionButton("context_trim_left", paste0("Trim left through ", pos)),
-            actionButton("context_trim_right", paste0("Trim right from ", pos)))
-      ) else NULL,
-      footer = modalButton("Close")
-    ))
-  }
+  output$peak_review_advanced_ui <- renderUI({
+    req(isTRUE(rv$peak_review_open), rv$context_peak_flag)
+    pos <- as.integer(rv$context_peak_flag$Position[1])
+    r <- ensure_curation_state(selected_result())
+    st <- as.integer(r$summary$trim_start[1]); en <- as.integer(r$summary$trim_end[1])
+    in_trim <- is.finite(st) && is.finite(en) && pos >= st && pos <= en
+    if (!in_trim) return(NULL)
+    tagList(
+      tags$hr(),
+      div(class = "compact-hint", "Advanced trim actions (require confirmation; ends guided pass after apply):"),
+      div(class = "curation-actions",
+          actionButton("context_trim_left", paste0("Trim left through ", pos)),
+          actionButton("context_trim_right", paste0("Trim right from ", pos)))
+    )
+  })
 
   output$peak_review_local_plot <- plotly::renderPlotly({
     req(isTRUE(rv$peak_review_open), rv$context_peak_flag)
     flag_row <- rv$context_peak_flag
     pos <- as.integer(flag_row$Position[1])
     plot_result <- selected_result()
-    plot_result$display_name <- paste0("Position ", pos)
     make_chromatogram_focus_plot(
       plot_result,
       selected_processing_settings(),
@@ -405,6 +471,10 @@
       marker_width = 1.2
     )
   })
+
+  observeEvent(input$peak_review_close, {
+    close_peak_review_shell()
+  }, ignoreInit = TRUE)
 
   observeEvent(input$peak_flag_context, {
     pos <- suppressWarnings(as.integer(input$peak_flag_context$position))
@@ -461,14 +531,27 @@
     pos <- as.integer(position)
     flag_row <- rv$context_peak_flag
     evidence <- flag_evidence_text(flag_row)
+    # Confirmation replaces the guided shell; remember to rebuild it after.
+    rv$peak_review_shell_open <- FALSE
     if (type == "base") {
       calls <- curated_raw_calls(r); before <- if (pos >= 1 && pos <= length(calls)) calls[pos] else ""
-      after <- toupper(as.character(value))
+      choice <- if (!is.null(flag_row) && nrow(flag_row)) peak_review_base_choices(flag_row) else {
+        list(choices = c(A = "A", C = "C", G = "G", T = "T", N = "N"), selected = "N", call = before)
+      }
+      suggested <- toupper(as.character(value))
+      if (!nzchar(suggested) || !(suggested %in% unname(choice$choices))) suggested <- choice$selected
       title <- "Confirm base edit"
       body <- tagList(
-        h4(paste0("Position ", pos, ": ", before, " -> ", after)),
+        h4(paste0("Position ", pos, " | current call ", before)),
         p(evidence),
-        div(class = "status-note", "The raw AB1 trace and original base call are preserved. This edit changes only the curated sequence and will be recorded in the audit log."))
+        radioButtons(
+          "confirm_base_choice",
+          "Choose the new base",
+          choices = choice$choices,
+          selected = suggested,
+          inline = TRUE
+        ),
+        div(class = "status-note", "Pick A, C, G, T or N explicitly, then confirm. The raw AB1 trace is preserved; only the curated sequence changes."))
     } else {
       st <- as.integer(r$summary$trim_start[1]); en <- as.integer(r$summary$trim_end[1])
       side <- as.character(value)
@@ -484,10 +567,26 @@
     rv$pending_curation <- list(type = type, position = pos, value = value, evidence = evidence, advance = isTRUE(advance))
     showModal(modalDialog(
       title = title, body,
-      footer = tagList(modalButton("Cancel"), actionButton("confirm_curation_action", "Confirm change", class = "btn-danger")),
+      footer = tagList(
+        actionButton("cancel_curation_action", "Cancel"),
+        actionButton("confirm_curation_action", "Confirm change", class = "btn-danger")
+      ),
       easyClose = FALSE
     ))
   }
+
+  observeEvent(input$cancel_curation_action, {
+    pnd <- rv$pending_curation
+    rv$pending_curation <- NULL
+    rv$peak_review_advance <- FALSE
+    if (isTRUE(rv$peak_review_open) && !is.null(rv$context_peak_flag)) {
+      # Re-open the guided shell on the same position after cancel.
+      show_peak_curation_menu(rv$context_peak_flag)
+    } else {
+      removeModal()
+    }
+    invisible(pnd)
+  }, ignoreInit = TRUE)
 
   observeEvent(input$peak_review_continue, {
     req(rv$context_peak_flag, input$inspect_sample)
@@ -562,7 +661,13 @@
     before_call <- if (pos >= 1 && pos <= length(calls)) calls[pos] else ""
     should_advance <- isTRUE(pnd$advance) || isTRUE(rv$peak_review_advance)
     if (identical(pnd$type, "base")) {
-      new_base <- toupper(as.character(pnd$value))
+      # Prefer the explicit choice from the confirmation radios.
+      chosen <- if (!is.null(input$confirm_base_choice) && nzchar(as.character(input$confirm_base_choice)[1])) {
+        as.character(input$confirm_base_choice)[1]
+      } else {
+        pnd$value
+      }
+      new_base <- toupper(as.character(chosen))
       if (identical(new_base, before_call)) {
         snap <- curation_review_snapshot(r, pos)
         row <- data.frame(Action = "Mark reviewed / keep call", Position = pos, Before = before_call, After = before_call,

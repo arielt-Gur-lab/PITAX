@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.8.1 — Faster guided review and explicit base choice
+
+- Guided local chromatogram now renders only the visible ±4-base window instead
+  of rebuilding the full-read Plotly chart on every position.
+- The review panel stays open while advancing, avoiding full modal teardown.
+- Base editing always exposes A/C/G/T/N as radio choices in the panel and again
+  in the confirmation dialog, including when the current call is N.
+- N calls are highlighted in the local view and metrics.
+
+
 ## 3.8.0 — Guided local QC peak review
 
 - Ambiguous-peak curation now opens a guided local-review panel from a table
