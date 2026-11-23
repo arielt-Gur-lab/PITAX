@@ -146,15 +146,20 @@
          paste0("Expected amplicon: ", settings$expected_amplicon_len, " bp | Locus: ", settings$target))
   })
 
+  # One cache per Shiny session, covering only the currently inspected read.
+  # Review marks and audit revisions do not invalidate trace evidence; manual
+  # base edits/trim changes still force recalculation (and scientific review).
+  peak_flag_cache <- new.env(parent = emptyenv())
   all_current_peak_flags <- reactive({
     req(selected_result())
     scope <- if (!is.null(input$peak_flag_scope) && input$peak_flag_scope %in% c("trimmed", "raw")) input$peak_flag_scope else "trimmed"
-    df <- ambiguous_peak_flags(selected_result(), scope = scope, params = ambiguous_peak_params_from_settings(selected_processing_settings()))
-    if (!nrow(df)) return(df)
-    r <- ensure_curation_state(selected_result())
-    reviewed <- as.integer(r$curation$reviewed_positions)
-    df$Review_status <- ifelse(df$Position %in% reviewed, "Reviewed", "Active")
-    df
+    pitax_cached_peak_flags(
+      peak_flag_cache,
+      sample_id = selected_sample_key(),
+      result = selected_result(),
+      scope = scope,
+      params = ambiguous_peak_params_from_settings(selected_processing_settings())
+    )
   })
 
   current_peak_flags <- reactive({
@@ -241,23 +246,15 @@
     comp <- as.character(flag_row$Competing_channel[1])
     comp_candidates <- unique(strsplit(gsub("[^ACGTN/]", "", toupper(comp)), "/", fixed = TRUE)[[1]])
     comp_candidates <- comp_candidates[comp_candidates %in% c("A", "C", "G", "T", "N")]
-    # Always expose A/C/G/T/N so N calls and free choice remain editable.
-    bases <- unique(c(comp_candidates, "A", "C", "G", "T", "N"))
+    # Quick single-base choices stay accessible in one click. A previous
+    # ambiguity edit is shown as the current call and selected separately
+    # below, never silently replaced with N or an inferred top dye channel.
+    bases <- unique(c("A", "C", "G", "T", "N",
+                      if (call %in% pitax_iupac_call_codes()) call else character()))
     labels <- vapply(bases, function(b) {
       if (identical(b, call)) paste0(b, " (current)") else b
     }, character(1))
-    selected <- if (length(comp_candidates) && !identical(comp_candidates[1], call)) {
-      comp_candidates[1]
-    } else if ("N" %in% bases && !identical(call, "N")) {
-      "N"
-    } else if (length(comp_candidates)) {
-      comp_candidates[1]
-    } else {
-      "N"
-    }
-    # Keep N selected during an unresolved-call review: a dominant channel is
-    # evidence to inspect, not consent to overwrite an AB1 base call.
-    if (identical(call, "N")) selected <- "N"
+    selected <- if (call %in% bases) call else "N"
     list(choices = stats::setNames(bases, labels), selected = selected, call = call, pair_code = {
       if (call %in% c("A", "C", "G", "T") && length(comp_candidates) && comp_candidates[1] %in% c("A", "C", "G", "T") &&
           comp_candidates[1] != call) iupac_for_pair(call, comp_candidates[1]) else NA_character_
@@ -405,7 +402,7 @@
       easyClose = TRUE, size = "l",
       div(class = "peak-review-modal-grid",
           div(class = "peak-review-modal-plot",
-              plotly::plotlyOutput("peak_review_local_plot", height = "300px")),
+              plotOutput("peak_review_local_plot", height = "300px")),
           div(class = "peak-review-modal-side", uiOutput("peak_review_side_ui"))),
       div(class = "peak-review-primary-actions",
           actionButton("peak_review_continue", "Continue", icon = icon("arrow-right"),
@@ -466,11 +463,29 @@
       div(class = "compact-hint", remaining_note),
       radioButtons(
         "manual_base_choice",
-        "Change current base to",
+        "Single base / unresolved",
         choices = choice$choices,
         selected = choice$selected,
         inline = TRUE
       ),
+      div(class = "curation-actions",
+        selectInput(
+          "manual_iupac_choice",
+          "Or choose an IUPAC ambiguity code",
+          choices = c("Choose ambiguity..." = "", pitax_iupac_ambiguity_choices()),
+          selected = if (as.character(flag_row$Call[1]) %in% unname(pitax_iupac_ambiguity_choices()))
+            as.character(flag_row$Call[1]) else ""
+        ),
+        actionButton(
+          "peak_review_apply_iupac",
+          "Apply ambiguity",
+          icon = icon("check"),
+          class = "btn-default",
+          title = "Manually choose M=A/C, V=A/C/G or another valid IUPAC code. Never auto-infer an unresolved base."
+        )
+      ),
+      div(class = "compact-hint",
+          "IUPAC codes record your interpretation, not a validated basecaller call. For unresolved/overlapping peaks, keep N unless the evidence supports your manual choice."),
       if (!is.na(choice$pair_code)) div(class = "curation-actions",
           actionButton("context_iupac_preview", paste0("Set ambiguity ", choice$pair_code))) else NULL
     )
@@ -492,21 +507,17 @@
     )
   })
 
-  output$peak_review_local_plot <- plotly::renderPlotly({
+  # This 9-base inset has no zoom/pan interaction. A small R graphics PNG
+  # avoids allocating and mounting an entire Plotly widget at each position.
+  # The full QC chromatogram remains interactive and retains its zoom state.
+  output$peak_review_local_plot <- renderPlot({
     req(isTRUE(rv$peak_review_open), rv$context_peak_flag)
-    flag_row <- rv$context_peak_flag
-    pos <- as.integer(flag_row$Position[1])
-    plot_result <- selected_result()
-    make_chromatogram_focus_plot(
-      plot_result,
-      selected_processing_settings(),
-      raw_position = pos,
-      title = paste0("Local view | ", pos, " +/- 4 bases"),
-      window = 4L,
-      marker_color = "#64748b",
-      marker_width = 1.2
+    draw_chromatogram_focus_fast(
+      selected_result(),
+      raw_position = as.integer(rv$context_peak_flag$Position[1]),
+      window = 4L
     )
-  })
+  }, res = 96)
 
   observeEvent(input$peak_review_close, {
     close_peak_review_shell()
@@ -584,22 +595,21 @@
     if (type == "base") {
       calls <- curated_raw_calls(r); before <- if (pos >= 1 && pos <= length(calls)) calls[pos] else ""
       choice <- if (!is.null(flag_row) && nrow(flag_row)) peak_review_base_choices(flag_row) else {
-        list(choices = c(A = "A", C = "C", G = "G", T = "T", N = "N"), selected = "N", call = before)
+        list(choices = pitax_iupac_confirmation_choices(), selected = "N", call = before)
       }
       suggested <- toupper(as.character(value))
-      if (!nzchar(suggested) || !(suggested %in% unname(choice$choices))) suggested <- choice$selected
+      if (!nzchar(suggested) || !(suggested %in% pitax_iupac_call_codes())) suggested <- if (choice$call %in% pitax_iupac_call_codes()) choice$call else "N"
       title <- "Confirm base edit"
       body <- tagList(
         h4(paste0("Position ", pos, " | current call ", before)),
         p(evidence),
-        radioButtons(
+        selectInput(
           "confirm_base_choice",
-          "Choose the new base",
-          choices = choice$choices,
-          selected = suggested,
-          inline = TRUE
+          "Confirm the manually chosen base / IUPAC ambiguity",
+          choices = pitax_iupac_confirmation_choices(),
+          selected = suggested
         ),
-        div(class = "status-note", "Pick A, C, G, T or N explicitly, then confirm. The raw AB1 trace is preserved; only the curated sequence changes."))
+        div(class = "status-note", "IUPAC M means A/C and V means A/C/G; these are manual ambiguity annotations, not confident base calls. When evidence is unresolved, N remains the conservative choice. Original AB1 data are preserved."))
     } else {
       st <- as.integer(r$summary$trim_start[1]); en <- as.integer(r$summary$trim_end[1])
       side <- as.character(value)
@@ -651,7 +661,22 @@
 
   observeEvent(input$peak_review_change, {
     req(rv$context_peak_flag, input$manual_base_choice)
-    show_curation_confirmation("base", rv$context_peak_flag$Position[1], input$manual_base_choice, advance = TRUE)
+    choice <- as.character(input$manual_base_choice)[1]
+    if (!choice %in% pitax_iupac_call_codes()) {
+      showNotification("Select a valid base or use Apply ambiguity for IUPAC codes.", type = "warning")
+      return()
+    }
+    show_curation_confirmation("base", rv$context_peak_flag$Position[1], choice, advance = TRUE)
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$peak_review_apply_iupac, {
+    req(rv$context_peak_flag)
+    choice <- toupper(as.character(input$manual_iupac_choice)[1])
+    if (!length(choice) || is.na(choice) || !choice %in% unname(pitax_iupac_ambiguity_choices())) {
+      showNotification("Choose a specific IUPAC ambiguity code, e.g. M=A/C or V=A/C/G.", type = "warning")
+      return()
+    }
+    show_curation_confirmation("base", rv$context_peak_flag$Position[1], choice, advance = TRUE)
   }, ignoreInit = TRUE)
 
   observeEvent(input$peak_review_flag, {
@@ -716,6 +741,10 @@
         pnd$value
       }
       new_base <- toupper(as.character(chosen))
+      if (length(new_base) != 1L || is.na(new_base) || !new_base %in% pitax_iupac_call_codes()) {
+        showNotification("Invalid base or IUPAC ambiguity code. No change was made.", type = "error")
+        return()
+      }
       if (identical(new_base, before_call)) {
         snap <- curation_review_snapshot(r, pos)
         row <- data.frame(Action = "Mark reviewed / keep call", Position = pos, Before = before_call, After = before_call,
@@ -731,7 +760,7 @@
       }
       snap <- curation_set_base_snapshot(r, pos, new_base)
       if (is.null(snap)) { showNotification("Could not apply the requested base edit.", type = "error"); return() }
-      method <- if (new_base %in% c("R","Y","S","W","K","M")) "Manual IUPAC ambiguity" else "Manual base correction"
+      method <- if (new_base %in% unname(pitax_iupac_ambiguity_choices())) "Manual IUPAC ambiguity" else "Manual base correction"
       row <- data.frame(Action = "Base edit", Position = pos, Before = before_call, After = new_base,
                         Method = method, Evidence = pnd$evidence, Details = "Confirmed by user", stringsAsFactors = FALSE)
       label <- paste0("Base edit at ", pos, ": ", before_call, "->", new_base)
@@ -938,6 +967,10 @@
   }, ignoreInit = TRUE)
 
   output$chromatogram_plot <- plotly::renderPlotly({
+    # Freeze the expensive full-read WebGL plot while the guided editor is
+    # active. Its existing view stays visible and zoomable behind the modal;
+    # repaint ONCE when review closes instead of after every position/edit.
+    req(!isTRUE(rv$peak_review_open), cancelOutput = TRUE)
     plot_result <- selected_result()
     plot_result$display_name <- qc_display_name(selected_sample_key())
     make_chromatogram_plotly(

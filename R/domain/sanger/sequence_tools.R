@@ -605,13 +605,41 @@ curation_redo <- function(result, settings = NULL) {
   list(result = result, changed = TRUE, label = tx$label)
 }
 
+# Full IUPAC DNA ambiguity alphabet for explicit human curation.
+# Codes describe an unresolved set of candidate bases, NOT proof of a
+# mixed template, heterozygosity or confidently called alleles. Keep N by
+# default for an unresolved AB1 call until the operator accepts a new code.
+pitax_iupac_call_codes <- function() {
+  c("A", "C", "G", "T", "N", "R", "Y", "S", "W", "K", "M", "B", "D", "H", "V")
+}
+
+pitax_iupac_ambiguity_choices <- function() {
+  c(
+    "R — A/G" = "R", "Y — C/T" = "Y", "S — C/G" = "S",
+    "W — A/T" = "W", "K — G/T" = "K", "M — A/C" = "M",
+    "B — C/G/T" = "B", "D — A/G/T" = "D",
+    "H — A/C/T" = "H", "V — A/C/G" = "V"
+  )
+}
+
+pitax_iupac_confirmation_choices <- function() {
+  c(
+    "A — adenine" = "A", "C — cytosine" = "C",
+    "G — guanine" = "G", "T — thymine" = "T",
+    "N — unresolved A/C/G/T" = "N",
+    pitax_iupac_ambiguity_choices()
+  )
+}
+
 curation_set_base_snapshot <- function(result, position, new_base) {
   result <- ensure_curation_state(result)
   snap <- curation_snapshot(result)
   pos <- as.integer(position)
   new_base <- toupper(as.character(new_base))
   raw_chars <- strsplit(sanitize_dna(result$raw_seq), "")[[1]]
-  if (!is.finite(pos) || pos < 1 || pos > length(raw_chars) || !new_base %in% c("A","C","G","T","N","R","Y","S","W","K","M")) return(NULL)
+  if (length(new_base) != 1L || is.na(new_base) || nchar(new_base) != 1L ||
+      !is.finite(pos) || pos < 1 || pos > length(raw_chars) ||
+      !new_base %in% pitax_iupac_call_codes()) return(NULL)
   original <- raw_chars[pos]
   edits <- snap$base_edits
   edits <- edits[edits$Position != pos, , drop = FALSE]
@@ -933,6 +961,45 @@ ambiguous_peak_flags <- function(result, scope = c("trimmed", "raw"), params = a
   out[order(out$Position), , drop = FALSE]
 }
 
+# Cached peak evidence for the active read in guided QC. Mark-reviewed and
+# "keep call" transactions change only reviewed_positions/revision/audit; the
+# underlying trace, edited calls and trim window are unchanged. Recomputing
+# every peak (including N peak-shape diagnostics) after each such click is
+# unnecessary. Retain just ONE read per session to bound memory usage.
+pitax_cached_peak_flags <- function(cache, sample_id, result, scope = "trimmed",
+                                    params = ambiguous_peak_defaults()) {
+  if (!is.environment(cache)) stop("Peak flag cache must be a session-local environment.")
+  result <- ensure_curation_state(result)
+  state <- list(
+    sample_id = as.character(sample_id)[1],
+    scope = as.character(scope)[1],
+    params = params,
+    raw_seq = result$raw_seq,
+    peak_pos = result$peak_pos,
+    trace = result$trace,
+    channel_map = result$channel_map,
+    metrics = result$metrics,
+    ab1_evidence = result$ab1_evidence,
+    trim_start = result$summary$trim_start,
+    trim_end = result$summary$trim_end,
+    base_edits = result$curation$base_edits
+  )
+  if (!identical(cache$evidence_state, state) || !is.data.frame(cache$flags)) {
+    cache$flags <- ambiguous_peak_flags(result, scope = scope, params = params)
+    cache$evidence_state <- state
+    # Visible in unit tests / troubleshooting, not exported or persisted.
+    cache$compute_count <- if (is.null(cache$compute_count)) 1L else cache$compute_count + 1L
+  }
+  flags <- cache$flags
+  if (nrow(flags)) {
+    reviewed <- as.integer(result$curation$reviewed_positions)
+    flags$Review_status <- ifelse(flags$Position %in% reviewed, "Reviewed", "Active")
+  } else {
+    flags$Review_status <- character()
+  }
+  flags
+}
+
 high_confidence_autocorrections <- function(result, settings = NULL) {
   flags <- ambiguous_peak_flags(result, scope = "trimmed", params = ambiguous_peak_params_from_settings(settings))
   if (!nrow(flags)) return(flags[0, , drop = FALSE])
@@ -1180,6 +1247,65 @@ make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags 
     displaylogo = FALSE,
     modeBarButtonsToRemove = c("select2d", "lasso2d")
   )
+}
+
+# Fast, non-interactive local preview for the guided manual review modal.
+# The full QC chromatogram below remains the interactive Plotly plot. Building
+# and mounting a second Plotly widget for each reviewed base was costly, even
+# when only nine bases were visible; draw the same raw A/C/G/T signal with R's
+# lightweight graphics device instead. This function never alters base calls.
+draw_chromatogram_focus_fast <- function(result, raw_position, window = 4L) {
+  empty <- function(note = "Local chromatogram unavailable") {
+    graphics::plot.new()
+    graphics::title(main = note, cex.main = 0.9)
+    invisible(FALSE)
+  }
+  pos <- suppressWarnings(as.integer(raw_position)[1])
+  if (!is.list(result) || !length(pos) || !is.finite(pos)) return(empty())
+  trace <- result$trace
+  peak_pos <- suppressWarnings(as.integer(result$peak_pos))
+  cmap <- result$channel_map
+  n <- length(peak_pos)
+  if (is.null(trace) || length(dim(trace)) != 2L || !nrow(trace) ||
+      n < 2L || is.null(cmap) || pos < 1L || pos > n) return(empty())
+  cols <- suppressWarnings(as.integer(cmap[c("A", "C", "G", "T")]))
+  if (length(cols) != 4L || any(!is.finite(cols)) ||
+      any(cols < 1L | cols > ncol(trace))) return(empty())
+
+  half <- max(1L, as.integer(window)[1])
+  left <- max(1L, pos - half)
+  right <- min(n, pos + half)
+  valid <- which(is.finite(peak_pos) & peak_pos >= 1 & peak_pos <= nrow(trace))
+  local <- valid[valid >= left & valid <= right]
+  if (!length(local)) return(empty("No local trace peaks"))
+  trace_idx <- seq.int(max(1L, min(peak_pos[local]) - 4L),
+                       min(nrow(trace), max(peak_pos[local]) + 4L))
+  x <- trace_to_base_x(peak_pos, trace_idx)
+  values <- trace[trace_idx, cols, drop = FALSE]
+  ymax <- suppressWarnings(max(values, na.rm = TRUE))
+  if (!is.finite(ymax) || ymax <= 0) ymax <- 1
+  palette <- c(A = "#2ca02c", C = "#1f77b4", G = "#111111", T = "#d62728")
+  old_par <- graphics::par(no.readonly = TRUE)
+  on.exit(graphics::par(old_par), add = TRUE)
+  graphics::par(mar = c(4.0, 4.2, 2.9, 1.1))
+  graphics::plot(x, values[, 1L], type = "l", col = palette[["A"]],
+                 lwd = 1.5, xaxt = "n", xlab = "Base position",
+                 ylab = "Signal", main = paste0("Local view | ", pos, " +/- ", half, " bases"),
+                 xlim = c(left - 0.35, right + 0.35),
+                 ylim = c(0, ymax * 1.27), cex.main = 0.95)
+  for (j in 2:4) graphics::lines(x, values[, j], col = palette[j], lwd = 1.5)
+  graphics::axis(1, at = seq.int(left, right), labels = seq.int(left, right), cex.axis = 0.87)
+  graphics::abline(v = pos, col = "#94a3b8", lty = 2, lwd = 1.2)
+  bases <- curated_raw_calls(result)
+  labels <- bases[seq.int(left, right)]
+  label_colors <- ifelse(seq.int(left, right) == pos, "#b91c1c", "#334155")
+  label_colors[labels %in% c("N", "B", "D", "H", "V", "R", "Y", "S", "W", "K", "M")] <- "#7c3aed"
+  graphics::text(seq.int(left, right), rep(ymax * 1.09, right - left + 1L),
+                 labels = labels, col = label_colors, cex = 0.92)
+  graphics::legend("top", legend = names(palette), col = palette,
+                   lty = 1, lwd = 1.5, horiz = TRUE, bty = "n",
+                   inset = c(0, -0.01), cex = 0.81)
+  invisible(TRUE)
 }
 
 # Local chromatogram around one raw base position. Builds ONLY the visible

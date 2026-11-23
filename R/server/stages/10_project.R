@@ -150,7 +150,9 @@
     new_seq <- if (!is.null(new_result$seq)) as.character(new_result$seq) else ""
 
     rv$results[[sample_name]] <- new_result
-    sync_summary_from_results()
+    # Curation already rebuilt this read; do not rebuild and publish every
+    # unrelated sample's full trace/summary on every click.
+    sync_summary_from_results(sample_ids = sample_name)
 
     if (identical(input$inspect_sample, sample_name)) {
       updateTextAreaInput(session, "trimmed_sequence_preview", value = new_seq)
@@ -187,7 +189,7 @@
       # performs per-analysis-sequence comparison and invalidates only records
       # whose emitted analysis sequence actually changed.
       rebuild_ok <- tryCatch(
-        isTRUE(build_analysis_sequences(notify = FALSE)),
+        isTRUE(build_analysis_sequences(notify = FALSE, changed_source = sample_name)),
         error = function(e) {
           rv$project_status_text <- paste0(
             "Sequence changed, but analysis sequence rebuild failed: ",

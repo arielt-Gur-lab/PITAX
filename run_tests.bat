@@ -54,6 +54,16 @@ echo [3/22] Manual curation / undo-redo smoke tests
 if errorlevel 1 goto :failed
 
 echo.
+echo [2e/22] Manual IUPAC M/V ambiguity and focused QC plot
+"%RDIR%\bin\Rscript.exe" "tests\unit\iupac_guided_review_smoke.R"
+if errorlevel 1 goto :failed
+
+echo.
+echo [2f/22] 50-read incremental consensus update
+"%RDIR%\bin\Rscript.exe" "tests\unit\incremental_consensus_smoke.R"
+if errorlevel 1 goto :failed
+
+echo.
 echo [3a/22] Reopen guided peak review on repeated row clicks
 "%RDIR%\bin\Rscript.exe" "tests\contracts\peak_review_reopen_contract_smoke.R"
 if errorlevel 1 goto :failed
