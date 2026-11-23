@@ -21,6 +21,11 @@ jobs:
         run: Rscript -e 'install.packages(c("zip", "jsonlite"))'
       - name: Parse all R sources
         run: Rscript tests/preflight/parse_all_r_sources.R
+      - name: Exercise N-call evidence and compact BLAST status
+        run: |
+          Rscript tests/unit/n_call_evidence_smoke.R
+          Rscript tests/unit/blast_batch_summary_smoke.R
+          Rscript tests/unit/qc_n_trim_window_smoke.R
       - name: Exercise FASTA and empty-table exports with 18 records
         run: Rscript tests/preflight/export_writer_base_smoke.R
       - name: Structured header profile model smoke

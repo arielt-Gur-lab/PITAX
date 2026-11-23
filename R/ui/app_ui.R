@@ -268,7 +268,7 @@ ui <- fluidPage(
           )
         ),
         div(class = "panel-box peak-review-card",
-          card_title("Ambiguous peak review", "Flags identify channel competition or locally non-dominant calls. Click a row, a chromatogram marker, or Review next to open the guided local-review panel.", "flag"),
+          card_title("Ambiguous peak review", "N calls: see original basecaller quality, strongest dye channel, top/next signal ratio and local peak separation. These are review hints, not automatic base calls. Click a flag to inspect and correct manually.", "flag"),
           div(class = "curation-toolbar",
             radioButtons(
               "peak_flag_scope", "Positions",

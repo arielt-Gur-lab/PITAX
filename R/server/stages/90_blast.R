@@ -565,8 +565,6 @@
     ready <- 0L; waiting <- 0L; too_soon <- 0L; failed <- 0L; no_hits <- 0L; stale <- 0L
     batch_started <- Sys.time()
     n_jobs <- length(selected_rows)
-    detail_notes <- character()
-
     withProgress(message = paste0("Retrieving ", n_jobs, " selected NCBI BLAST job(s)"), value = 0, {
       for (k in seq_along(selected_rows)) {
         idx <- selected_rows[k]
@@ -586,24 +584,8 @@
         }
 
         if (ans$status == "READY") ready <- ready + 1L
-        else if (ans$status %in% c("WAITING")) {
-          waiting <- waiting + 1L
-          if (isTRUE(rv$blast_jobs$manual_retrieval_required[idx])) {
-            detail_notes <- c(
-              detail_notes,
-              paste0(
-                "NCBI status: SEARCHING | Result is not ready yet. | Last checked: ",
-                rv$blast_jobs$last_checked_at[idx], " | RID: ", rid
-              )
-            )
-          } else {
-            detail_notes <- c(detail_notes, ans$message)
-          }
-        }
-        else if (ans$status == "TOO_SOON") {
-          too_soon <- too_soon + 1L
-          detail_notes <- c(detail_notes, ans$message)
-        }
+        else if (ans$status == "WAITING") waiting <- waiting + 1L
+        else if (ans$status == "TOO_SOON") too_soon <- too_soon + 1L
         else if (ans$status == "NO_HITS") no_hits <- no_hits + 1L
         else if (ans$status == "STALE") stale <- stale + 1L
         else failed <- failed + 1L
@@ -615,16 +597,10 @@
     })
 
     elapsed_txt <- format_elapsed_seconds(difftime(Sys.time(), batch_started, units = "secs"))
-    rv$blast_batch_status_text <- paste0(
-      "Selected retrieval | jobs: ", n_jobs,
-      " | ready: ", ready,
-      " | still running: ", waiting,
-      " | too soon to poll: ", too_soon,
-      " | no parsed hits: ", no_hits,
-      " | stale: ", stale,
-      " | failed: ", failed,
-      " | elapsed ", elapsed_txt,
-      if (length(detail_notes)) paste0(" | ", paste(unique(detail_notes), collapse = " || ")) else ""
+    rv$blast_batch_status_text <- blast_batch_summary_text(
+      "Selected retrieval", ready = ready, waiting = waiting,
+      too_soon = too_soon, no_hits = no_hits, stale = stale, failed = failed,
+      elapsed = elapsed_txt
     )
     showNotification(rv$blast_batch_status_text, type=if(failed) "warning" else "message", duration=10)
   })
@@ -643,7 +619,6 @@
     ready <- 0L; waiting <- 0L; too_soon <- 0L; failed <- 0L; no_hits <- 0L; stale <- 0L
     batch_started <- Sys.time()
     n_jobs <- length(latest_indices)
-    detail_notes <- character()
     rv$blast_batch_status_text <- paste0(
       "Checking ", n_jobs, " BLAST job(s)... | elapsed ", format_elapsed_seconds(0)
     )
@@ -672,10 +647,7 @@
           apply_blast_job_updates(idx, blast_disable_auto_poll_fields())
         }
         if (ans$status == "READY") ready <- ready + 1L
-        else if (ans$status == "WAITING") {
-          waiting <- waiting + 1L
-          detail_notes <- c(detail_notes, ans$message)
-        }
+        else if (ans$status == "WAITING") waiting <- waiting + 1L
         else if (ans$status == "TOO_SOON") too_soon <- too_soon + 1L
         else if (ans$status == "NO_HITS") no_hits <- no_hits + 1L
         else if (ans$status == "STALE") stale <- stale + 1L
@@ -688,21 +660,64 @@
     })
 
     elapsed_txt <- format_elapsed_seconds(difftime(Sys.time(), batch_started, units = "secs"))
-    rv$blast_batch_status_text <- paste0(
-      "Batch retrieval | ready: ", ready,
-      " | still running: ", waiting,
-      " | too soon to poll: ", too_soon,
-      " | no parsed hits: ", no_hits,
-      " | stale: ", stale,
-      " | failed: ", failed,
-      " | elapsed ", elapsed_txt,
-      if (length(detail_notes)) paste0(" | ", paste(unique(detail_notes), collapse = " || ")) else ""
+    rv$blast_batch_status_text <- blast_batch_summary_text(
+      "Batch retrieval", ready = ready, waiting = waiting,
+      too_soon = too_soon, no_hits = no_hits, stale = stale, failed = failed,
+      elapsed = elapsed_txt
     )
     showNotification(rv$blast_batch_status_text, type=if(failed) "warning" else "message", duration=10)
   })
 
+  # Current latest jobs only: historical RIDs remain in the main BLAST jobs
+  # table, but must not inflate the count of active waiting sequences.
+  blast_pending_jobs <- function() {
+    jobs <- rv$blast_jobs
+    if (!is.data.frame(jobs) || !nrow(jobs)) return(data.frame())
+    latest <- !duplicated(as.character(jobs$original_name), fromLast = TRUE)
+    current <- jobs[latest, , drop = FALSE]
+    current[current$status %in% c("WAITING", "SUBMITTED"), , drop = FALSE]
+  }
+
   output$blast_batch_status <- renderUI({
-    div(class="tax-note", strong("Batch status: "), rv$blast_batch_status_text)
+    pending <- blast_pending_jobs()
+    waiting_count <- nrow(pending)
+    pending_ui <- if (waiting_count > 0L) {
+      cols <- c("Sequence", "Status", "RID", "Elapsed", "Last checked")
+      rows <- lapply(seq_len(waiting_count), function(i) {
+        j <- pending[i, , drop = FALSE]
+        values <- c(
+          as.character(j$final_name[1]),
+          as.character(j$status[1]),
+          as.character(j$rid[1]),
+          format_elapsed_seconds(blast_elapsed_since(j$submitted_at[1])),
+          as.character(j$last_checked_at[1])
+        )
+        tags$tr(lapply(values, tags$td))
+      })
+      tags$details(
+        class = "blast-pending-details",
+        style = "margin-top:8px",
+        tags$summary(paste0(waiting_count, " BLAST job(s) pending - show RID details")),
+        tags$p(
+          class = "compact-hint",
+          "WAITING means NCBI has not finished; it is not a failure. RTOE is an initial estimate, not a completion deadline. Check again later without resubmitting the same sequence."
+        ),
+        tags$div(
+          style = "overflow-x:auto; max-height:300px; overflow-y:auto",
+          tags$table(
+            class = "table table-striped table-condensed",
+            tags$thead(tags$tr(lapply(cols, tags$th))),
+            tags$tbody(rows)
+          )
+        )
+      )
+    } else NULL
+    div(
+      class = "tax-note",
+      tags$strong("Batch status: "),
+      tags$span(rv$blast_batch_status_text),
+      pending_ui
+    )
   })
 
   # PITAX auto-poll observer (NCBI): separate from status-card UI invalidateLater.

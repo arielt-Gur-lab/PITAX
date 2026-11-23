@@ -254,9 +254,9 @@
     } else {
       "N"
     }
-    if (identical(call, "N") && length(comp_candidates) && comp_candidates[1] %in% c("A", "C", "G", "T")) {
-      selected <- comp_candidates[1]
-    }
+    # Keep N selected during an unresolved-call review: a dominant channel is
+    # evidence to inspect, not consent to overwrite an AB1 base call.
+    if (identical(call, "N")) selected <- "N"
     list(choices = stats::setNames(bases, labels), selected = selected, call = call, pair_code = {
       if (call %in% c("A", "C", "G", "T") && length(comp_candidates) && comp_candidates[1] %in% c("A", "C", "G", "T") &&
           comp_candidates[1] != call) iupac_for_pair(call, comp_candidates[1]) else NA_character_
@@ -290,10 +290,14 @@
       ))
     }
     show <- df[, c("Position", "Call", "Competing_channel", "Peak_ratio", "Competitor_percent",
-                   "Competitor_peak_offset", "Severity", "Flag", "Auto_correct_candidate", "Review_status"), drop = FALSE]
+                   "Competitor_peak_offset", "Basecaller_quality", "Top_channel",
+                   "Top_to_second_ratio", "Peak_prominence_percent", "Peak_separation",
+                   "Review_hint", "Severity", "Flag", "Auto_correct_candidate", "Review_status"), drop = FALSE]
     show$Auto_correct_candidate <- ifelse(show$Auto_correct_candidate %in% TRUE, "Yes", "")
     names(show) <- c("Position", "Call", "Competing channel", "Peak ratio", "Competitor / called (%)",
-                     "Peak offset", "Severity", "Flag", "Auto", "Status")
+                     "Peak offset", "Basecaller Q (N)", "Top channel (N)",
+                     "Top / next (N)", "Peak prominence % (N)", "Peak shape (N)",
+                     "N review note", "Severity", "Flag", "Auto", "Status")
     datatable(
       show,
       rownames = FALSE,
@@ -307,7 +311,7 @@
           Shiny.setInputValue('peak_flag_context', {position: row[0], nonce: Math.random()}, {priority: 'event'});
         });
       "),
-      options = list(pageLength = 10, lengthChange = FALSE, scrollX = FALSE, autoWidth = TRUE, dom = "tip", order = list(list(0, "asc")))
+      options = list(pageLength = 10, lengthChange = FALSE, scrollX = TRUE, autoWidth = TRUE, dom = "tip", order = list(list(0, "asc")))
     )
   })
 
@@ -360,6 +364,16 @@
           metric("Called signal", as.character(flag_row$Called_signal[1])),
           metric("Competitor signal", as.character(flag_row$Competitor_signal[1])),
           metric("Peak offset", offset),
+          if (identical(toupper(call), "N")) tagList(
+            metric("Dominant channel (not a call)", as.character(flag_row$Top_channel[1])),
+            metric("Top / next at peak", as.character(round(flag_row$Top_to_second_ratio[1], 2))),
+            metric("Original basecaller Q", if (is.finite(flag_row$Basecaller_quality[1]))
+                   as.character(round(flag_row$Basecaller_quality[1], 1)) else "Unavailable"),
+            metric("Peak prominence", if (is.finite(flag_row$Peak_prominence_percent[1]))
+                   paste0(flag_row$Peak_prominence_percent[1], "%") else "Unavailable"),
+            metric("Peak separation", as.character(flag_row$Peak_separation[1])),
+            div(class = "compact-hint", as.character(flag_row$Review_hint[1]))
+          ) else NULL,
           metric("Flag", as.character(flag_row$Flag[1])),
           metric("Status", as.character(flag_row$Review_status[1])))
     )
