@@ -244,11 +244,12 @@
     # Quick single-base choices stay accessible in one click. A previous
     # ambiguity edit is shown as the current call and selected separately
     # below, never silently replaced with N or an inferred top dye channel.
-    bases <- c("A", "C", "G", "T", "N")
+    bases <- unique(c("A", "C", "G", "T", "N",
+                      if (call %in% pitax_iupac_call_codes()) call else character()))
     labels <- vapply(bases, function(b) {
       if (identical(b, call)) paste0(b, " (current)") else b
     }, character(1))
-    selected <- if (call %in% bases) call else character(0)
+    selected <- if (call %in% bases) call else "N"
     list(choices = stats::setNames(bases, labels), selected = selected, call = call, pair_code = {
       if (call %in% c("A", "C", "G", "T") && length(comp_candidates) && comp_candidates[1] %in% c("A", "C", "G", "T") &&
           comp_candidates[1] != call) iupac_for_pair(call, comp_candidates[1]) else NA_character_
@@ -656,8 +657,8 @@
   observeEvent(input$peak_review_change, {
     req(rv$context_peak_flag, input$manual_base_choice)
     choice <- as.character(input$manual_base_choice)[1]
-    if (!choice %in% c("A", "C", "G", "T", "N")) {
-      showNotification("Select A, C, G, T or N, or use Apply ambiguity for IUPAC codes.", type = "warning")
+    if (!choice %in% pitax_iupac_call_codes()) {
+      showNotification("Select a valid base or use Apply ambiguity for IUPAC codes.", type = "warning")
       return()
     }
     show_curation_confirmation("base", rv$context_peak_flag$Position[1], choice, advance = TRUE)
