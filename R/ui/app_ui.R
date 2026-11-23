@@ -217,6 +217,16 @@ ui <- fluidPage(
       tabPanel("Trim & QC", value = "qc",
 
         uiOutput("qc_summary_cards"),
+        div(class = "panel-box saved-retrim-card",
+          card_title("Re-trim saved project", "Reapply the current trimming algorithm to original base calls and traces already stored in this project. Reuses all saved Assay/Assign metadata and read names; no AB1 re-upload required.", "refresh"),
+          div(class = "curation-toolbar",
+            radioButtons("saved_retrim_scope", "Which saved reads?",
+              choices = c("All saved reads" = "all", "Selected read only" = "selected"),
+              selected = "all", inline = TRUE),
+            actionButton("open_saved_retrim", "Preview re-trim", icon = icon("refresh"), class = "btn-warning")
+          ),
+          div(class = "compact-hint", "Preview changes and confirm before applying. Existing manual base edits are preserved, but manual trim bounds reset to the new automatic boundaries. Changed analysis sequences require rebuilding; unrelated BLAST results are retained.")
+        ),
         div(class = "panel-box stage-table-card",
           card_title("Trimming results", "Run-level summary of automatic trimming for all uploaded chromatograms.", "table"),
           DTOutput("summary_table")

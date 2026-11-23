@@ -49,6 +49,11 @@
       return(FALSE)
     }
 
+    # Re-trim may have changed only a subset of reads. Keep previously
+    # reviewed/manual consensus records for entirely unchanged input pairs,
+    # instead of silently discarding their curation on Build / rebuild.
+    built <- stage3_reuse_unchanged_records(rv$consensus_set, built)
+
     old_records <- tryCatch(stage3_analysis_records(rv$consensus_set), error = function(e) list())
     new_records <- stage3_analysis_records(built)
 

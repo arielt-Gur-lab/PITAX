@@ -201,6 +201,8 @@
         actionButton("back_settings_from_rename", "Back to Assay", icon = icon("arrow-left")),
         export_btn,
         div(class = "stage-topbar-spacer"),
+        actionButton("open_saved_retrim_from_assign", "Re-trim saved project", icon = icon("refresh"),
+                     class = "btn-warning", title = "Use saved chromatograms and existing Assay/Assign metadata. No AB1 upload needed."),
         actionButton("run_trimming", "Start trimming", icon = icon("play"), class = "btn-primary")
       ),
       "qc" = tagList(

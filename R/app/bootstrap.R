@@ -22,6 +22,7 @@ pitax_source(file.path("R", "domain", "consensus", "stage3_consensus.R"), local 
 pitax_source(file.path("R", "domain", "multilocus", "stage4_multilocus.R"), local = TRUE)
 pitax_source(file.path("R", "domain", "sanger", "core_sanger.R"), local = TRUE)
 pitax_source(file.path("R", "domain", "sanger", "sequence_tools.R"), local = TRUE)
+pitax_source(file.path("R", "domain", "sanger", "retrim_saved.R"), local = TRUE)
 pitax_source(file.path("R", "export", "export_tools.R"), local = TRUE)
 pitax_source(file.path("R", "export", "catalog.R"), local = TRUE)
 pitax_source(file.path("R", "export", "snapshot.R"), local = TRUE)

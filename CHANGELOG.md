@@ -1,5 +1,31 @@
 # Changelog
 
+## 3.8.4 — Re-trim saved projects without AB1 re-upload
+
+- Add **Re-trim saved project** from Assign and **Preview re-trim** from
+  Trim & QC (all saved reads or only the selected read).
+- Apply the same automatic trim algorithm to the immutable original
+  calls/trace/peak positions and per-read trimming settings already
+  included in a saved .sangerproject. No new upload or repeat Assay/Assign
+  work. The read IDs, isolate/assay/locus/direction mapping, final names,
+  original AB1 evidence and manual base substitutions remain intact.
+- Show before/after bounds, lengths and which sequences would change,
+  with a separate confirmation step. A legacy project missing original
+  trace/positions/settings is blocked before any partial update.
+- New auto-trim boundaries replace previous manual trim bounds. Preserve
+  the previous summary, bounds and curated sequence in the read's
+  re-trim history; retain its curation audit while clearing obsolete
+  undo/redo snapshots for changed reads.
+- Preserve unaffected BLAST/taxonomy evidence. Flag only analysis records
+  dependent on changed source sequences as stale, requiring a Stage 3
+  rebuild. Never resubmit BLAST automatically. During rebuild, retain
+  previously reviewed consensus records (and their audit history) when
+  their source sequences, identities and algorithm settings are unchanged.
+- Add 50-read regression covering atomic processing, names/assignments,
+  manual base edits, idempotence and legacy error handling.
+- Project schema unchanged.
+
+
 ## 3.8.3 — N-call evidence and readable BLAST retrieval
 
 - For unresolved AB1 N calls, show the strongest dye channel, the ratio
