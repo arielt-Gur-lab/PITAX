@@ -146,15 +146,20 @@
          paste0("Expected amplicon: ", settings$expected_amplicon_len, " bp | Locus: ", settings$target))
   })
 
+  # One cache per Shiny session, covering only the currently inspected read.
+  # Review marks and audit revisions do not invalidate trace evidence; manual
+  # base edits/trim changes still force recalculation (and scientific review).
+  peak_flag_cache <- new.env(parent = emptyenv())
   all_current_peak_flags <- reactive({
     req(selected_result())
     scope <- if (!is.null(input$peak_flag_scope) && input$peak_flag_scope %in% c("trimmed", "raw")) input$peak_flag_scope else "trimmed"
-    df <- ambiguous_peak_flags(selected_result(), scope = scope, params = ambiguous_peak_params_from_settings(selected_processing_settings()))
-    if (!nrow(df)) return(df)
-    r <- ensure_curation_state(selected_result())
-    reviewed <- as.integer(r$curation$reviewed_positions)
-    df$Review_status <- ifelse(df$Position %in% reviewed, "Reviewed", "Active")
-    df
+    pitax_cached_peak_flags(
+      peak_flag_cache,
+      sample_id = selected_sample_key(),
+      result = selected_result(),
+      scope = scope,
+      params = ambiguous_peak_params_from_settings(selected_processing_settings())
+    )
   })
 
   current_peak_flags <- reactive({
