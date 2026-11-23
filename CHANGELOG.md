@@ -1,5 +1,30 @@
 # Changelog
 
+## 3.8.6 — Full manual IUPAC ambiguity + faster guided QC editing
+
+- **Guided peak review:** Preserve quick A/C/G/T/N choices and expose the
+  complete **IUPAC DNA ambiguity alphabet** as a separate operator-controlled
+  dropdown, including M=A/C and V=A/C/G (also R/Y/S/W/K/B/D/H). Require
+  explicit selection and confirmation; never infer a mixed call solely from
+  dye dominance. Existing N calls remain N unless explicitly edited.
+- Accept all valid IUPAC codes in manual base-curation, persist them in
+  the project, render the resulting letters on chromatograms, preserve
+  edit audit/history and output them through the Stage 3/FASTA paths.
+- **Performance:** Replace the non-interactive 9-base guided preview Plotly
+  with a light static raw-trace preview (the main full-read Plotly remains
+  interactive). Suspend expensive main Plotly redraws while reviewing and
+  refresh once upon leaving the guided editor.
+- Update only the changed read's QC summary on curation rather than
+  rebuilding all stored chromatograms. Incrementally rebuild the affected
+  Stage 3 analysis group (one simple read or one Forward/Reverse pair)
+  instead of re-aligning all the other reads. Fall back to full rebuild
+  when stored architecture, assignments or consensus settings differ.
+- Retain unrelated manually curated consensus records and preserve the
+  existing per-analysis-sequence BLAST/taxonomy invalidation behavior.
+- New unit tests cover M/V and all IUPAC codes, persistence, undo, lightweight
+  plot, 50-read incremental rebuild, paired-read updates and safety fallbacks.
+  No project schema migration required.
+
 ## 3.8.5 — Guided peak-review modal reopening fix
 
 - Fix an ambiguous-peak row that could be opened only once after Close:
