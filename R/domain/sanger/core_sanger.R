@@ -610,111 +610,9 @@ find_collapse <- function(
 # Trim one AB1
 # ============================================================
 
-trim_one_ab1 <- function(
-    file,
-    sample_id,
-    settings
-) {
-  
-  s <- readsangerseq(
-    file
-  )
-  
-  
-  seq_string <- toupper(
-    as.character(
-      s@primarySeq
-    )
-  )
-  
-  
-  seq_string <- gsub(
-    "[^ACGTN]",
-    "N",
-    seq_string
-  )
-  
-  
-  trace <- as.matrix(
-    s@traceMatrix
-  )
-  
-  
-  peak_pos <- as.integer(
-    s@peakPosMatrix[
-      ,
-      1
-    ]
-  )
-  
-  
-  if (
-    length(peak_pos) !=
-    nchar(seq_string)
-  ) {
-    
-    stop(
-      sample_id,
-      ": primarySeq length and peakPosMatrix rows do not match."
-    )
-  }
-  
-  
-  inferred <- infer_channel_map(
-    
-    seq_string =
-      seq_string,
-    
-    trace =
-      trace,
-    
-    peak_pos =
-      peak_pos,
-    
-    max_index =
-      settings$absolute_max_base_index
-  )
-
-
-  # Stage 1 / PITAX 3.0: capture ABIF primary-call positions, PCON quality and canonical A/C/G/T
-  # trace evidence in parallel with the established v2 processing path. This
-  # is observational only in 3.0.0-alpha.6; trim/QC decisions below still use
-  # the legacy metrics.
-  ab1_evidence <- tryCatch(
-    build_ab1_evidence(
-      sanger_object = s,
-      seq_string = seq_string,
-      trace = trace,
-      legacy_peak_pos = peak_pos,
-      legacy_channel_map = inferred$map,
-      abif_object = tryCatch(read.abif(file), error = function(e) NULL)
-    ),
-    error = function(e) list(
-      schema = "ab1-evidence-audit-v2",
-      mode = "observational-only",
-      error = conditionMessage(e),
-      detail = data.frame(),
-      summary = data.frame()
-    )
-  )
-  
-  
-  metrics <- calculate_metrics(
-    
-    seq_string =
-      seq_string,
-    
-    trace =
-      trace,
-    
-    peak_pos =
-      peak_pos,
-    
-    channel_map =
-      inferred$map
-  )
-  
-  
+# Shared automatic-trim policy for fresh AB1 and retrim of stored trace data.
+# No base calls are inferred or changed here.
+pitax_trim_decision <- function(seq_string, metrics, settings) {
   start_index <- find_start(
     
     metrics =
@@ -944,6 +842,135 @@ trim_one_ab1 <- function(
     }
   
   
+  list(
+    start_index = start_index,
+    end_index = end_index,
+    collapse_index = collapse_index,
+    trimmed_seq = trimmed_seq,
+    trimmed_length = trimmed_length,
+    mean_signal = mean_signal,
+    median_ratio = median_ratio,
+    status = status,
+    reason = reason
+  )
+}
+
+trim_one_ab1 <- function(
+    file,
+    sample_id,
+    settings
+) {
+  
+  s <- readsangerseq(
+    file
+  )
+  
+  
+  seq_string <- toupper(
+    as.character(
+      s@primarySeq
+    )
+  )
+  
+  
+  seq_string <- gsub(
+    "[^ACGTN]",
+    "N",
+    seq_string
+  )
+  
+  
+  trace <- as.matrix(
+    s@traceMatrix
+  )
+  
+  
+  peak_pos <- as.integer(
+    s@peakPosMatrix[
+      ,
+      1
+    ]
+  )
+  
+  
+  if (
+    length(peak_pos) !=
+    nchar(seq_string)
+  ) {
+    
+    stop(
+      sample_id,
+      ": primarySeq length and peakPosMatrix rows do not match."
+    )
+  }
+  
+  
+  inferred <- infer_channel_map(
+    
+    seq_string =
+      seq_string,
+    
+    trace =
+      trace,
+    
+    peak_pos =
+      peak_pos,
+    
+    max_index =
+      settings$absolute_max_base_index
+  )
+
+
+  # Stage 1 / PITAX 3.0: capture ABIF primary-call positions, PCON quality and canonical A/C/G/T
+  # trace evidence in parallel with the established v2 processing path. This
+  # is observational only in 3.0.0-alpha.6; trim/QC decisions below still use
+  # the legacy metrics.
+  ab1_evidence <- tryCatch(
+    build_ab1_evidence(
+      sanger_object = s,
+      seq_string = seq_string,
+      trace = trace,
+      legacy_peak_pos = peak_pos,
+      legacy_channel_map = inferred$map,
+      abif_object = tryCatch(read.abif(file), error = function(e) NULL)
+    ),
+    error = function(e) list(
+      schema = "ab1-evidence-audit-v2",
+      mode = "observational-only",
+      error = conditionMessage(e),
+      detail = data.frame(),
+      summary = data.frame()
+    )
+  )
+  
+  
+  metrics <- calculate_metrics(
+    
+    seq_string =
+      seq_string,
+    
+    trace =
+      trace,
+    
+    peak_pos =
+      peak_pos,
+    
+    channel_map =
+      inferred$map
+  )
+  
+  
+  trim <- pitax_trim_decision(seq_string, metrics, settings)
+  start_index <- trim$start_index
+  end_index <- trim$end_index
+  collapse_index <- trim$collapse_index
+  trimmed_seq <- trim$trimmed_seq
+  trimmed_length <- trim$trimmed_length
+  mean_signal <- trim$mean_signal
+  median_ratio <- trim$median_ratio
+  status <- trim$status
+  reason <- trim$reason
+
   summary <- data.frame(
     
     sample_id =
