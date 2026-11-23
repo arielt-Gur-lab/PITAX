@@ -80,6 +80,30 @@ grDevices::dev.off()
 stopifnot(isTRUE(plotted), file.exists(plot_path), file.info(plot_path)$size > 1000L)
 unlink(plot_path)
 
+# Repeated "mark reviewed" must NOT re-run expensive N peak metrics.
+# A true base edit or trim change must invalidate the cached evidence.
+peak_cache <- new.env(parent = emptyenv())
+cached_1 <- pitax_cached_peak_flags(peak_cache, "FB001", result, scope = "raw")
+stopifnot(peak_cache$compute_count == 1L)
+result_reviewed <- result
+result_reviewed$curation$reviewed_positions <- c(4L)
+cached_2 <- pitax_cached_peak_flags(peak_cache, "FB001", result_reviewed, scope = "raw")
+stopifnot(peak_cache$compute_count == 1L)
+if (nrow(cached_2)) {
+  stopifnot(any(cached_2$Position == 4L))
+  stopifnot(all(cached_2$Review_status[cached_2$Position == 4L] == "Reviewed"))
+}
+changed_base <- result_reviewed
+changed_base$curation$base_edits <- curation_set_base_snapshot(changed_base, 4L, "M")$base_edits
+pitax_cached_peak_flags(peak_cache, "FB001", changed_base, scope = "raw")
+stopifnot(peak_cache$compute_count == 2L)
+changed_window <- changed_base
+changed_window$summary$trim_start <- 2L
+pitax_cached_peak_flags(peak_cache, "FB001", changed_window, scope = "raw")
+stopifnot(peak_cache$compute_count == 3L)
+pitax_cached_peak_flags(peak_cache, "DIFFERENT_READ", changed_window, scope = "raw")
+stopifnot(peak_cache$compute_count == 4L)
+
 # Production server wiring: the ambiguity dropdown must reach a dedicated
 # explicit-operator event and its confirmation must accept full IUPAC codes.
 server_code <- paste(readLines(file.path(root, "R", "server", "stages", "50_evidence_review.R"),
