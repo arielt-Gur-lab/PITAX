@@ -44,6 +44,11 @@ echo [2c/22] N-call evidence and peak-separation tests
 if errorlevel 1 goto :failed
 
 echo.
+echo [2d/22] Saved-project re-trim (50 reads; no re-upload)
+"%RDIR%\bin\Rscript.exe" "tests\unit\saved_project_retrim_smoke.R"
+if errorlevel 1 goto :failed
+
+echo.
 echo [3/22] Manual curation / undo-redo smoke tests
 "%RDIR%\bin\Rscript.exe" "tests\unit\manual_curation_smoke.R"
 if errorlevel 1 goto :failed
