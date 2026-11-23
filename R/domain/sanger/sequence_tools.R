@@ -1210,6 +1210,65 @@ make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags 
   )
 }
 
+# Fast, non-interactive local preview for the guided manual review modal.
+# The full QC chromatogram below remains the interactive Plotly plot. Building
+# and mounting a second Plotly widget for each reviewed base was costly, even
+# when only nine bases were visible; draw the same raw A/C/G/T signal with R's
+# lightweight graphics device instead. This function never alters base calls.
+draw_chromatogram_focus_fast <- function(result, raw_position, window = 4L) {
+  empty <- function(note = "Local chromatogram unavailable") {
+    graphics::plot.new()
+    graphics::title(main = note, cex.main = 0.9)
+    invisible(FALSE)
+  }
+  pos <- suppressWarnings(as.integer(raw_position)[1])
+  if (!is.list(result) || !length(pos) || !is.finite(pos)) return(empty())
+  trace <- result$trace
+  peak_pos <- suppressWarnings(as.integer(result$peak_pos))
+  cmap <- result$channel_map
+  n <- length(peak_pos)
+  if (is.null(trace) || length(dim(trace)) != 2L || !nrow(trace) ||
+      n < 2L || is.null(cmap) || pos < 1L || pos > n) return(empty())
+  cols <- suppressWarnings(as.integer(cmap[c("A", "C", "G", "T")]))
+  if (length(cols) != 4L || any(!is.finite(cols)) ||
+      any(cols < 1L | cols > ncol(trace))) return(empty())
+
+  half <- max(1L, as.integer(window)[1])
+  left <- max(1L, pos - half)
+  right <- min(n, pos + half)
+  valid <- which(is.finite(peak_pos) & peak_pos >= 1 & peak_pos <= nrow(trace))
+  local <- valid[valid >= left & valid <= right]
+  if (!length(local)) return(empty("No local trace peaks"))
+  trace_idx <- seq.int(max(1L, min(peak_pos[local]) - 4L),
+                       min(nrow(trace), max(peak_pos[local]) + 4L))
+  x <- trace_to_base_x(peak_pos, trace_idx)
+  values <- trace[trace_idx, cols, drop = FALSE]
+  ymax <- suppressWarnings(max(values, na.rm = TRUE))
+  if (!is.finite(ymax) || ymax <= 0) ymax <- 1
+  palette <- c(A = "#2ca02c", C = "#1f77b4", G = "#111111", T = "#d62728")
+  old_par <- graphics::par(no.readonly = TRUE)
+  on.exit(graphics::par(old_par), add = TRUE)
+  graphics::par(mar = c(4.0, 4.2, 2.9, 1.1))
+  graphics::plot(x, values[, 1L], type = "l", col = palette[["A"]],
+                 lwd = 1.5, xaxt = "n", xlab = "Base position",
+                 ylab = "Signal", main = paste0("Local view | ", pos, " +/- ", half, " bases"),
+                 xlim = c(left - 0.35, right + 0.35),
+                 ylim = c(0, ymax * 1.27), cex.main = 0.95)
+  for (j in 2:4) graphics::lines(x, values[, j], col = palette[j], lwd = 1.5)
+  graphics::axis(1, at = seq.int(left, right), labels = seq.int(left, right), cex.axis = 0.87)
+  graphics::abline(v = pos, col = "#94a3b8", lty = 2, lwd = 1.2)
+  bases <- curated_raw_calls(result)
+  labels <- bases[seq.int(left, right)]
+  label_colors <- ifelse(seq.int(left, right) == pos, "#b91c1c", "#334155")
+  label_colors[labels %in% c("N", "B", "D", "H", "V", "R", "Y", "S", "W", "K", "M")] <- "#7c3aed"
+  graphics::text(seq.int(left, right), rep(ymax * 1.09, right - left + 1L),
+                 labels = labels, col = label_colors, cex = 0.92)
+  graphics::legend("top", legend = names(palette), col = palette,
+                   lty = 1, lwd = 1.5, horiz = TRUE, bty = "n",
+                   inset = c(0, -0.01), cex = 0.81)
+  invisible(TRUE)
+}
+
 # Local chromatogram around one raw base position. Builds ONLY the visible
 # window (not the full read) so guided QC review stays responsive.
 # QC guided review uses ~4 bases each side; consensus conflict review keeps a wider view.
