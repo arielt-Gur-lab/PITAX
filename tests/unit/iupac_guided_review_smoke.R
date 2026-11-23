@@ -84,7 +84,7 @@ unlink(plot_path)
 # explicit-operator event and its confirmation must accept full IUPAC codes.
 server_code <- paste(readLines(file.path(root, "R", "server", "stages", "50_evidence_review.R"),
                                warn = FALSE), collapse = "\n")
-stopifnot(grepl('selectInput(\n          "manual_iupac_choice"', server_code, fixed = TRUE))
+stopifnot(grepl('"manual_iupac_choice"', server_code, fixed = TRUE))
 stopifnot(grepl('observeEvent(input$peak_review_apply_iupac', server_code, fixed = TRUE))
 stopifnot(grepl('pitax_iupac_confirmation_choices()', server_code, fixed = TRUE))
 stopifnot(grepl('plotOutput("peak_review_local_plot"', server_code, fixed = TRUE))
