@@ -34,6 +34,11 @@ echo [2/22] QC ambiguous-peak smoke tests
 if errorlevel 1 goto :failed
 
 echo.
+echo [2b/22] N-rich trim-window regression tests
+"%RDIR%\bin\Rscript.exe" "tests\unit\qc_n_trim_window_smoke.R"
+if errorlevel 1 goto :failed
+
+echo.
 echo [3/22] Manual curation / undo-redo smoke tests
 "%RDIR%\bin\Rscript.exe" "tests\unit\manual_curation_smoke.R"
 if errorlevel 1 goto :failed

@@ -408,9 +408,16 @@ find_start <- function(
     min_peak_ratio
 ) {
   
+  # Every base in the window must count toward its denominator. Unresolved
+  # AB1 calls (N) have NA peak metrics: treating them as missing with
+  # mean(..., na.rm = TRUE) previously made an N-heavy window look 100% good
+  # when only one or two called bases had usable signals.
   good <-
+    !is.na(metrics$peak_ratio) &
+    !is.na(metrics$called_signal) &
     metrics$peak_ratio >= min_peak_ratio &
     metrics$called_signal > 0
+  good[is.na(good)] <- FALSE
   
   
   n <- length(good)
@@ -433,10 +440,7 @@ find_start <- function(
       i:(i + window - 1)
     
     
-    good_fraction <- mean(
-      good[idx],
-      na.rm = TRUE
-    )
+    good_fraction <- mean(good[idx])
     
     
     if (
