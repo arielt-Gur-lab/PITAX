@@ -517,6 +517,7 @@
     # delayed dismissal from an older shell if a fresh click already reopened.
     generation <- suppressWarnings(as.integer(input$peak_review_modal_dismissed$generation[1]))
     if (!length(generation) || !is.finite(generation) ||
+        !isTRUE(isolate(rv$peak_review_shell_open)) ||
         !identical(generation, isolate(as.integer(rv$peak_review_shell_generation)))) return()
     rv$peak_review_open <- FALSE
     rv$peak_review_shell_open <- FALSE
