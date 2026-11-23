@@ -3,7 +3,7 @@
     files <- input$ab1_files
     if (is.null(files) || !is.data.frame(files) || !nrow(files)) {
       showNotification(
-        "Upload at least one AB1 file and complete Assign before starting trimming.",
+        if (length(rv$results)) "No newly uploaded AB1 files. Use Re-trim saved reads to re-run trimming without uploading or assigning again." else "Upload at least one AB1 file and complete Assign before starting trimming.",
         type = "warning",
         duration = 8
       )
@@ -89,6 +89,140 @@
     session$sendCustomMessage("showLoader", list(text = "Opening Trim & QC workspace..."))
     updateTabsetPanel(session,"pipeline_step",selected="qc")
   })
+
+  # Re-trim from immutable raw trace data embedded in a saved project.
+  # Unlike Start trimming, this does NOT use input$ab1_files and never calls
+  # collect_assignment_editor() or sync_assignment_state() (which can replace
+  # saved Final_Name values with defaults after a project load).
+  saved_retrim_preview <- reactiveVal(NULL)
+
+  open_saved_retrim_dialog <- function(scope = c("all", "selected")) {
+    scope <- match.arg(scope)
+    results <- isolate(rv$results)
+    if (!is.list(results) || !length(results)) {
+      showNotification("Load a project with previously processed chromatograms before re-trimming.", type = "warning", duration = 8)
+      return(invisible(FALSE))
+    }
+    keys <- names(results)
+    if (identical(scope, "selected")) {
+      selected <- as.character(isolate(input$inspect_sample))[1]
+      if (!length(selected) || is.na(selected) || !selected %in% keys) {
+        showNotification("Choose a saved read in Sequence inspection.", type = "warning")
+        return(invisible(FALSE))
+      }
+      keys <- selected
+    }
+    preview <- tryCatch(pitax_retrim_saved_batch(results, keys), error = function(e) e)
+    if (inherits(preview, "error")) {
+      showNotification(
+        paste0("Could not prepare re-trim: ", conditionMessage(preview)),
+        type = "error", duration = 14
+      )
+      return(invisible(FALSE))
+    }
+    saved_retrim_preview(preview)
+    changes <- sum(preview$summary$Sequence_changed)
+    showModal(modalDialog(
+      title = paste0("Confirm re-trim of ", nrow(preview$summary), " saved read(s)"),
+      div(class = "status-note",
+          tags$strong(paste0(nrow(preview$summary), " read(s) ready; ", changes, " resulting sequence(s) will change.")),
+          tags$p("Re-trim uses the chromatogram and original base calls ALREADY SAVED with this project. No AB1 upload, Assay setup or Assign step is needed. Existing read identities, locus/assay assignments and names are preserved."),
+          tags$p("Existing manual base substitutions remain, but old manual TRIM boundaries are replaced by the new automatic bounds. Their previous values are recorded in re-trim history. Existing undo/redo stacks are reset for updated reads; the audit log is kept."),
+          if (changes > 0) tags$p(class = "status-warning",
+             "Changed sequences will invalidate their BLAST and taxonomy evidence. The affected consensus/analysis sequences will require a rebuild before further BLAST. Unchanged sequences retain their evidence.") else NULL,
+          tags$p("Save a copy of the current project first if you want an independent backup. This action cannot be undone using the ordinary curation Undo button.")),
+      DTOutput("saved_retrim_preview_table"),
+      easyClose = FALSE, size = "l",
+      footer = tagList(
+        actionButton("cancel_saved_retrim", "Cancel"),
+        actionButton("confirm_saved_retrim", "Confirm re-trim", class = "btn-warning", icon = icon("refresh"))
+      )
+    ))
+    invisible(TRUE)
+  }
+
+  observeEvent(input$open_saved_retrim, {
+    scope <- if (identical(input$saved_retrim_scope, "selected")) "selected" else "all"
+    open_saved_retrim_dialog(scope)
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$open_saved_retrim_from_assign, {
+    open_saved_retrim_dialog("all")
+  }, ignoreInit = TRUE)
+
+  output$saved_retrim_preview_table <- renderDT({
+    preview <- saved_retrim_preview()
+    req(preview)
+    display <- preview$summary
+    display$Sequence_changed <- ifelse(display$Sequence_changed, "Yes", "No")
+    names(display) <- c("Source read", "Old bounds", "New bounds", "Old length",
+                        "New length", "Sequence changed")
+    datatable(display, rownames = FALSE, options = list(pageLength = 10, scrollX = TRUE, dom = "tip"),
+              selection = "none")
+  })
+
+  observeEvent(input$cancel_saved_retrim, {
+    saved_retrim_preview(NULL)
+    removeModal()
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$confirm_saved_retrim, {
+    preview <- saved_retrim_preview()
+    if (is.null(preview)) return()
+    current <- isolate(rv$results)
+    ids <- names(preview$results)
+    unchanged <- all(vapply(ids, function(id) {
+      is.list(current[[id]]) && identical(
+        pitax_saved_retrim_before(current[[id]]), preview$original[[id]]
+      )
+    }, logical(1)))
+    if (!unchanged) {
+      saved_retrim_preview(NULL)
+      removeModal()
+      showNotification("The saved read state changed after preview. Re-open the re-trim preview to avoid overwriting newer edits.", type = "error", duration = 12)
+      return()
+    }
+
+    # Commit all validated candidate reads together. Validation happens
+    # before any mutation, so legacy/missing-trace reads cannot cause a
+    # half-retrimmed project.
+    for (id in ids) current[[id]] <- preview$results[[id]]
+    changed_sources <- preview$changed_sources
+    affected_analysis <- character()
+    if (length(changed_sources) && is.list(rv$consensus_set) &&
+        is.list(rv$consensus_set$records) && length(rv$consensus_set$records)) {
+      affected_analysis <- names(rv$consensus_set$records)[vapply(
+        rv$consensus_set$records, function(record) {
+          any(as.character(record$source_read_ids) %in% changed_sources)
+        }, logical(1)
+      )]
+    }
+    rv$results <- current
+    sync_summary_from_results()
+    # Preserve the existing consensus history but prevent the stale analysis
+    # from being used. stage3_consensus_gate_error detects changed sources.
+    # BLAST/taxonomy are invalidated only for affected analysis IDs.
+    for (key in unique(c(changed_sources, affected_analysis))) {
+      invalidate_downstream_for_sample(key, "Saved chromatogram re-trim changed the sequence")
+    }
+    saved_retrim_preview(NULL)
+    removeModal()
+    sync_qc_sample_choices()
+    workflow_mark_unlocked("qc")
+    workflow_mark_completed("qc")
+    rv$project_status_text <- paste0(
+      "Unsaved re-trim from stored chromatograms: ", length(ids), " processed; ",
+      length(changed_sources), " sequence(s) changed. Assay and Assign were preserved."
+    )
+    showNotification(
+      paste0("Re-trim complete: ", length(ids), " saved reads processed, ",
+             length(changed_sources), " sequence(s) changed. ",
+             if (length(changed_sources)) "Rebuild affected analysis sequences before BLAST. " else "",
+             "Save the updated project."),
+      type = "message", duration = 12
+    )
+    updateTabsetPanel(session, "pipeline_step", selected = "qc")
+  }, ignoreInit = TRUE)
 
   qc_display_name <- function(original_name) {
     original_name <- as.character(original_name)[1]
