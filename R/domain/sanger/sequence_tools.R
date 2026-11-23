@@ -613,20 +613,24 @@ pitax_iupac_call_codes <- function() {
   c("A", "C", "G", "T", "N", "R", "Y", "S", "W", "K", "M", "B", "D", "H", "V")
 }
 
+# Shiny selectInput choices must be locale-safe. On Posit Connect servers
+# using non-UTF-8 R locales, typographic punctuation in these labels can be
+# emitted as literal byte sequences such as <e2><80><94>. Use ASCII-only
+# display labels; the stored DNA codes/values remain exactly unchanged.
 pitax_iupac_ambiguity_choices <- function() {
   c(
-    "R — A/G" = "R", "Y — C/T" = "Y", "S — C/G" = "S",
-    "W — A/T" = "W", "K — G/T" = "K", "M — A/C" = "M",
-    "B — C/G/T" = "B", "D — A/G/T" = "D",
-    "H — A/C/T" = "H", "V — A/C/G" = "V"
+    "R (A/G)" = "R", "Y (C/T)" = "Y", "S (C/G)" = "S",
+    "W (A/T)" = "W", "K (G/T)" = "K", "M (A/C)" = "M",
+    "B (C/G/T)" = "B", "D (A/G/T)" = "D",
+    "H (A/C/T)" = "H", "V (A/C/G)" = "V"
   )
 }
 
 pitax_iupac_confirmation_choices <- function() {
   c(
-    "A — adenine" = "A", "C — cytosine" = "C",
-    "G — guanine" = "G", "T — thymine" = "T",
-    "N — unresolved A/C/G/T" = "N",
+    "A (adenine)" = "A", "C (cytosine)" = "C",
+    "G (guanine)" = "G", "T (thymine)" = "T",
+    "N (unresolved A/C/G/T)" = "N",
     pitax_iupac_ambiguity_choices()
   )
 }
