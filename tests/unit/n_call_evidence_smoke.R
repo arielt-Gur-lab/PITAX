@@ -35,8 +35,8 @@ stopifnot(grepl("low basecaller Q", e$Review_hint, fixed = TRUE))
 
 # N is still N: neither evidence generation nor peak flags modify the read.
 flags <- ambiguous_peak_flags(result, scope = "raw")
-nrow <- flags[flags$Position == 2L, , drop = FALSE]
-stopifnot(nrow(nrow) == 1L, identical(nrow$Top_channel, "C"))
+n_flag <- flags[flags$Position == 2L, , drop = FALSE]
+stopifnot(nrow(n_flag) == 1L, identical(n_flag$Top_channel, "C"))
 stopifnot(identical(result$raw_seq, "ANAAA"))
 
 # A C plateau over multiple basecall intervals cannot be interpreted as
