@@ -616,6 +616,30 @@ stage3_refresh_consensus_summary <- function(consensus_set) {
   consensus_set
 }
 
+# Preserve reviewed consensus decisions when a rebuild was triggered by
+# re-trimming OTHER reads. Only reuse a record when all source sequences,
+# names, biological source IDs and consensus algorithm settings are identical.
+stage3_reuse_unchanged_records <- function(previous, candidate) {
+  if (!is.list(previous) || !is.list(candidate) ||
+      !is.list(previous$records) || !is.list(candidate$records)) return(candidate)
+  if (!identical(previous$settings, candidate$settings)) return(candidate)
+  shared <- intersect(names(previous$records), names(candidate$records))
+  if (!length(shared)) return(candidate)
+  for (id in shared) {
+    old <- previous$records[[id]]
+    new <- candidate$records[[id]]
+    if (!is.list(old) || !is.list(new)) next
+    same_inputs <- identical(old$source_read_ids, new$source_read_ids) &&
+      identical(old$source_sequences, new$source_sequences) &&
+      identical(old$final_name, new$final_name) &&
+      identical(old$isolate, new$isolate) &&
+      identical(old$locus, new$locus) &&
+      identical(old$algorithm, new$algorithm)
+    if (isTRUE(same_inputs)) candidate$records[[id]] <- stage3_ensure_record_curation(old)
+  }
+  stage3_refresh_consensus_summary(candidate)
+}
+
 stage3_ensure_consensus_set <- function(consensus_set) {
   if (!is.list(consensus_set) || !identical(stage3_scalar_text(consensus_set$schema), "pitax-consensus-set-v1")) {
     return(stage3_empty_consensus_set())
