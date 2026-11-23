@@ -54,6 +54,11 @@ echo [3/22] Manual curation / undo-redo smoke tests
 if errorlevel 1 goto :failed
 
 echo.
+echo [3a/22] Reopen guided peak review on repeated row clicks
+"%RDIR%\bin\Rscript.exe" "tests\contracts\peak_review_reopen_contract_smoke.R"
+if errorlevel 1 goto :failed
+
+echo.
 echo [3b/22] Guided peak-review queue smoke tests
 "%RDIR%\bin\Rscript.exe" "tests\unit\peak_review_queue_smoke.R"
 if errorlevel 1 goto :failed
