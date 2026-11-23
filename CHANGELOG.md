@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.8.3 — N-call evidence and readable BLAST retrieval
+
+- For unresolved AB1 N calls, show the strongest dye channel, the ratio
+  to the next channel at the candidate peak, available original PCON
+  basecaller quality, and a conservative local peak-prominence/separation
+  indicator. Broad/overlapping plateaus remain unresolved; these are
+  review hints, not automatic base calls. A reviewed N defaults to N in
+  the base-choice panel until an explicit user selection.
+- Display N-specific evidence in the flagged-position table, guided-review
+  metrics and chromatogram hover information.
+- Replace concatenated WAITING RID messages in selected and batch BLAST
+  retrieval notifications with compact summaries. Pending job/RID details
+  remain available in an expandable table beside the batch summary.
+- Explain that NCBI RTOE is an initial estimate, not a guaranteed deadline,
+  and WAITING is not an error; no change to RID status, polling schedule,
+  or resubmission behavior.
+- Add unit regressions and CI execution for both changes. No schema change.
+
+
 ## 3.8.2 — N-aware trim-window quality check
 
 - Fix automatic trimming falsely accepting N-rich starting windows: missing
