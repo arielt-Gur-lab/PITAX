@@ -605,13 +605,41 @@ curation_redo <- function(result, settings = NULL) {
   list(result = result, changed = TRUE, label = tx$label)
 }
 
+# Full IUPAC DNA ambiguity alphabet for explicit human curation.
+# Codes describe an unresolved set of candidate bases, NOT proof of a
+# mixed template, heterozygosity or confidently called alleles. Keep N by
+# default for an unresolved AB1 call until the operator accepts a new code.
+pitax_iupac_call_codes <- function() {
+  c("A", "C", "G", "T", "N", "R", "Y", "S", "W", "K", "M", "B", "D", "H", "V")
+}
+
+pitax_iupac_ambiguity_choices <- function() {
+  c(
+    "R — A/G" = "R", "Y — C/T" = "Y", "S — C/G" = "S",
+    "W — A/T" = "W", "K — G/T" = "K", "M — A/C" = "M",
+    "B — C/G/T" = "B", "D — A/G/T" = "D",
+    "H — A/C/T" = "H", "V — A/C/G" = "V"
+  )
+}
+
+pitax_iupac_confirmation_choices <- function() {
+  c(
+    "A — adenine" = "A", "C — cytosine" = "C",
+    "G — guanine" = "G", "T — thymine" = "T",
+    "N — unresolved A/C/G/T" = "N",
+    pitax_iupac_ambiguity_choices()
+  )
+}
+
 curation_set_base_snapshot <- function(result, position, new_base) {
   result <- ensure_curation_state(result)
   snap <- curation_snapshot(result)
   pos <- as.integer(position)
   new_base <- toupper(as.character(new_base))
   raw_chars <- strsplit(sanitize_dna(result$raw_seq), "")[[1]]
-  if (!is.finite(pos) || pos < 1 || pos > length(raw_chars) || !new_base %in% c("A","C","G","T","N","R","Y","S","W","K","M")) return(NULL)
+  if (length(new_base) != 1L || is.na(new_base) || nchar(new_base) != 1L ||
+      !is.finite(pos) || pos < 1 || pos > length(raw_chars) ||
+      !new_base %in% pitax_iupac_call_codes()) return(NULL)
   original <- raw_chars[pos]
   edits <- snap$base_edits
   edits <- edits[edits$Position != pos, , drop = FALSE]
