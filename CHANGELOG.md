@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.8.2 — N-aware trim-window quality check
+
+- Fix automatic trimming falsely accepting N-rich starting windows: missing
+  peak ratios are now counted as unsuccessful positions rather than removed
+  from the quality-window denominator.
+- Clarify in the chromatogram that N is an unresolved original AB1 base call
+  (or an upstream non-ACGT call normalized to N), not an automatic PITAX call
+  based on chromatogram color. Manual curation remains explicit and audited.
+- Add a focused regression test for N-rich, fully unresolved, 80%-pass and
+  clear-call windows. No base is automatically substituted from dye dominance.
+
+
 ## 3.8.1 — Faster guided review and explicit base choice
 
 - Guided local chromatogram now renders only the visible ±4-base window instead
