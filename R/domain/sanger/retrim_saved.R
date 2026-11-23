@@ -37,7 +37,10 @@ pitax_saved_retrim_requirements <- function(result) {
     value <- suppressWarnings(as.numeric(settings[[key]])[1])
     if (!length(value)) NA_real_ else value
   }, numeric(1))
-  if (any(!is.finite(vals)) || any(vals <= 0)) {
+  if (any(!is.finite(vals)) ||
+      any(vals[c("window", "min_len_before_collapse", "bad_run_windows",
+                 "absolute_max_base_index", "min_usable_len")] <= 0) ||
+      any(vals[c("min_peak_ratio", "min_relative_signal")] < 0)) {
     return("Stored trimming settings contain invalid parameters.")
   }
   if (vals[["window"]] > n) {
