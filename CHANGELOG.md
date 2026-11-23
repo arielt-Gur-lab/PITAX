@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.8.5 — Guided peak-review modal reopening fix
+
+- Fix an ambiguous-peak row that could be opened only once after Close:
+  DataTables single selection did not emit another event for the same selected
+  row. Route EVERY left click through an explicit Shiny event carrying the
+  actual raw Position, independent of table ordering, paging or filtering.
+  Right-click continues to open the same review.
+- Reset the guided modal state after outside-click, ESC or X dismissal, not
+  only after its Close button. Force a fresh user click to remount a previously
+  dismissed shell and guard delayed dismissal messages with generation tokens.
+- Keep the in-modal Continue/Flag & continue navigation working without
+  remounting the dialog between positions.
+- Add a focused regression contract to R preflight and the local test runner.
+
+
 ## 3.8.4 — Re-trim saved projects without AB1 re-upload
 
 - Add **Re-trim saved project** from Assign and **Preview re-trim** from
