@@ -678,6 +678,110 @@ collect_curation_log <- function(results) {
   out <- do.call(rbind, parts); rownames(out) <- NULL; out
 }
 
+# Evidence for unresolved AB1 (N) calls. This is descriptive evidence, not a
+# new basecaller: color dominance alone cannot establish base identity or the
+# number of repeated bases within a broad peak.
+pitax_n_call_evidence <- function(result, position, min_dominance = 1.75,
+                                  min_prominence = 0.20) {
+  out <- list(
+    Top_channel = NA_character_,
+    Top_to_second_ratio = NA_real_,
+    Basecaller_quality = NA_real_,
+    Peak_prominence_percent = NA_real_,
+    Peak_separation = "Unavailable",
+    Review_hint = "Insufficient peak evidence; keep N"
+  )
+  i <- suppressWarnings(as.integer(position)[1])
+  pos <- suppressWarnings(as.integer(result$peak_pos))
+  trace <- result$trace
+  cmap <- result$channel_map
+  if (!length(i) || !is.finite(i) || i < 1L || i > length(pos) ||
+      is.null(trace) || length(dim(trace)) != 2L || nrow(trace) < 3L ||
+      is.null(cmap)) return(out)
+
+  # PCON is diagnostic, including when its original basecall is N; do not
+  # substitute a numerical dye-ratio score for genuine basecaller quality.
+  detail <- if (is.list(result$ab1_evidence)) result$ab1_evidence$detail else NULL
+  if (is.data.frame(detail) && "Basecaller_quality" %in% names(detail) &&
+      i <= nrow(detail)) {
+    q <- suppressWarnings(as.numeric(detail$Basecaller_quality[i]))
+    if (length(q) && is.finite(q)) out$Basecaller_quality <- q
+  }
+
+  col_idx <- suppressWarnings(as.integer(cmap[c("A", "C", "G", "T")]))
+  if (length(col_idx) != 4L || any(!is.finite(col_idx)) ||
+      any(col_idx < 1L | col_idx > ncol(trace))) return(out)
+  p <- pos[i]
+  if (!is.finite(p) || p < 1L || p > nrow(trace)) return(out)
+  prev <- if (i > 1L) pos[i - 1L] else NA_integer_
+  next_p <- if (i < length(pos)) pos[i + 1L] else NA_integer_
+  # Midpoints delimit this basecall's trace interval. A broad plateau crossing
+  # several such intervals cannot be counted as multiple resolved peaks.
+  left <- if (is.finite(prev) && prev < p) floor((prev + p) / 2) + 1L else p - 5L
+  right <- if (is.finite(next_p) && next_p > p) ceiling((next_p + p) / 2) - 1L else p + 5L
+  left <- max(1L, as.integer(left))
+  right <- min(nrow(trace), as.integer(right))
+  if (left >= right) return(out)
+
+  idx <- seq.int(left, right)
+  local_max <- vapply(col_idx, function(j) {
+    vals <- as.numeric(trace[idx, j])
+    if (any(is.finite(vals))) max(vals[is.finite(vals)]) else NA_real_
+  }, numeric(1))
+  names(local_max) <- c("A", "C", "G", "T")
+  if (!any(is.finite(local_max))) return(out)
+  best <- which.max(replace(local_max, !is.finite(local_max), -Inf))[1]
+  out$Top_channel <- names(local_max)[best]
+  if (!is.finite(local_max[best]) || local_max[best] <= 0) {
+    out$Peak_separation <- "No usable signal"
+    out$Review_hint <- "No usable channel signal; keep N"
+    return(out)
+  }
+  signal <- as.numeric(trace[idx, col_idx[best]])
+  signal[!is.finite(signal)] <- -Inf
+  at <- which.max(signal)[1]
+  peak_at <- idx[at]
+  # Compare channels at the same trace sample rather than mixing neighboring
+  # peaks belonging to different bases.
+  simultaneous <- as.numeric(trace[peak_at, col_idx])
+  alternative <- simultaneous[-best]
+  best_alt <- if (any(is.finite(alternative))) max(alternative[is.finite(alternative)]) else NA_real_
+  if (is.finite(best_alt)) {
+    out$Top_to_second_ratio <- if (best_alt > 0) local_max[best] / best_alt else Inf
+  }
+
+  # A resolved peak needs a local summit and valleys on BOTH sides. This
+  # deliberately rejects flat/broad peaks and an apparent peak at a window
+  # boundary. Prominence is a heuristic, not a validated basecaller score.
+  if (length(idx) >= 5L && at > 1L && at < length(idx)) {
+    left_valley <- suppressWarnings(min(signal[seq_len(at)], na.rm = TRUE))
+    right_valley <- suppressWarnings(min(signal[seq.int(at, length(idx))], na.rm = TRUE))
+    prominence <- (local_max[best] - max(left_valley, right_valley)) / local_max[best]
+    if (is.finite(prominence)) {
+      out$Peak_prominence_percent <- round(100 * max(0, prominence), 1)
+    }
+  }
+  distinct <- is.finite(out$Peak_prominence_percent) &&
+    out$Peak_prominence_percent >= 100 * min_prominence
+  out$Peak_separation <- if (distinct) "Distinct local summit" else "Broad/overlapping or unseparated"
+
+  dominant <- is.finite(out$Top_to_second_ratio) &&
+    out$Top_to_second_ratio >= min_dominance
+  if (distinct && dominant) {
+    out$Review_hint <- paste0("Inspect ", out$Top_channel,
+                              ": separated dominant signal; keep N until manually confirmed")
+  } else if (!distinct) {
+    out$Review_hint <- paste0("Signal suggests ", out$Top_channel,
+                              ", but peak separation/base count is unresolved")
+  } else {
+    out$Review_hint <- "Multiple dye channels compete; keep N pending review"
+  }
+  if (is.finite(out$Basecaller_quality) && out$Basecaller_quality < 20) {
+    out$Review_hint <- paste0(out$Review_hint, " (low basecaller Q)")
+  }
+  out
+}
+
 # Detect individual base positions where another dye channel competes strongly
 # with the current curated base call. This is a REVIEW aid, not a biological
 # diagnosis. Low-signal noise is suppressed using the retained-region median.
@@ -697,6 +801,8 @@ ambiguous_peak_flags <- function(result, scope = c("trimmed", "raw"), params = a
     Competitor_percent = numeric(), Competitor_peak_offset = numeric(),
     Alternative_to_called_ratio = numeric(), Alternative_to_third_ratio = numeric(),
     Severity = character(), Flag = character(), Auto_correct_candidate = logical(),
+    Top_channel = character(), Top_to_second_ratio = numeric(), Basecaller_quality = numeric(),
+    Peak_prominence_percent = numeric(), Peak_separation = character(), Review_hint = character(),
     stringsAsFactors = FALSE
   )
 
@@ -802,6 +908,8 @@ ambiguous_peak_flags <- function(result, scope = c("trimmed", "raw"), params = a
       flag <- if (identical(call, "N")) "Ambiguous N base call" else "IUPAC ambiguity call"
     }
 
+    n_info <- if (is_n) pitax_n_call_evidence(result, i) else NULL
+
     rows[[length(rows) + 1L]] <- data.frame(
       Position = i, Call = call, Competing_channel = competitor_channel,
       Called_signal = round(called_signal, 1), Competitor_signal = round(competitor_signal, 1),
@@ -811,6 +919,12 @@ ambiguous_peak_flags <- function(result, scope = c("trimmed", "raw"), params = a
       Alternative_to_called_ratio = if (is.finite(alt_to_called)) round(alt_to_called, 2) else alt_to_called,
       Alternative_to_third_ratio = if (is.finite(alt_to_third)) round(alt_to_third, 2) else alt_to_third,
       Severity = severity, Flag = flag, Auto_correct_candidate = isTRUE(auto_candidate),
+      Top_channel = if (is_n) n_info$Top_channel else NA_character_,
+      Top_to_second_ratio = if (is_n) n_info$Top_to_second_ratio else NA_real_,
+      Basecaller_quality = if (is_n) n_info$Basecaller_quality else NA_real_,
+      Peak_prominence_percent = if (is_n) n_info$Peak_prominence_percent else NA_real_,
+      Peak_separation = if (is_n) n_info$Peak_separation else "",
+      Review_hint = if (is_n) n_info$Review_hint else "",
       stringsAsFactors = FALSE
     )
   }
@@ -999,6 +1113,8 @@ make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags 
       "<br>Peak ratio: ", flags$Peak_ratio,
       "<br>Competitor / called: ", flags$Competitor_percent, "%",
       "<br>", flags$Flag,
+      ifelse(!is.null(flags$Review_hint) & nzchar(flags$Review_hint),
+             paste0("<br>", flags$Review_hint), ""),
       ifelse(!is.null(flags$Auto_correct_candidate) & flags$Auto_correct_candidate, "<br>High-confidence auto-correction candidate", "")
     )
     p <- plotly::add_trace(
