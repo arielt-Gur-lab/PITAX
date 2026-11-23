@@ -106,4 +106,44 @@ missing <- make_saved_read("legacy")
 missing$processing_settings <- NULL
 stopifnot(grepl("re-upload", pitax_saved_retrim_requirements(missing), fixed = TRUE))
 
+# Rebuilding after a partial re-trim must not delete unrelated manual
+# consensus calls and their audit history.
+source(file.path(app_dir, "R", "domain", "consensus", "stage3_consensus.R"))
+record <- function(read_id, source_seq, analysis_seq, revision = 0L) {
+  stage3_ensure_record_curation(list(
+    consensus_id = read_id, final_name = paste0(read_id, "_TEF1_F"),
+    isolate = read_id, locus = "TEF1",
+    status = "INDEPENDENT_READ", sequence = analysis_seq,
+    source_read_ids = read_id,
+    source_sequences = setNames(list(source_seq), read_id),
+    forward_read = read_id, reverse_read = "",
+    metrics = list(overlap = 0L, identity_percent = NA_real_, mismatches = 0L,
+                   indels = 0L, review_positions = 0L),
+    algorithm = "independent-read-orientation-v1", built_at = "2026-11-23 12:00:00",
+    curation = list(revision = revision)
+  ))
+}
+old <- list(
+  settings = list(project_mode = "simple"),
+  records = list(
+    consensus_001 = record("FB001", "AAA", "AAG", revision = 3L),
+    consensus_002 = record("FB002", "AAA", "AAT", revision = 5L)
+  )
+)
+candidate <- list(
+  settings = old$settings,
+  records = list(
+    consensus_001 = record("FB001", "AAA", "AAA", revision = 0L),
+    consensus_002 = record("FB002", "AAC", "AAC", revision = 0L)
+  )
+)
+reused <- stage3_reuse_unchanged_records(old, candidate)
+stopifnot(reused$records$consensus_001$sequence == "AAG")
+stopifnot(reused$records$consensus_001$curation$revision == 3L)
+stopifnot(reused$records$consensus_002$sequence == "AAC")
+stopifnot(reused$records$consensus_002$curation$revision == 0L)
+candidate$settings$min_overlap <- 200L
+not_reused <- stage3_reuse_unchanged_records(old, candidate)
+stopifnot(not_reused$records$consensus_001$sequence == "AAA")
+
 cat("saved_project_retrim_smoke: OK\n")
