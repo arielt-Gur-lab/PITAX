@@ -153,6 +153,38 @@ blast_disable_auto_poll_fields <- function() {
   )
 }
 
+# Summarize batch results without repeating an entire job-status line for
+# each waiting RID. Per-job details are available in the BLAST jobs table and
+# an expandable waiting-jobs panel, never embedded in notification text.
+blast_batch_summary_text <- function(action, ready = 0L, waiting = 0L,
+                                     too_soon = 0L, no_hits = 0L,
+                                     stale = 0L, failed = 0L,
+                                     elapsed = "") {
+  as_count <- function(x) {
+    x <- suppressWarnings(as.integer(x)[1])
+    if (!length(x) || !is.finite(x)) 0L else max(0L, x)
+  }
+  ready <- as_count(ready)
+  waiting <- as_count(waiting)
+  too_soon <- as_count(too_soon)
+  no_hits <- as_count(no_hits)
+  stale <- as_count(stale)
+  failed <- as_count(failed)
+  parts <- c(
+    paste0(as.character(action)[1], ": ", ready, " ready"),
+    paste0(waiting, " still running at NCBI")
+  )
+  if (too_soon) parts <- c(parts, paste0(too_soon, " too soon to check"))
+  if (no_hits) parts <- c(parts, paste0(no_hits, " no parsed hits"))
+  if (stale) parts <- c(parts, paste0(stale, " stale"))
+  if (failed) parts <- c(parts, paste0(failed, " failed"))
+  elapsed <- as.character(elapsed)[1]
+  if (length(elapsed) && !is.na(elapsed) && nzchar(elapsed)) {
+    parts <- c(parts, paste0("check took ", elapsed))
+  }
+  paste(parts, collapse = " | ")
+}
+
 # UI copy helpers (no HTML). Elapsed/countdown formatting is left to the stage.
 blast_status_banner_parts <- function(job_row, now = Sys.time(), format_elapsed = NULL) {
   job_row <- job_row[1, , drop = FALSE]
