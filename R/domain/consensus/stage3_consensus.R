@@ -619,6 +619,70 @@ stage3_refresh_consensus_summary <- function(consensus_set) {
 # Preserve reviewed consensus decisions when a rebuild was triggered by
 # re-trimming OTHER reads. Only reuse a record when all source sequences,
 # names, biological source IDs and consensus algorithm settings are identical.
+# Incremental single-source rebuild for interactive QC edits. A project
+# with 50 reads should not re-align every unrelated Forward/Reverse pair
+# whenever one raw call is manually corrected. Return NULL if ANY structural
+# assumption does not hold so the caller safely falls back to a full rebuild.
+stage3_rebuild_changed_source <- function(previous, assignments, results, source_id,
+                                          min_overlap = 40L, min_identity = 85,
+                                          quality_delta = 10, strong_quality = 20,
+                                          project_mode = c("paired_consensus", "simple")) {
+  project_mode <- match.arg(project_mode)
+  if (!is.list(previous) ||
+      !identical(stage3_scalar_text(previous$schema), "pitax-consensus-set-v1") ||
+      !is.list(previous$records) || !length(previous$records) ||
+      !is.data.frame(assignments) || !nrow(assignments) || !is.list(results)) return(NULL)
+  source_id <- stage3_scalar_text(source_id)
+  indices <- which(as.character(assignments$Source_ID) == source_id)
+  if (length(indices) != 1L) return(NULL)
+
+  # Only reuse a saved model whose source group coverage is identical to the
+  # current project. A newly added/removed/renamed assignment needs a full
+  # rebuild to avoid stale records and unstable consensus IDs.
+  recorded_sources <- unlist(lapply(previous$records, function(rec) as.character(rec$source_read_ids)),
+                             use.names = FALSE)
+  all_sources <- as.character(assignments$Source_ID)
+  if (anyDuplicated(all_sources) || anyDuplicated(recorded_sources) ||
+      !identical(sort(recorded_sources), sort(all_sources))) return(NULL)
+
+  rows <- if (identical(project_mode, "simple")) {
+    assignments[indices, , drop = FALSE]
+  } else {
+    assigned <- assignments[indices, , drop = FALSE]
+    group_idx <- which(as.character(assignments$Isolate) == as.character(assigned$Isolate[1]) &
+                       as.character(assignments$Locus) == as.character(assigned$Locus[1]))
+    assignments[group_idx, , drop = FALSE]
+  }
+  ids <- as.character(rows$Source_ID)
+  affected <- which(vapply(previous$records, function(rec) {
+    identical(sort(as.character(rec$source_read_ids)), sort(ids))
+  }, logical(1)))
+  if (length(affected) != 1L) return(NULL)
+  record_id <- names(previous$records)[affected]
+  old <- previous$records[[record_id]]
+  if (!identical(stage3_scalar_text(old$isolate), stage3_scalar_text(rows$Isolate[1])) ||
+      !identical(stage3_scalar_text(old$locus), stage3_scalar_text(rows$Locus[1]))) return(NULL)
+
+  candidate <- tryCatch(stage3_build_consensus_set(
+    rows, results, min_overlap = min_overlap, min_identity = min_identity,
+    quality_delta = quality_delta, strong_quality = strong_quality,
+    project_mode = project_mode
+  ), error = function(e) NULL)
+  if (is.null(candidate) || length(candidate$records) != 1L ||
+      !identical(previous$settings, candidate$settings)) return(NULL)
+
+  record <- candidate$records[[1]]
+  # A later change to assay naming must also use the full validation path.
+  if (!identical(stage3_scalar_text(old$final_name), stage3_scalar_text(record$final_name)) ||
+      !identical(sort(as.character(old$source_read_ids)), sort(as.character(record$source_read_ids)))) return(NULL)
+
+  record$consensus_id <- record_id
+  updated <- previous
+  updated$records[[record_id]] <- record
+  updated$built_at <- candidate$built_at
+  stage3_refresh_consensus_summary(updated)
+}
+
 stage3_reuse_unchanged_records <- function(previous, candidate) {
   if (!is.list(previous) || !is.list(candidate) ||
       !is.list(previous$records) || !is.list(candidate$records)) return(candidate)
