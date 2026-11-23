@@ -113,19 +113,31 @@
     )
   }
 
-  sync_summary_from_results <- function() {
-    if (is.null(rv$summary) || !is.data.frame(rv$summary) || !nrow(rv$summary) || is.null(rv$results) || !length(rv$results)) return(invisible(NULL))
-    for (nm in names(rv$results)) {
-      r <- ensure_curation_state(rv$results[[nm]])
-      r <- curation_rebuild(r, settings_for_result(r))
-      rv$results[[nm]] <- r
+  # Full reconciliation on project load; one-read summary updates during
+  # curation. Rebuilding every stored chromatogram on EVERY base edit causes
+  # major lag in projects with tens of reads and needlessly invalidates UI.
+  sync_summary_from_results <- function(sample_ids = NULL) {
+    if (is.null(rv$summary) || !is.data.frame(rv$summary) || !nrow(rv$summary) ||
+        is.null(rv$results) || !length(rv$results)) return(invisible(NULL))
+    is_full_sync <- is.null(sample_ids)
+    ids <- if (is_full_sync) names(rv$results) else intersect(as.character(sample_ids), names(rv$results))
+    if (!length(ids)) return(invisible(NULL))
+    summary <- rv$summary
+    for (nm in ids) {
+      r <- rv$results[[nm]]
+      if (is_full_sync) {
+        # Legacy loaded projects may need their curation state rebuilt.
+        r <- curation_rebuild(ensure_curation_state(r), settings_for_result(r))
+        rv$results[[nm]] <- r
+      }
       sm <- r$summary
-      idx <- which(as.character(rv$summary$sample_id) == nm)
-      if (!length(idx) || !nrow(sm)) next
+      idx <- match(nm, as.character(summary$sample_id))
+      if (is.na(idx) || !is.data.frame(sm) || !nrow(sm)) next
       for (col in names(sm)) {
-        if (!col %in% names(rv$summary)) rv$summary[[col]] <- NA
-        rv$summary[idx[1], col] <- sm[1, col]
+        if (!col %in% names(summary)) summary[[col]] <- NA
+        summary[idx, col] <- sm[1, col]
       }
     }
+    rv$summary <- summary
     invisible(NULL)
   }
