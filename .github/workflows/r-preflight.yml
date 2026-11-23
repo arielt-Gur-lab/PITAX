@@ -28,6 +28,10 @@ jobs:
           Rscript tests/unit/qc_n_trim_window_smoke.R
       - name: Re-trim saved projects without re-uploading AB1
         run: Rscript tests/unit/saved_project_retrim_smoke.R
+      - name: Full IUPAC guided manual review (M/V) and lightweight plot
+        run: Rscript tests/unit/iupac_guided_review_smoke.R
+      - name: 50-read incremental consensus after single-base edit
+        run: Rscript tests/unit/incremental_consensus_smoke.R
       - name: Validate repeatable guided peak review row clicks
         run: Rscript tests/contracts/peak_review_reopen_contract_smoke.R
       - name: Exercise FASTA and empty-table exports with 18 records
