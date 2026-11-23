@@ -18,7 +18,9 @@
   undo/redo snapshots for changed reads.
 - Preserve unaffected BLAST/taxonomy evidence. Flag only analysis records
   dependent on changed source sequences as stale, requiring a Stage 3
-  rebuild. Never resubmit BLAST automatically.
+  rebuild. Never resubmit BLAST automatically. During rebuild, retain
+  previously reviewed consensus records (and their audit history) when
+  their source sequences, identities and algorithm settings are unchanged.
 - Add 50-read regression covering atomic processing, names/assignments,
   manual base edits, idempotence and legacy error handling.
 - Project schema unchanged.
