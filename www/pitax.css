@@ -21,9 +21,44 @@
       .btn { border-radius:7px; margin-right:6px; margin-bottom:6px; }
       .experimental-box { background:#fffdf5; border:1px solid #f1dfae; border-radius:8px; padding:10px 12px; margin-top:8px; }
       .stage1-evidence-card { border-style:dashed; }
-      .stage1-audit-details { margin-top:8px; }
-      .stage1-audit-toggle { cursor:pointer; font-weight:600; padding:10px 0; color:#374151; }
-      .stage1-audit-details[open] .stage1-audit-toggle { margin-bottom:10px; }
+      .stage1-audit-details { margin-top:0; }
+      .stage1-audit-toggle,
+      .saved-retrim-toggle {
+        cursor:pointer;
+        list-style:none;
+        font-weight:600;
+        padding:0;
+        color:#374151;
+      }
+      .stage1-audit-toggle::-webkit-details-marker,
+      .saved-retrim-toggle::-webkit-details-marker { display:none; }
+      .stage1-audit-toggle::before,
+      .saved-retrim-toggle::before {
+        content:"▸";
+        display:inline-block;
+        width:1em;
+        color:#64748b;
+        margin-right:4px;
+      }
+      .stage1-audit-details[open] > .stage1-audit-toggle::before,
+      .saved-retrim-details[open] > .saved-retrim-toggle::before { content:"▾"; }
+      .stage1-audit-details[open] > .stage1-audit-toggle,
+      .saved-retrim-details[open] > .saved-retrim-toggle { margin-bottom:10px; }
+      .stage1-audit-toggle .card-title-row,
+      .saved-retrim-toggle .card-title-row { display:inline-flex; vertical-align:middle; }
+      .qc-plot-toolbar { align-items:center; }
+      .qc-plot-status {
+        display:inline-block;
+        font-size:12px;
+        font-weight:700;
+        padding:4px 10px;
+        border-radius:999px;
+        border:1px solid transparent;
+      }
+      .qc-plot-status-missing { color:#64748b; background:#f8fafc; border-color:#e2e8f0; }
+      .qc-plot-status-current { color:#166534; background:#f0fdf4; border-color:#bbf7d0; }
+      .qc-plot-status-outdated { color:#9a3412; background:#fff7ed; border-color:#fdba74; }
+      .qc-metrics-plot-card img { max-width:100%; height:auto; }
       .stage-topbar { background:#ffffff; border:1px solid #dbe3ee; border-radius:10px; padding:12px 14px; margin:0 0 16px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
       .stage-topbar .btn { margin-bottom:0; }
       .pipeline-schema-wrap { margin:30px 4px 12px; padding:8px 4px 4px; }
@@ -913,10 +948,29 @@
         overflow-y:auto;
       }
       .peak-review-modal-side .form-group { margin-bottom:4px; }
-      .peak-review-modal-side .control-label { margin-bottom:2px; font-size:11.5px; }
+      .peak-review-modal-side .shiny-input-radiogroup,
+      .peak-review-modal-side .shiny-input-container {
+        display:flex;
+        flex-direction:column;
+        align-items:stretch;
+      }
+      .peak-review-modal-side .shiny-input-radiogroup > .control-label,
+      .peak-review-modal-side .shiny-input-container > label.control-label,
+      .peak-review-modal-side .control-label {
+        display:block !important;
+        float:none !important;
+        clear:both;
+        width:100%;
+        margin-bottom:4px;
+        font-size:11.5px;
+      }
       .peak-review-modal-side .shiny-options-group {
+        display:flex;
+        flex-wrap:wrap;
         gap:3px 9px;
         align-items:center;
+        clear:both;
+        width:100%;
       }
       .peak-review-modal-side .radio-inline {
         padding-left:18px;

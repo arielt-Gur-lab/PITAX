@@ -69,6 +69,11 @@ echo [3p/22] Session-only performance diagnostics
 if errorlevel 1 goto :failed
 
 echo.
+echo [3p2/22] On-demand QC plots + collapsed Trim/QC panels
+"%RDIR%\bin\Rscript.exe" "tests\unit\qc_plot_ondemand_smoke.R"
+if errorlevel 1 goto :failed
+
+echo.
 echo [3q/22] Guided Focus / Full Y-scale display
 "%RDIR%\bin\Rscript.exe" "tests\unit\guided_focus_yscale_smoke.R"
 if errorlevel 1 goto :failed

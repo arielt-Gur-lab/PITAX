@@ -1,5 +1,28 @@
 # Changelog
 
+## 3.8.12 — On-demand QC plots + Trim/QC panel cleanup
+
+- Stop auto-rendering the Trim/QC **QC signal metrics** plot after every
+  base edit, trim or Reviewed mark. Add **Generate / Refresh QC Plots** so
+  the on-screen plot is built only on demand, with a per-sample session
+  cache and **Not generated / Current / Outdated** status. Guided Review
+  local chromatogram updates remain real-time; scientific QC metrics and
+  `draw_qc_metrics` / `write_qc_plot_png` algorithms are unchanged.
+- At **Prepare ZIP**, refresh the export snapshot from live project state
+  and regenerate QC PNGs from that snapshot (never from the display cache).
+- Collapse **Re-trim saved project** and **Stage 1 | AB1 evidence audit**
+  by default; remove the nested **Open evidence audit** toggle.
+- Stack Guided Review **Single base / unresolved** (and IUPAC) labels
+  above their controls instead of beside them.
+- Performance Diagnostics: `qc.signal_metrics_plot` is recorded only on
+  Generate. Continue/Confirm no longer pay metrics-plot redraw cost in the
+  same reactive flush (verify with Enable diagnostics → Continue/Confirm
+  series → Export CSV; expect no `qc.signal_metrics_plot` rows during
+  those cycles). Before this change that operation ran on every curation
+  commit; after, Continue/Confirm medians exclude that plot work by
+  construction.
+- Add `qc_plot_ondemand_smoke` regression coverage.
+
 ## 3.8.11 — Continue-cycle performance probe depth
 
 - Coalesce Performance diagnostics table refreshes with `session$onFlushed`

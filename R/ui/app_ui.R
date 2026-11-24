@@ -217,8 +217,10 @@ ui <- fluidPage(
       tabPanel("Trim & QC", value = "qc",
 
         uiOutput("qc_summary_cards"),
-        div(class = "panel-box saved-retrim-card",
-          card_title("Re-trim saved project", "Reapply the current trimming algorithm to original base calls and traces already stored in this project. Reuses all saved Assay/Assign metadata and read names; no AB1 re-upload required.", "refresh"),
+        tags$details(class = "panel-box saved-retrim-card saved-retrim-details",
+          tags$summary(class = "saved-retrim-toggle",
+            card_title("Re-trim saved project", "Reapply the current trimming algorithm to original base calls and traces already stored in this project. Reuses all saved Assay/Assign metadata and read names; no AB1 re-upload required.", "refresh")
+          ),
           div(class = "curation-toolbar",
             radioButtons("saved_retrim_scope", "Which saved reads?",
               choices = c("All saved reads" = "all", "Selected read only" = "selected"),
@@ -255,27 +257,25 @@ ui <- fluidPage(
             )
           )
         ),
-        div(class = "panel-box stage1-evidence-card",
-          card_title("Stage 1 | AB1 evidence audit", "Observational audit of the established PITAX v2 read model against raw ABIF primary-call coordinates, basecaller quality and canonical A/C/G/T trace evidence. This panel does not alter trimming, curation, BLAST or taxonomy.", "microscope"),
-          tags$details(
-            class = "stage1-audit-details",
-            tags$summary(class = "stage1-audit-toggle", "Open evidence audit"),
-            div(class = "status-note",
-                tags$strong("Validation mode only. "),
-                "The active v2.14.2 trimming/QC path is still the decision path. The current build keeps the same-length PCON-only comparison observational; it does not apply that proposal to the processed sequence, FASTA or BLAST output."),
-            div(class = "subsection-title", "Run-level audit"),
-            DTOutput("ab1_evidence_run_table"),
-            div(class = "blast-action-row",
-              actionButton("export_preset_qc_ab1_run", "Export run audit", class = "btn-default", icon = icon("download")),
-              actionButton("export_preset_qc_ab1_detail", "Export selected-base audit", class = "btn-default", icon = icon("download"))
-            ),
-            div(class = "subsection-divider"),
-            div(class = "subsection-title", "Selected sample | per-base evidence"),
-            uiOutput("ab1_evidence_selected_note"),
-            div(class = "subsection-title", "Legacy auto trim vs PCON-only comparison"),
-            DTOutput("ab1_trim_comparison_table"),
-            DTOutput("ab1_evidence_detail_table")
-          )
+        tags$details(class = "panel-box stage1-evidence-card stage1-audit-details",
+          tags$summary(class = "stage1-audit-toggle",
+            card_title("Stage 1 | AB1 evidence audit", "Observational audit of the established PITAX v2 read model against raw ABIF primary-call coordinates, basecaller quality and canonical A/C/G/T trace evidence. This panel does not alter trimming, curation, BLAST or taxonomy.", "microscope")
+          ),
+          div(class = "status-note",
+              tags$strong("Validation mode only. "),
+              "The active v2.14.2 trimming/QC path is still the decision path. The current build keeps the same-length PCON-only comparison observational; it does not apply that proposal to the processed sequence, FASTA or BLAST output."),
+          div(class = "subsection-title", "Run-level audit"),
+          DTOutput("ab1_evidence_run_table"),
+          div(class = "blast-action-row",
+            actionButton("export_preset_qc_ab1_run", "Export run audit", class = "btn-default", icon = icon("download")),
+            actionButton("export_preset_qc_ab1_detail", "Export selected-base audit", class = "btn-default", icon = icon("download"))
+          ),
+          div(class = "subsection-divider"),
+          div(class = "subsection-title", "Selected sample | per-base evidence"),
+          uiOutput("ab1_evidence_selected_note"),
+          div(class = "subsection-title", "Legacy auto trim vs PCON-only comparison"),
+          DTOutput("ab1_trim_comparison_table"),
+          DTOutput("ab1_evidence_detail_table")
         ),
         div(class = "panel-box peak-review-card",
           card_title("Ambiguous peak review", "N calls: see original basecaller quality, strongest dye channel, top/next signal ratio and local peak separation. These are review hints, not automatic base calls. Click a flag to inspect and correct manually.", "flag"),
@@ -317,9 +317,19 @@ ui <- fluidPage(
           h4("Recent events"),
           tableOutput("pitax_perf_recent")
         ),
-        div(class = "panel-box",
-          card_title("QC signal metrics", "Called-base signal and called-peak / second-peak ratio. These plots are retained in QC exports.", "area-chart"),
-          plotOutput("qc_plot", height = "650px")
+        div(class = "panel-box qc-metrics-plot-card",
+          card_title("QC signal metrics", "Called-base signal and called-peak / second-peak ratio. Generated on demand for display; QC exports always redraw from current results.", "area-chart"),
+          div(class = "curation-toolbar qc-plot-toolbar",
+            actionButton(
+              "qc_plots_generate",
+              "Generate / Refresh QC Plots",
+              icon = icon("area-chart"),
+              class = "btn-primary",
+              title = "Build or refresh the on-screen QC signal metrics plot for the selected sample from current data."
+            ),
+            uiOutput("qc_plot_status", inline = TRUE)
+          ),
+          imageOutput("qc_plot", height = "650px")
         ),
         conditionalPanel(
           condition = "input.enable_primer_mapping === true",

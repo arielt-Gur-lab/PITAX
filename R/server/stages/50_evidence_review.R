@@ -1058,9 +1058,92 @@
     })
   })
 
-  output$qc_plot <- renderPlot({
+  # On-demand QC signal-metrics plot: session cache per sample. Curation
+  # commits mark Outdated but do not redraw; Generate / Refresh rebuilds.
+  qc_plot_cache_store <- reactiveVal(list())
+  qc_plot_display_token <- reactiveVal(0L)
+  qc_plot_empty_png <- local({
+    path <- tempfile("pitax_qc_plot_empty_", fileext = ".png")
+    grDevices::png(path, width = 1500, height = 900, res = 140)
+    on.exit(grDevices::dev.off(), add = TRUE)
+    plot.new()
+    text(0.5, 0.5, "Click Generate / Refresh QC Plots")
+    path
+  })
+
+  observeEvent(input$qc_plots_generate, {
+    sid <- selected_sample_key()
+    r <- selected_result()
+    settings <- selected_processing_settings()
+    safe_sid <- gsub("[^A-Za-z0-9_-]", "_", as.character(sid)[1])
+    path <- tempfile(paste0("pitax_qc_", safe_sid, "_"), fileext = ".png")
     perf_measure("qc.signal_metrics_plot", {
-      draw_qc_metrics(selected_result(), selected_processing_settings())
+      write_qc_plot_png(r, settings, path)
     })
+    store <- isolate(qc_plot_cache_store())
+    old <- store[[sid]]
+    if (!is.null(old$path) && nzchar(as.character(old$path)[1]) &&
+        file.exists(old$path) && !identical(old$path, path)) {
+      unlink(old$path)
+    }
+    store[[sid]] <- list(
+      path = path,
+      fingerprint = qc_plot_fingerprint(r, settings),
+      generated_at = Sys.time()
+    )
+    qc_plot_cache_store(store)
+    qc_plot_display_token(isolate(qc_plot_display_token()) + 1L)
+  }, ignoreInit = TRUE)
+
+  output$qc_plot_status <- renderUI({
+    qc_plot_display_token()
+    sid <- selected_sample_key()
+    # React to curation so Outdated appears without redrawing the PNG.
+    r <- selected_result()
+    settings <- selected_processing_settings()
+    store <- isolate(qc_plot_cache_store())
+    entry <- store[[sid]]
+    if (is.null(entry) || is.null(entry$path) || !isTRUE(file.exists(entry$path))) {
+      return(span(class = "qc-plot-status qc-plot-status-missing", "Not generated"))
+    }
+    current_fp <- qc_plot_fingerprint(r, settings)
+    if (!identical(as.character(entry$fingerprint)[1], current_fp)) {
+      return(span(class = "qc-plot-status qc-plot-status-outdated", "Outdated"))
+    }
+    span(class = "qc-plot-status qc-plot-status-current", "Current")
+  })
+
+  output$qc_plot <- renderImage({
+    # Image depends only on sample selection + explicit Generate token.
+    # Avoid reading the curated result object here or curation would force a redraw.
+    qc_plot_display_token()
+    sid <- selected_sample_key()
+    store <- isolate(qc_plot_cache_store())
+    entry <- store[[sid]]
+    if (is.null(entry) || is.null(entry$path) || !isTRUE(file.exists(entry$path))) {
+      return(list(
+        src = qc_plot_empty_png,
+        contentType = "image/png",
+        width = "100%",
+        height = 650,
+        alt = "QC plot not generated"
+      ))
+    }
+    list(
+      src = entry$path,
+      contentType = "image/png",
+      width = "100%",
+      height = 650,
+      alt = "QC signal metrics"
+    )
+  }, deleteFile = FALSE)
+
+  session$onSessionEnded(function() {
+    store <- isolate(qc_plot_cache_store())
+    for (nm in names(store)) {
+      p <- store[[nm]]$path
+      if (!is.null(p) && length(p) && file.exists(p)) unlink(p)
+    }
+    if (file.exists(qc_plot_empty_png)) unlink(qc_plot_empty_png)
   })
 
