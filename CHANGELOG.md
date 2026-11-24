@@ -1,5 +1,25 @@
 # Changelog
 
+## 3.8.8 — Compact, quick guided chromatogram review
+
+- Compact the Guided Review dialog for fast repetitive review without
+  routine vertical scrolling on desktop: reduce the nine-base trace
+  preview from 300 px to 226 px and widen the workspace.
+- Present a focused two-column summary of key evidence. Keep **all**
+  scientific signal diagnostics and N-specific review hints accessible
+  under an optional collapsed "Full signal evidence" disclosure.
+- Keep A/C/G/T/N, manual IUPAC selection (including M/V), and Continue,
+  Change base, Flag & continue readily visible. Move advanced trimming
+  actions under a separate collapsed disclosure; neither changes the
+  underlying curation logic or adds automatic corrections.
+- Tighten paddings, controls and modal margins. Bound modal height to
+  the browser viewport and allow internal scroll only for unusually
+  short/mobile viewports or manually expanded details. Small screens
+  retain safe layout without clipping controls.
+- Add structural regression contract to CI and local R test runner.
+- No project schema changes or changes to base calls, peak evidence or
+  downstream analysis.
+
 ## 3.8.7 — Fix IUPAC dropdown character encoding
 
 - Replace Unicode em dashes in manual base and IUPAC ambiguity selectInput labels with ASCII-safe parentheses, preventing visible UTF-8 byte sequences (e.g. `<e2><80><94>`) on Posit Connect instances with non-UTF-8 R locales.
