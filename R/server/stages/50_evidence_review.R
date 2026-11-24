@@ -347,10 +347,14 @@
     )
   }
 
+  # Keep only the high-value evidence visible in the guided workflow.
+  # The complete diagnostic set is one click away in a collapsed disclosure.
+  # This avoids a tall, scroll-heavy modal for every N/ambiguous call.
   peak_review_metrics_ui <- function(flag_row) {
     if (is.null(flag_row) || !nrow(flag_row)) return(NULL)
     metric <- function(label, value) {
-      div(class = "peak-review-metric",
+      value_text <- paste(as.character(value), collapse = " ")
+      div(class = "peak-review-metric", title = paste0(label, ": ", value_text),
           span(class = "peak-review-metric-label", label),
           span(class = "peak-review-metric-value", value))
     }
@@ -360,34 +364,53 @@
       "NA"
     }
     call <- as.character(flag_row$Call[1])
-    call_value <- if (identical(toupper(call), "N")) tags$span(class = "peak-review-n-call", "N") else call
+    is_n <- identical(toupper(call), "N")
+    call_value <- if (is_n) tags$span(class = "peak-review-n-call", "N") else call
+    fmt <- function(value, digits = 2L) {
+      value <- suppressWarnings(as.numeric(value)[1])
+      if (length(value) && is.finite(value)) as.character(round(value, digits)) else "Unavailable"
+    }
+    primary <- if (is_n) tagList(
+      metric("Basecaller Q", fmt(flag_row$Basecaller_quality[1], 0L)),
+      metric("Dominant dye", flag_row$Top_channel[1]),
+      metric("Top / next", fmt(flag_row$Top_to_second_ratio[1])),
+      metric("Peak ratio", fmt(flag_row$Peak_ratio[1])),
+      metric("Competition", paste0(fmt(flag_row$Competitor_percent[1], 1L), "%")),
+      metric("Separation", flag_row$Peak_separation[1])
+    ) else tagList(
+      metric("Peak ratio", fmt(flag_row$Peak_ratio[1])),
+      metric("Competition", paste0(fmt(flag_row$Competitor_percent[1], 1L), "%")),
+      metric("Competitor", flag_row$Competing_channel[1]),
+      metric("Peak offset", offset),
+      metric("Called signal", fmt(flag_row$Called_signal[1], 0L)),
+      metric("Other signal", fmt(flag_row$Competitor_signal[1], 0L))
+    )
     tagList(
       div(class = "peak-review-callout",
           tags$strong(tagList(call_value, "  <->  ", flag_row$Competing_channel[1])),
           span(class = "peak-flag-pill", flag_row$Severity[1])),
-      div(class = "peak-review-metrics",
-          metric("Position", as.character(flag_row$Position[1])),
-          div(class = "peak-review-metric",
-              span(class = "peak-review-metric-label", "Call"),
-              span(class = "peak-review-metric-value", call_value)),
-          metric("Competitor", as.character(flag_row$Competing_channel[1])),
-          metric("Peak ratio", as.character(flag_row$Peak_ratio[1])),
-          metric("Competitor / called", paste0(flag_row$Competitor_percent[1], "%")),
-          metric("Called signal", as.character(flag_row$Called_signal[1])),
-          metric("Competitor signal", as.character(flag_row$Competitor_signal[1])),
-          metric("Peak offset", offset),
-          if (identical(toupper(call), "N")) tagList(
-            metric("Dominant channel (not a call)", as.character(flag_row$Top_channel[1])),
-            metric("Top / next at peak", as.character(round(flag_row$Top_to_second_ratio[1], 2))),
-            metric("Original basecaller Q", if (is.finite(flag_row$Basecaller_quality[1]))
-                   as.character(round(flag_row$Basecaller_quality[1], 1)) else "Unavailable"),
-            metric("Peak prominence", if (is.finite(flag_row$Peak_prominence_percent[1]))
-                   paste0(flag_row$Peak_prominence_percent[1], "%") else "Unavailable"),
-            metric("Peak separation", as.character(flag_row$Peak_separation[1])),
-            div(class = "compact-hint", as.character(flag_row$Review_hint[1]))
-          ) else NULL,
-          metric("Flag", as.character(flag_row$Flag[1])),
-          metric("Status", as.character(flag_row$Review_status[1])))
+      div(class = "peak-review-metrics peak-review-metrics-main", primary),
+      tags$details(class = "peak-review-evidence-details",
+          tags$summary("Full signal evidence"),
+          div(class = "peak-review-metrics peak-review-metrics-extra",
+              metric("Position", as.character(flag_row$Position[1])),
+              metric("Call", call_value),
+              metric("Competitor", as.character(flag_row$Competing_channel[1])),
+              metric("Peak ratio", fmt(flag_row$Peak_ratio[1])),
+              metric("Competitor / called", paste0(fmt(flag_row$Competitor_percent[1], 1L), "%")),
+              metric("Called signal", fmt(flag_row$Called_signal[1], 0L)),
+              metric("Competitor signal", fmt(flag_row$Competitor_signal[1], 0L)),
+              metric("Peak offset", offset),
+              if (is_n) tagList(
+                metric("Dominant channel", as.character(flag_row$Top_channel[1])),
+                metric("Top / next", fmt(flag_row$Top_to_second_ratio[1])),
+                metric("Original basecaller Q", fmt(flag_row$Basecaller_quality[1], 0L)),
+                metric("Peak prominence", paste0(fmt(flag_row$Peak_prominence_percent[1]), "%")),
+                metric("Peak separation", as.character(flag_row$Peak_separation[1]))
+              ) else NULL,
+              metric("Flag", as.character(flag_row$Flag[1])),
+              metric("Status", as.character(flag_row$Review_status[1]))),
+          if (is_n) div(class = "compact-hint", as.character(flag_row$Review_hint[1])) else NULL)
     )
   }
 
@@ -402,7 +425,7 @@
       easyClose = TRUE, size = "l",
       div(class = "peak-review-modal-grid",
           div(class = "peak-review-modal-plot",
-              plotOutput("peak_review_local_plot", height = "300px")),
+              plotOutput("peak_review_local_plot", height = "226px")),
           div(class = "peak-review-modal-side", uiOutput("peak_review_side_ui"))),
       div(class = "peak-review-primary-actions",
           actionButton("peak_review_continue", "Continue", icon = icon("arrow-right"),
@@ -411,7 +434,9 @@
                        class = "btn-warning", title = "Choose A/C/G/T/N above, confirm the edit, then continue."),
           actionButton("peak_review_flag", "Flag & continue", icon = icon("flag"),
                        title = "Keep this position active, defer it for this pass, and open the next position.")),
-      uiOutput("peak_review_advanced_ui"),
+      tags$details(class = "peak-review-trim-details",
+        tags$summary("Advanced trim options"),
+        uiOutput("peak_review_advanced_ui")),
       footer = actionButton("peak_review_close", "Close", class = "btn-default")
     ))
   }
@@ -459,8 +484,11 @@
     }
     tagList(
       peak_review_metrics_ui(flag_row),
-      if (nzchar(recommendation)) div(class = "status-note", recommendation) else NULL,
-      div(class = "compact-hint", remaining_note),
+      div(class = "peak-review-next-hint",
+        span(remaining_note),
+        if (nzchar(recommendation))
+          span(title = recommendation, icon("info-circle"), " Edge trim available")
+        else NULL),
       radioButtons(
         "manual_base_choice",
         "Single base / unresolved",
@@ -484,8 +512,8 @@
           title = "Manually choose M=A/C, V=A/C/G or another valid IUPAC code. Never auto-infer an unresolved base."
         )
       ),
-      div(class = "compact-hint",
-          "IUPAC codes record your interpretation, not a validated basecaller call. For unresolved/overlapping peaks, keep N unless the evidence supports your manual choice."),
+      div(class = "compact-hint peak-review-interpretation-note",
+          "Manual IUPAC choice; keep N when evidence is unresolved."),
       if (!is.na(choice$pair_code)) div(class = "curation-actions",
           actionButton("context_iupac_preview", paste0("Set ambiguity ", choice$pair_code))) else NULL
     )
@@ -499,8 +527,7 @@
     in_trim <- is.finite(st) && is.finite(en) && pos >= st && pos <= en
     if (!in_trim) return(NULL)
     tagList(
-      tags$hr(),
-      div(class = "compact-hint", "Advanced trim actions (require confirmation; ends guided pass after apply):"),
+      div(class = "compact-hint", "Requires confirmation and ends this review pass:"),
       div(class = "curation-actions",
           actionButton("context_trim_left", paste0("Trim left through ", pos)),
           actionButton("context_trim_right", paste0("Trim right from ", pos)))
