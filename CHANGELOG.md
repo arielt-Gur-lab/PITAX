@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.8.11 — Continue-cycle performance probe depth
+
+- Coalesce Performance diagnostics table refreshes with `session$onFlushed`
+  so summary/recent updates run after the measured Continue flush instead of
+  inflating it.
+- Measure server render cost for the Continue update cycle: ambiguous-peak
+  summary/table, guided title/side/advanced UI, plus diagnostic table self-cost
+  (`publish = FALSE` to avoid re-entrancy).
+- Expand the browser probe: click → first `shiny:message` → tracked output
+  `shiny:value` events → `shiny:idle`, with phase rows in the CSV when
+  diagnostics are enabled.
+- Add a console-only stopwatch (`localStorage.pitaxPerfConsole=1` or
+  `window.__PITAX_PERF_CONSOLE__`) and `window.__pitaxPerfLog` so Continue
+  series can be timed with diagnostics OFF for overhead comparisons.
+  Still records no DNA, read names or paths.
+
+
 ## 3.8.10 — Guided Review Focus / Full Y-scale
 
 - Add a display-only **Focus Scale** for the Guided Review local

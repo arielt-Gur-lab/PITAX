@@ -105,18 +105,48 @@
         });
       })();
 
-      // Developer-only browser latency probe. Entirely dormant until
-      // "Enable diagnostics" is checked in QC. Measures from the click to
-      // Shiny's next idle event (network + server + binding work), NOT the
-      // final image paint. Never transmits DNA, filenames, samples or URLs.
+      // Developer-only browser latency probe. Dormant until Enable diagnostics
+      // is checked, or until window.__PITAX_PERF_CONSOLE__ / localStorage
+      // pitaxPerfConsole=1 enables a console-only stopwatch (for OFF vs ON
+      // comparisons without server table updates). Measures click -> first
+      // server message -> tracked output values -> shiny:idle. Never transmits
+      // DNA, filenames, samples or URLs.
       (function() {
         var pending = null;
-        function enabled() {
+        var TRACKED = {
+          'peak_review_local_plot': true,
+          'peak_review_side_ui': true,
+          'peak_review_modal_title': true,
+          'peak_review_advanced_ui': true,
+          'ambiguous_peak_table': true,
+          'ambiguous_peak_summary': true,
+          'pitax_perf_summary': true,
+          'pitax_perf_recent': true
+        };
+        function recordingEnabled() {
           var checkbox = document.getElementById('pitax_perf_enabled');
           return !!(checkbox && checkbox.checked);
         }
+        function consoleEnabled() {
+          if (window.__PITAX_PERF_CONSOLE__) return true;
+          try { return localStorage.getItem('pitaxPerfConsole') === '1'; }
+          catch (e) { return false; }
+        }
+        function active() { return recordingEnabled() || consoleEnabled(); }
+        function markAction(action) {
+          pending = {
+            action: action,
+            started: performance.now(),
+            firstMessageAt: null,
+            lastValueAt: null,
+            values: {},
+            finalizing: false,
+            idleAt: null
+          };
+        }
+
         document.addEventListener('click', function(event) {
-          if (!enabled()) return;
+          if (!active()) return;
           var target = event.target;
           if (!target || !target.closest) return;
           var action = null;
@@ -126,22 +156,76 @@
           else if (target.closest('#peak_review_flag')) action = 'guided.flag';
           else if (target.closest('#confirm_curation_action')) action = 'guided.confirm';
           else if (target.closest('#cancel_curation_action')) action = 'guided.cancel';
-          if (action) pending = {action: action, started: performance.now()};
+          if (action) markAction(action);
         }, true);
 
+        $(document).on('shiny:message.pitaxDevPerf', function() {
+          if (!pending || pending.firstMessageAt != null) return;
+          pending.firstMessageAt = performance.now();
+        });
+        $(document).on('shiny:value.pitaxDevPerf', function(event) {
+          if (!pending) return;
+          var name = event && event.name;
+          if (!name || !TRACKED[name]) return;
+          var now = performance.now();
+          pending.values[name] = Math.round(now - pending.started);
+          pending.lastValueAt = now;
+        });
         $(document).on('shiny:idle.pitaxDevPerf', function() {
-          if (!pending || !enabled() || !window.Shiny || !Shiny.setInputValue) return;
+          if (!pending || !active() || pending.finalizing) return;
+          // shiny:idle can fire in the same turn as shiny:value; defer so
+          // value handlers run, then briefly wait for late plot/DT bindings.
           var current = pending;
-          pending = null;
-          var elapsed = performance.now() - current.started;
-          if (!isFinite(elapsed) || elapsed < 0) return;
-          Shiny.setInputValue('pitax_perf_browser_event', {
-            action: current.action, duration_ms: elapsed,
-            nonce: Date.now() + Math.random()
-          }, {priority: 'event'});
+          current.finalizing = true;
+          current.idleAt = performance.now();
+          setTimeout(function() {
+            if (pending !== current) return;
+            setTimeout(function() {
+              if (pending !== current) return;
+              pending = null;
+              var idleElapsed = current.idleAt - current.started;
+              var settledElapsed = performance.now() - current.started;
+              if (!isFinite(idleElapsed) || idleElapsed < 0) return;
+              var toMsg = current.firstMessageAt == null ? null :
+                Math.round(current.firstMessageAt - current.started);
+              var toVal = current.lastValueAt == null ? null :
+                Math.round(current.lastValueAt - current.started);
+              var valueKeys = Object.keys(current.values);
+              var details = 'msg=' + (toMsg == null ? 'na' : toMsg) +
+                ';ui=' + (toVal == null ? 'na' : toVal) +
+                ';outs=' + valueKeys.length +
+                ';settled=' + Math.round(settledElapsed);
+              var record = {
+                action: current.action,
+                duration_ms: Math.round(idleElapsed * 100) / 100,
+                settled_ms: Math.round(settledElapsed * 100) / 100,
+                to_first_message_ms: toMsg,
+                to_last_value_ms: toVal,
+                values: current.values,
+                details: details,
+                recording: recordingEnabled(),
+                t: new Date().toISOString()
+              };
+              if (!window.__pitaxPerfLog) window.__pitaxPerfLog = [];
+              window.__pitaxPerfLog.push(record);
+              if (window.__pitaxPerfLog.length > 100) window.__pitaxPerfLog.shift();
+              if (consoleEnabled() && window.console && console.info) {
+                console.info('[PITAX perf]', current.action, record);
+              }
+              if (!recordingEnabled() || !window.Shiny || !Shiny.setInputValue) return;
+              Shiny.setInputValue('pitax_perf_browser_event', {
+                action: current.action,
+                duration_ms: idleElapsed,
+                to_first_message_ms: toMsg,
+                to_last_value_ms: toVal,
+                details: details,
+                nonce: Date.now() + Math.random()
+              }, {priority: 'event'});
+            }, 50);
+          }, 0);
         });
         $(document).on('change.pitaxDevPerf', '#pitax_perf_enabled', function() {
-          if (!this.checked) pending = null;
+          if (!this.checked && !consoleEnabled()) pending = null;
         });
       })();
 

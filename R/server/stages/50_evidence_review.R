@@ -266,6 +266,7 @@
   }
 
   output$ambiguous_peak_summary <- renderUI({
+    perf_measure("qc.ambiguous_peak_summary_render", {
     all_df <- all_current_peak_flags()
     active <- if (nrow(all_df)) all_df[all_df$Review_status == "Active", , drop = FALSE] else all_df
     total <- nrow(active)
@@ -281,9 +282,11 @@
         if (auto_count > 0) div(class = "peak-flag-pill", tags$strong(auto_count), " high-confidence proposals") else NULL,
         if (reviewed_count > 0) div(class = "peak-flag-pill", tags$strong(reviewed_count), " reviewed") else NULL,
         if (r$curation$revision > 0) div(class = "manual-edit-badge", paste0("Curation revision ", r$curation$revision)) else NULL)
+    })
   })
 
   output$ambiguous_peak_table <- renderDT({
+    perf_measure("qc.ambiguous_peak_table_render", {
     df <- current_peak_flags()
     if (!nrow(df)) {
       return(datatable(
@@ -330,6 +333,7 @@
       "),
       options = list(pageLength = 10, lengthChange = FALSE, scrollX = TRUE, autoWidth = TRUE, dom = "tip", order = list(list(0, "asc")))
     )
+    })
   })
 
   observeEvent(input$peak_flag_row_click, {
@@ -477,13 +481,16 @@
 
   output$peak_review_modal_title <- renderUI({
     req(isTRUE(rv$peak_review_open), rv$context_peak_flag)
-    pos <- as.integer(rv$context_peak_flag$Position[1])
-    call <- as.character(rv$context_peak_flag$Call[1])
-    span(paste0("Guided review | position ", pos, " | call ", call))
+    perf_measure("qc.guided_title_render", {
+      pos <- as.integer(rv$context_peak_flag$Position[1])
+      call <- as.character(rv$context_peak_flag$Call[1])
+      span(paste0("Guided review | position ", pos, " | call ", call))
+    })
   })
 
   output$peak_review_side_ui <- renderUI({
     req(isTRUE(rv$peak_review_open), rv$context_peak_flag)
+    perf_measure("qc.guided_side_ui_render", {
     flag_row <- rv$context_peak_flag
     pos <- as.integer(flag_row$Position[1])
     choice <- peak_review_base_choices(flag_row)
@@ -538,10 +545,12 @@
       if (!is.na(choice$pair_code)) div(class = "curation-actions",
           actionButton("context_iupac_preview", paste0("Set ambiguity ", choice$pair_code))) else NULL
     )
+    })
   })
 
   output$peak_review_advanced_ui <- renderUI({
     req(isTRUE(rv$peak_review_open), rv$context_peak_flag)
+    perf_measure("qc.guided_advanced_ui_render", {
     pos <- as.integer(rv$context_peak_flag$Position[1])
     r <- ensure_curation_state(selected_result())
     st <- as.integer(r$summary$trim_start[1]); en <- as.integer(r$summary$trim_end[1])
@@ -555,6 +564,7 @@
                      title = "Exclude this base and all earlier retained bases; confirmation required."),
         actionButton("context_trim_right", paste0("Trim right from ", pos),
                      title = "Exclude this base and all later retained bases; confirmation required."))
+    })
   })
 
   # This 9-base inset has no zoom/pan interaction. A small R graphics PNG

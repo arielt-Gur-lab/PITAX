@@ -306,7 +306,7 @@ ui <- fluidPage(
         tags$details(class = "panel-box pitax-dev-performance-panel",
           tags$summary(tagList(icon("tachometer"), " Developer tools | Performance diagnostics")),
           div(class = "compact-hint",
-              "Opt-in session-only timings (milliseconds). No DNA or sample identifiers are recorded. Browser timing is click to Shiny idle, not full image paint. Disable during normal QC work."),
+              "Opt-in session-only timings (milliseconds). No DNA or sample identifiers are recorded. Browser timing is click -> first server message -> tracked UI values -> Shiny idle (not final image paint). Summary/recent tables refresh after the measured flush so they do not inflate Continue. For OFF comparisons without server tables: localStorage.setItem('pitaxPerfConsole','1') then inspect window.__pitaxPerfLog. Disable during normal QC work."),
           div(class = "curation-toolbar",
             checkboxInput("pitax_perf_enabled", "Enable diagnostics", value = FALSE),
             actionButton("pitax_perf_clear", "Clear timings", icon = icon("trash")),
