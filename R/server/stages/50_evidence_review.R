@@ -425,7 +425,18 @@
       easyClose = TRUE, size = "l",
       div(class = "peak-review-modal-grid",
           div(class = "peak-review-modal-plot",
-              plotOutput("peak_review_local_plot", height = "226px")),
+              # Separate legend from chromatogram so the A/C/G/T keys never
+              # overlap base letters when the display is short/compact.
+              div(class = "peak-review-dye-legend", `aria-label` = "Trace dye channels",
+                span(class = "dye-key dye-a", "A"),
+                span(class = "dye-key dye-c", "C"),
+                span(class = "dye-key dye-g", "G"),
+                span(class = "dye-key dye-t", "T")),
+              plotOutput("peak_review_local_plot", height = "195px"),
+              # Manual left/right trims are frequent QC actions: always
+              # visible and immediately accessible, no disclosure click.
+              div(class = "peak-review-trim-inline",
+                  uiOutput("peak_review_advanced_ui"))),
           div(class = "peak-review-modal-side", uiOutput("peak_review_side_ui"))),
       div(class = "peak-review-primary-actions",
           actionButton("peak_review_continue", "Continue", icon = icon("arrow-right"),
@@ -434,9 +445,6 @@
                        class = "btn-warning", title = "Choose A/C/G/T/N above, confirm the edit, then continue."),
           actionButton("peak_review_flag", "Flag & continue", icon = icon("flag"),
                        title = "Keep this position active, defer it for this pass, and open the next position.")),
-      tags$details(class = "peak-review-trim-details",
-        tags$summary("Advanced trim options"),
-        uiOutput("peak_review_advanced_ui")),
       footer = actionButton("peak_review_close", "Close", class = "btn-default")
     ))
   }
@@ -525,13 +533,15 @@
     r <- ensure_curation_state(selected_result())
     st <- as.integer(r$summary$trim_start[1]); en <- as.integer(r$summary$trim_end[1])
     in_trim <- is.finite(st) && is.finite(en) && pos >= st && pos <= en
-    if (!in_trim) return(NULL)
-    tagList(
-      div(class = "compact-hint", "Requires confirmation and ends this review pass:"),
-      div(class = "curation-actions",
-          actionButton("context_trim_left", paste0("Trim left through ", pos)),
-          actionButton("context_trim_right", paste0("Trim right from ", pos)))
-    )
+    if (!in_trim) {
+      return(div(class = "compact-hint peak-review-trim-unavailable",
+        "Manual trim is available only for bases within the retained sequence."))
+    }
+    div(class = "curation-actions peak-review-trim-controls",
+        actionButton("context_trim_left", paste0("Trim left through ", pos),
+                     title = "Exclude this base and all earlier retained bases; confirmation required."),
+        actionButton("context_trim_right", paste0("Trim right from ", pos),
+                     title = "Exclude this base and all later retained bases; confirmation required."))
   })
 
   # This 9-base inset has no zoom/pan interaction. A small R graphics PNG
@@ -539,11 +549,13 @@
   # The full QC chromatogram remains interactive and retains its zoom state.
   output$peak_review_local_plot <- renderPlot({
     req(isTRUE(rv$peak_review_open), rv$context_peak_flag)
-    draw_chromatogram_focus_fast(
-      selected_result(),
-      raw_position = as.integer(rv$context_peak_flag$Position[1]),
-      window = 4L
-    )
+    perf_measure("qc.guided_plot_render", {
+      draw_chromatogram_focus_fast(
+        selected_result(),
+        raw_position = as.integer(rv$context_peak_flag$Position[1]),
+        window = 4L
+      )
+    })
   }, res = 96)
 
   observeEvent(input$peak_review_close, {
