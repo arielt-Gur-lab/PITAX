@@ -264,7 +264,14 @@
     export_dialog_state$prepared_name <- NULL
     if (!is.null(previous) && file.exists(previous)) unlink(previous)
     export_dialog_state$last_result_message <- "Preparing export..."
-    snap <- export_dialog_state$snap
+    # Capture a fresh snapshot at Prepare so QC PNGs and package contents
+    # reflect live project state, independent of any on-screen plot cache.
+    stage_id <- export_dialog_state$stage_id
+    if (is.null(stage_id) || !nzchar(as.character(stage_id)[1])) {
+      stage_id <- if (!is.null(input$pipeline_step)) as.character(input$pipeline_step)[1] else "export"
+    }
+    snap <- pitax_export_snapshot_from_rv(rv, input, source_stage = as.character(stage_id)[1])
+    export_dialog_state$snap <- snap
     if (is.null(snap)) {
       export_dialog_state$last_result_message <- "Export snapshot is missing. Re-open Export."
       showNotification(export_dialog_state$last_result_message, type = "error", duration = 12)

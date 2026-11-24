@@ -66,8 +66,18 @@ stopifnot(all(vapply(c(
   "perf_measure", "qc.guided_plot_render", "guided.open_server",
   "qc.peak_flags", "qc.full_chromatogram_build",
   "qc.ambiguous_peak_table_render", "qc.guided_side_ui_render",
-  "qc.ambiguous_peak_summary_render"
+  "qc.ambiguous_peak_summary_render",
+  "qc.signal_metrics_plot", "qc_plots_generate"
 ), grepl, logical(1), x = qc, fixed = TRUE)))
+# QC metrics plot timing remains, but only on explicit Generate — not in
+# the reactive Continue/Confirm flush via selected_result().
+stopifnot(grepl('observeEvent(input$qc_plots_generate', qc, fixed = TRUE))
+stopifnot(grepl("output$qc_plot <- renderImage", qc, fixed = TRUE))
+img_a <- regexpr("output$qc_plot <- renderImage", qc, fixed = TRUE)[1]
+img_b <- regexpr("session$onSessionEnded(function()", qc, fixed = TRUE)[1]
+stopifnot(img_a > 0L, img_b > img_a)
+stopifnot(!grepl("selected_result()", substr(qc, img_a, img_b - 1L), fixed = TRUE))
+
 stopifnot(grepl("qc.commit_curated_result", project, fixed = TRUE))
 stopifnot(grepl("analysis.rebuild_after_edit", project, fixed = TRUE))
 stopifnot(grepl("analysis.single_group_rebuild", consensus, fixed = TRUE))

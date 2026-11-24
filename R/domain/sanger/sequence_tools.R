@@ -1510,6 +1510,50 @@ pitax_next_active_peak_position <- function(flag_df, current_position = NA_integ
 # QC plots used both on-screen and in exported checkpoints
 # ============================================================
 
+# Display-cache fingerprint only. Does not alter metrics or drawing.
+qc_plot_fingerprint <- function(result, settings) {
+  revision <- if (is.list(result$curation)) {
+    suppressWarnings(as.integer(result$curation$revision[1]))
+  } else {
+    NA_integer_
+  }
+  sm <- result$summary
+  trim_start <- if (!is.null(sm) && is.data.frame(sm) && nrow(sm)) {
+    suppressWarnings(as.integer(sm$trim_start[1]))
+  } else {
+    NA_integer_
+  }
+  trim_end <- if (!is.null(sm) && is.data.frame(sm) && nrow(sm)) {
+    suppressWarnings(as.integer(sm$trim_end[1]))
+  } else {
+    NA_integer_
+  }
+  sample_id <- if (!is.null(result$sample_id) && length(result$sample_id)) {
+    as.character(result$sample_id)[1]
+  } else {
+    ""
+  }
+  min_peak <- if (!is.null(settings$min_peak_ratio) && length(settings$min_peak_ratio)) {
+    as.character(settings$min_peak_ratio)[1]
+  } else {
+    ""
+  }
+  abs_max <- if (!is.null(settings$absolute_max_base_index) && length(settings$absolute_max_base_index)) {
+    as.character(settings$absolute_max_base_index)[1]
+  } else {
+    ""
+  }
+  paste(
+    sample_id,
+    if (length(revision) && is.finite(revision[1])) as.character(revision[1]) else "NA",
+    if (length(trim_start) && is.finite(trim_start[1])) as.character(trim_start[1]) else "NA",
+    if (length(trim_end) && is.finite(trim_end[1])) as.character(trim_end[1]) else "NA",
+    min_peak,
+    abs_max,
+    sep = "|"
+  )
+}
+
 draw_qc_metrics <- function(result, settings) {
   metrics <- result$metrics
   sm <- result$summary

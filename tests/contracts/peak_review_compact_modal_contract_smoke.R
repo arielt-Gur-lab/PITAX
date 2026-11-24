@@ -52,6 +52,11 @@ stopifnot(grepl('.peak-review-trim-controls', css, fixed = TRUE))
 stopifnot(!grepl('tags$summary("Advanced trim options")', server, fixed = TRUE))
 stopifnot(grepl('"context_trim_left"', server, fixed = TRUE))
 stopifnot(grepl('"context_trim_right"', server, fixed = TRUE))
+# Nucleotide / IUPAC control labels stack ABOVE their controls, not beside.
+stopifnot(grepl("Single base / unresolved", server, fixed = TRUE))
+stopifnot(grepl("flex-direction:column", css, fixed = TRUE))
+stopifnot(grepl("float:none !important", css, fixed = TRUE))
+
 seq_tools <- paste(readLines(file.path(root, "R", "domain", "sanger", "sequence_tools.R"),
                              warn = FALSE), collapse = "\n")
 stopifnot(grepl("pitax_chromatogram_focus_yscale <- function", seq_tools, fixed = TRUE))
