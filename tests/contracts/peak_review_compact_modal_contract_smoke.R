@@ -11,11 +11,15 @@ server <- paste(readLines(file.path(root, "R", "server", "stages", "50_evidence_
 css <- paste(readLines(file.path(root, "www", "pitax.css"), warn = FALSE), collapse = "\n")
 
 required <- c(
-  "plotOutput(\"peak_review_local_plot\", height = \"195px\")",
+  "plotOutput(\"peak_review_local_plot\", height = \"260px\")",
   'class = "peak-review-metrics peak-review-metrics-main"',
   'class = "peak-review-evidence-details"',
   'tags$summary("Full signal evidence")',
   'class = "peak-review-dye-legend"',
+  'class = "peak-review-yscale-toggle"',
+  '"peak_review_yscale"',
+  '"Focus Scale" = "focus"',
+  '"Full Scale" = "full"',
   'class = "peak-review-trim-inline"',
   'uiOutput("peak_review_advanced_ui")',
   'class = "peak-review-primary-actions"',
@@ -44,17 +48,23 @@ stopifnot(all(vapply(c(
 # The four dye labels must sit in HTML ABOVE the image, not overlay calls.
 # Manual trim actions now stay in the visible left column instead of hidden.
 stopifnot(grepl('.peak-review-dye-legend', css, fixed = TRUE))
+stopifnot(grepl('.peak-review-yscale-toggle', css, fixed = TRUE))
 stopifnot(grepl('.peak-review-trim-controls', css, fixed = TRUE))
 stopifnot(!grepl('tags$summary("Advanced trim options")', server, fixed = TRUE))
 stopifnot(grepl('"context_trim_left"', server, fixed = TRUE))
 stopifnot(grepl('"context_trim_right"', server, fixed = TRUE))
 seq_tools <- paste(readLines(file.path(root, "R", "domain", "sanger", "sequence_tools.R"),
                              warn = FALSE), collapse = "\n")
+stopifnot(grepl("pitax_chromatogram_focus_yscale <- function", seq_tools, fixed = TRUE))
 start <- regexpr("draw_chromatogram_focus_fast <- function", seq_tools, fixed = TRUE)[1]
 end <- regexpr("make_chromatogram_focus_plot <- function", seq_tools, fixed = TRUE)[1]
 stopifnot(start > 0L, end > start)
 local_plot <- substr(seq_tools, start, end - 1L)
 stopifnot(!grepl('graphics::legend(', local_plot, fixed = TRUE))
+stopifnot(grepl("yscale = c(\"focus\", \"full\")", local_plot, fixed = TRUE) ||
+            grepl('yscale = c("focus", "full")', local_plot, fixed = TRUE))
+stopifnot(grepl("pitax_chromatogram_focus_yscale", local_plot, fixed = TRUE))
+stopifnot(grepl("Clipped peak", local_plot, fixed = TRUE))
 
 # The old tall fixed layout caused routine scrolling. The CSS caps the modal
 # height for tiny viewports, but desktop opens with 2 columns and compact
