@@ -153,13 +153,15 @@
   all_current_peak_flags <- reactive({
     req(selected_result())
     scope <- if (!is.null(input$peak_flag_scope) && input$peak_flag_scope %in% c("trimmed", "raw")) input$peak_flag_scope else "trimmed"
-    pitax_cached_peak_flags(
-      peak_flag_cache,
-      sample_id = selected_sample_key(),
-      result = selected_result(),
-      scope = scope,
-      params = ambiguous_peak_params_from_settings(selected_processing_settings())
-    )
+    perf_measure("qc.peak_flags", {
+      pitax_cached_peak_flags(
+        peak_flag_cache,
+        sample_id = selected_sample_key(),
+        result = selected_result(),
+        scope = scope,
+        params = ambiguous_peak_params_from_settings(selected_processing_settings())
+      )
+    })
   })
 
   current_peak_flags <- reactive({
@@ -212,6 +214,7 @@
   }
 
   open_peak_review_at <- function(pos, recenter = TRUE, reopen_shell = FALSE) {
+    perf_measure(if (isTRUE(reopen_shell)) "guided.open_server" else "guided.next_server", {
     pos <- suppressWarnings(as.integer(pos[1]))
     if (!is.finite(pos)) {
       close_peak_review_shell()
@@ -228,6 +231,7 @@
     if (isTRUE(recenter)) center_chromatogram_at(pos)
     show_peak_curation_menu(row[1, , drop = FALSE], reopen_shell = reopen_shell)
     invisible(TRUE)
+    })
   }
 
   advance_peak_review_after <- function(current_pos) {
@@ -1012,15 +1016,19 @@
     req(!isTRUE(rv$peak_review_open), cancelOutput = TRUE)
     plot_result <- selected_result()
     plot_result$display_name <- qc_display_name(selected_sample_key())
-    make_chromatogram_plotly(
-      plot_result, selected_processing_settings(),
-      flags = current_peak_flags(),
-      show_flags = isTRUE(input$show_peak_flags),
-      plotly_source = "qc_chromatogram"
-    )
+    perf_measure("qc.full_chromatogram_build", {
+      make_chromatogram_plotly(
+        plot_result, selected_processing_settings(),
+        flags = current_peak_flags(),
+        show_flags = isTRUE(input$show_peak_flags),
+        plotly_source = "qc_chromatogram"
+      )
+    })
   })
 
   output$qc_plot <- renderPlot({
-    draw_qc_metrics(selected_result(), selected_processing_settings())
+    perf_measure("qc.signal_metrics_plot", {
+      draw_qc_metrics(selected_result(), selected_processing_settings())
+    })
   })
 
