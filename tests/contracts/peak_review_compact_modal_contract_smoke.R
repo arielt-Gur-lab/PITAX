@@ -11,15 +11,14 @@ server <- paste(readLines(file.path(root, "R", "server", "stages", "50_evidence_
 css <- paste(readLines(file.path(root, "www", "pitax.css"), warn = FALSE), collapse = "\n")
 
 required <- c(
-  "plotOutput(\"peak_review_local_plot\", height = \"260px\")",
+  "plotOutput(\"peak_review_local_plot\", height = \"340px\")",
   'class = "peak-review-metrics peak-review-metrics-main"',
   'class = "peak-review-evidence-details"',
   'tags$summary("Full signal evidence")',
   'class = "peak-review-dye-legend"',
-  'class = "peak-review-yscale-toggle"',
-  '"peak_review_yscale"',
-  '"Focus Scale" = "focus"',
-  '"Full Scale" = "full"',
+  'class = "peak-review-yscale-toggle',
+  '"peak_review_yscale_focus"',
+  '"peak_review_yscale_full"',
   'class = "peak-review-trim-inline"',
   'uiOutput("peak_review_advanced_ui")',
   'class = "peak-review-primary-actions"',

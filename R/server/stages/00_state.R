@@ -41,6 +41,7 @@
     peak_review_open = FALSE,
     peak_review_shell_open = FALSE,
     peak_review_shell_generation = 0L,
+    peak_review_yscale = "focus",
     auto_correct_preview_df = data.frame()
   )
 

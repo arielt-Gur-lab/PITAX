@@ -436,17 +436,16 @@
                 span(class = "dye-key dye-c", "C"),
                 span(class = "dye-key dye-g", "G"),
                 span(class = "dye-key dye-t", "T")),
-              # Display-only Y-axis mode: Focus resists outlier spikes; Full
-              # restores the absolute local maximum. Trace/QC data unchanged.
-              div(class = "peak-review-yscale-toggle",
-                  radioButtons(
-                    "peak_review_yscale",
-                    NULL,
-                    choices = c("Focus Scale" = "focus", "Full Scale" = "full"),
-                    selected = "focus",
-                    inline = TRUE
-                  )),
-              plotOutput("peak_review_local_plot", height = "260px"),
+              # Display-only Y-axis mode: action buttons update rv so the plot
+              # always re-renders. Focus resists outlier spikes; Full restores
+              # the absolute local maximum. Trace/QC data unchanged.
+              div(class = "peak-review-yscale-toggle btn-group", role = "group",
+                  `aria-label` = "Chromatogram Y scale",
+                  actionButton("peak_review_yscale_focus", "Focus Scale",
+                               class = "btn-default btn-sm peak-review-yscale-btn"),
+                  actionButton("peak_review_yscale_full", "Full Scale",
+                               class = "btn-default btn-sm peak-review-yscale-btn")),
+              plotOutput("peak_review_local_plot", height = "340px"),
               # Manual left/right trims are frequent QC actions: always
               # visible and immediately accessible, no disclosure click.
               div(class = "peak-review-trim-inline",
@@ -563,7 +562,7 @@
   # The full QC chromatogram remains interactive and retains its zoom state.
   output$peak_review_local_plot <- renderPlot({
     req(isTRUE(rv$peak_review_open), rv$context_peak_flag)
-    yscale <- as.character(input$peak_review_yscale)[1]
+    yscale <- as.character(rv$peak_review_yscale)[1]
     if (!length(yscale) || is.na(yscale) || !yscale %in% c("focus", "full")) {
       yscale <- "focus"
     }
@@ -576,6 +575,14 @@
       )
     })
   }, res = 96)
+
+  observeEvent(input$peak_review_yscale_focus, {
+    rv$peak_review_yscale <- "focus"
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$peak_review_yscale_full, {
+    rv$peak_review_yscale <- "full"
+  }, ignoreInit = TRUE)
 
   observeEvent(input$peak_review_close, {
     close_peak_review_shell()

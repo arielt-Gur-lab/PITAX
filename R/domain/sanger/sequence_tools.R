@@ -1259,8 +1259,8 @@ make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags 
 # when only nine bases were visible; draw the same raw A/C/G/T signal with R's
 # lightweight graphics device instead. This function never alters base calls.
 # Display-only Y limits for the guided local chromatogram.
-# Never mutates trace values; Focus mode uses a robust local ceiling so a
-# single outlier spike does not flatten competing peaks in the same window.
+# Never mutates trace values. Focus ceilings on the lower peak cluster so a
+# wide outlier spike cannot pull percentile-based limits up to the absolute max.
 pitax_chromatogram_focus_yscale <- function(values, mode = c("focus", "full")) {
   mode <- match.arg(mode)
   if (is.null(values) || !length(dim(values)) || !nrow(values) || !ncol(values)) {
@@ -1283,14 +1283,20 @@ pitax_chromatogram_focus_yscale <- function(values, mode = c("focus", "full")) {
     ))
   }
   full_max <- max(finite)
-  # 90th percentile of the local max-envelope resists a narrow spike while
-  # still covering typical competing dye peaks in the nine-base window.
-  focus_raw <- as.numeric(stats::quantile(finite, probs = 0.90, names = FALSE, type = 7))
-  if (!is.finite(focus_raw) || focus_raw <= 0) focus_raw <- full_max
-  focus_max <- focus_raw * 1.12
-  # Prefer full scale when the absolute max is not a clear outlier.
+  # Typical competing peaks sit well below a lone spike. Ceiling on that
+  # lower cluster (+ headroom). Plain high percentiles fail on wide spikes.
+  lower <- finite[finite <= full_max * 0.55]
+  if (length(lower) >= 2L) {
+    focus_max <- max(lower) * 1.18
+  } else {
+    soft <- as.numeric(stats::quantile(finite, probs = 0.75, names = FALSE, type = 7))
+    if (!is.finite(soft) || soft <= 0) soft <- full_max
+    focus_max <- min(full_max, soft * 1.15)
+  }
+  if (!is.finite(focus_max) || focus_max <= 0) focus_max <- full_max
+  focus_max <- min(full_max, max(focus_max, full_max * 0.12))
   use_focus <- identical(mode, "focus") && is.finite(full_max) &&
-    full_max > focus_max * 1.25
+    full_max > focus_max * 1.08
   display_max <- if (use_focus) focus_max else full_max
   if (!is.finite(display_max) || display_max <= 0) display_max <- 1
   clip_rows <- if (use_focus) {
