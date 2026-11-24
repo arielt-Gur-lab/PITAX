@@ -69,6 +69,11 @@ echo [3p/22] Session-only performance diagnostics
 if errorlevel 1 goto :failed
 
 echo.
+echo [3q/22] Guided Focus / Full Y-scale display
+"%RDIR%\bin\Rscript.exe" "tests\unit\guided_focus_yscale_smoke.R"
+if errorlevel 1 goto :failed
+
+echo.
 echo [3aa/22] Compact guided review (no routine scrolling)
 "%RDIR%\bin\Rscript.exe" "tests\contracts\peak_review_compact_modal_contract_smoke.R"
 if errorlevel 1 goto :failed

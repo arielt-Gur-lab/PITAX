@@ -34,6 +34,8 @@ jobs:
         run: Rscript tests/unit/incremental_consensus_smoke.R
       - name: Opt-in performance diagnostics and browser timing contract
         run: Rscript tests/unit/performance_probe_smoke.R
+      - name: Guided local chromatogram Focus / Full Y-scale
+        run: Rscript tests/unit/guided_focus_yscale_smoke.R
       - name: Verify compact guided review with optional detailed evidence
         run: Rscript tests/contracts/peak_review_compact_modal_contract_smoke.R
       - name: Validate repeatable guided peak review row clicks

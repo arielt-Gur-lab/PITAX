@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.8.10 — Guided Review Focus / Full Y-scale
+
+- Add a display-only **Focus Scale** for the Guided Review local
+  chromatogram: Y limits follow a robust local intensity envelope so a
+  single outlier spike (for example 3,000) no longer flattens typical
+  competing peaks (500–1,000).
+- Add an immediate **Focus Scale / Full Scale** toggle above the local
+  plot. Focus marks clipped peaks at the display ceiling with a dashed
+  guide line and triangular markers; Full restores the absolute local
+  maximum. Stored AB1/trace values, QC metrics and base calls are
+  unchanged.
+- Raise the local plot height from 195 px to 260 px while keeping the
+  external A/C/G/T legend, readable base letters and always-visible
+  Trim left / Trim right controls. Compact modal constraints remain.
+
 ## 3.8.9 — Development timing probes + guided QC trace layout
 
 - Add an **opt-in, removable developer-only Performance diagnostics** section

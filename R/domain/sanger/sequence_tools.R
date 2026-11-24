@@ -1258,14 +1258,67 @@ make_chromatogram_plotly <- function(result, settings, flags = NULL, show_flags 
 # and mounting a second Plotly widget for each reviewed base was costly, even
 # when only nine bases were visible; draw the same raw A/C/G/T signal with R's
 # lightweight graphics device instead. This function never alters base calls.
-draw_chromatogram_focus_fast <- function(result, raw_position, window = 4L) {
+# Display-only Y limits for the guided local chromatogram.
+# Never mutates trace values; Focus mode uses a robust local ceiling so a
+# single outlier spike does not flatten competing peaks in the same window.
+pitax_chromatogram_focus_yscale <- function(values, mode = c("focus", "full")) {
+  mode <- match.arg(mode)
+  if (is.null(values) || !length(dim(values)) || !nrow(values) || !ncol(values)) {
+    return(list(
+      mode = mode, full_max = 1, display_max = 1, focus_max = 1,
+      clipped = FALSE, clip_rows = integer()
+    ))
+  }
+  envelope <- suppressWarnings(apply(values, 1L, function(row) {
+    row <- as.numeric(row)
+    row <- row[is.finite(row)]
+    if (!length(row)) return(NA_real_)
+    max(row)
+  }))
+  finite <- envelope[is.finite(envelope) & envelope > 0]
+  if (!length(finite)) {
+    return(list(
+      mode = mode, full_max = 1, display_max = 1, focus_max = 1,
+      clipped = FALSE, clip_rows = integer()
+    ))
+  }
+  full_max <- max(finite)
+  # 90th percentile of the local max-envelope resists a narrow spike while
+  # still covering typical competing dye peaks in the nine-base window.
+  focus_raw <- as.numeric(stats::quantile(finite, probs = 0.90, names = FALSE, type = 7))
+  if (!is.finite(focus_raw) || focus_raw <= 0) focus_raw <- full_max
+  focus_max <- focus_raw * 1.12
+  # Prefer full scale when the absolute max is not a clear outlier.
+  use_focus <- identical(mode, "focus") && is.finite(full_max) &&
+    full_max > focus_max * 1.25
+  display_max <- if (use_focus) focus_max else full_max
+  if (!is.finite(display_max) || display_max <= 0) display_max <- 1
+  clip_rows <- if (use_focus) {
+    which(is.finite(envelope) & envelope > display_max + 1e-9)
+  } else {
+    integer()
+  }
+  list(
+    mode = mode,
+    full_max = full_max,
+    display_max = display_max,
+    focus_max = focus_max,
+    clipped = length(clip_rows) > 0L,
+    clip_rows = as.integer(clip_rows)
+  )
+}
+
+draw_chromatogram_focus_fast <- function(result, raw_position, window = 4L,
+                                         yscale = c("focus", "full")) {
   empty <- function(note = "Local chromatogram unavailable") {
     graphics::plot.new()
     graphics::title(main = note, cex.main = 0.9)
     invisible(FALSE)
   }
+  yscale <- match.arg(yscale)
   pos <- suppressWarnings(as.integer(raw_position)[1])
   if (!is.list(result) || !length(pos) || !is.finite(pos)) return(empty())
+  # Read-only view of the stored AB1/trace matrix; never rewrite peak data.
   trace <- result$trace
   peak_pos <- suppressWarnings(as.integer(result$peak_pos))
   cmap <- result$channel_map
@@ -1286,20 +1339,35 @@ draw_chromatogram_focus_fast <- function(result, raw_position, window = 4L) {
                        min(nrow(trace), max(peak_pos[local]) + 4L))
   x <- trace_to_base_x(peak_pos, trace_idx)
   values <- trace[trace_idx, cols, drop = FALSE]
-  ymax <- suppressWarnings(max(values, na.rm = TRUE))
-  if (!is.finite(ymax) || ymax <= 0) ymax <- 1
+  scale <- pitax_chromatogram_focus_yscale(values, mode = yscale)
+  ymax <- scale$display_max
+  scale_label <- if (identical(yscale, "full")) "Full scale" else "Focus scale"
   palette <- c(A = "#2ca02c", C = "#1f77b4", G = "#111111", T = "#d62728")
   old_par <- graphics::par(no.readonly = TRUE)
   on.exit(graphics::par(old_par), add = TRUE)
   graphics::par(mar = c(4.0, 4.2, 2.9, 1.1))
   graphics::plot(x, values[, 1L], type = "l", col = palette[["A"]],
                  lwd = 1.5, xaxt = "n", xlab = "Base position",
-                 ylab = "Signal", main = paste0("Local view | ", pos, " +/- ", half, " bases"),
+                 ylab = "Signal",
+                 main = paste0("Local view | ", pos, " +/- ", half, " bases | ", scale_label),
                  xlim = c(left - 0.35, right + 0.35),
-                 ylim = c(0, ymax * 1.27), cex.main = 0.95)
+                 ylim = c(0, ymax * 1.27), cex.main = 0.92)
   for (j in 2:4) graphics::lines(x, values[, j], col = palette[j], lwd = 1.5)
   graphics::axis(1, at = seq.int(left, right), labels = seq.int(left, right), cex.axis = 0.87)
   graphics::abline(v = pos, col = "#94a3b8", lty = 2, lwd = 1.2)
+  if (isTRUE(scale$clipped)) {
+    # Mark clipped outliers at the display ceiling without altering stored
+    # intensities or hiding that a taller peak exists.
+    graphics::abline(h = ymax, col = "#f59e0b", lty = 3, lwd = 1.1)
+    clip_x <- x[scale$clip_rows]
+    clip_x <- clip_x[is.finite(clip_x)]
+    if (length(clip_x)) {
+      graphics::points(clip_x, rep(ymax, length(clip_x)),
+                       pch = 17, col = "#b45309", cex = 0.85)
+    }
+    graphics::mtext("Clipped peak(s) above Focus scale",
+                    side = 3, line = 0.05, cex = 0.72, col = "#b45309")
+  }
   bases <- curated_raw_calls(result)
   labels <- bases[seq.int(left, right)]
   label_colors <- ifelse(seq.int(left, right) == pos, "#b91c1c", "#334155")

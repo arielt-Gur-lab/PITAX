@@ -436,7 +436,17 @@
                 span(class = "dye-key dye-c", "C"),
                 span(class = "dye-key dye-g", "G"),
                 span(class = "dye-key dye-t", "T")),
-              plotOutput("peak_review_local_plot", height = "195px"),
+              # Display-only Y-axis mode: Focus resists outlier spikes; Full
+              # restores the absolute local maximum. Trace/QC data unchanged.
+              div(class = "peak-review-yscale-toggle",
+                  radioButtons(
+                    "peak_review_yscale",
+                    NULL,
+                    choices = c("Focus Scale" = "focus", "Full Scale" = "full"),
+                    selected = "focus",
+                    inline = TRUE
+                  )),
+              plotOutput("peak_review_local_plot", height = "260px"),
               # Manual left/right trims are frequent QC actions: always
               # visible and immediately accessible, no disclosure click.
               div(class = "peak-review-trim-inline",
@@ -553,11 +563,16 @@
   # The full QC chromatogram remains interactive and retains its zoom state.
   output$peak_review_local_plot <- renderPlot({
     req(isTRUE(rv$peak_review_open), rv$context_peak_flag)
+    yscale <- as.character(input$peak_review_yscale)[1]
+    if (!length(yscale) || is.na(yscale) || !yscale %in% c("focus", "full")) {
+      yscale <- "focus"
+    }
     perf_measure("qc.guided_plot_render", {
       draw_chromatogram_focus_fast(
         selected_result(),
         raw_position = as.integer(rv$context_peak_flag$Position[1]),
-        window = 4L
+        window = 4L,
+        yscale = yscale
       )
     })
   }, res = 96)
