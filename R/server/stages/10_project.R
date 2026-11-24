@@ -502,13 +502,18 @@
 
   observeEvent(input$load_project, {
     req(input$load_project$datapath)
-    obj <- tryCatch(readRDS(input$load_project$datapath), error = function(e) structure(list(error = conditionMessage(e)), class = "project_load_error"))
+    obj <- perf_measure("project.read_saved_file", {
+      tryCatch(readRDS(input$load_project$datapath),
+               error = function(e) structure(list(error = conditionMessage(e)), class = "project_load_error"))
+    })
     if (inherits(obj, "project_load_error")) {
       showNotification(paste("Could not load project:", obj$error), type = "error", duration = 10)
       return()
     }
     rv$share_banner_text <- ""
-    apply_loaded_project_object(obj, source_label = input$load_project$name, notify = TRUE)
+    perf_measure("project.restore_workspace", {
+      apply_loaded_project_object(obj, source_label = input$load_project$name, notify = TRUE)
+    })
   })
 
   # ---------------- Share Project (immutable snapshot + tokenized URL) ----------------
