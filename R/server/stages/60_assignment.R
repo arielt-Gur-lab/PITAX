@@ -80,6 +80,7 @@
   }
 
   output$assignment_editor <- renderUI({
+    perf_measure("assign.table_render", {
     assignments <- stage2_coerce_assignments(rv$read_assignments)
     if (!nrow(assignments)) return(div(class = "status-note", "Upload AB1 files to create the Rename table."))
     header <- tags$thead(tags$tr(
@@ -115,6 +116,7 @@
       )
     })
     div(class = "assignment-editor-wrap", tags$table(class = "assignment-editor", header, tags$tbody(body_rows)))
+    })
   })
 
   observeEvent(input$save_assignment_edits, {

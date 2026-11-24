@@ -5,6 +5,7 @@
 PITAX_SERVER_MODULES <- file.path(
   "R", "server", "stages",
   c(
+    "00_perf.R",
     "00_state.R",
     "05_workflow.R",
     "10_project.R",

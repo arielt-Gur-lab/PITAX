@@ -11,12 +11,13 @@ server <- paste(readLines(file.path(root, "R", "server", "stages", "50_evidence_
 css <- paste(readLines(file.path(root, "www", "pitax.css"), warn = FALSE), collapse = "\n")
 
 required <- c(
-  "plotOutput(\"peak_review_local_plot\", height = \"226px\")",
+  "plotOutput(\"peak_review_local_plot\", height = \"195px\")",
   'class = "peak-review-metrics peak-review-metrics-main"',
   'class = "peak-review-evidence-details"',
   'tags$summary("Full signal evidence")',
-  'class = "peak-review-trim-details"',
-  'tags$summary("Advanced trim options")',
+  'class = "peak-review-dye-legend"',
+  'class = "peak-review-trim-inline"',
+  'uiOutput("peak_review_advanced_ui")',
   'class = "peak-review-primary-actions"',
   '"peak_review_continue"',
   '"peak_review_change"',
@@ -39,6 +40,21 @@ stopifnot(all(vapply(c(
   "Original basecaller Q", "Peak prominence", "Peak separation",
   "Called signal", "Competitor signal", "Peak offset", "Flag", "Status"
 ), function(x) grepl(x, metrics, fixed = TRUE), logical(1))))
+
+# The four dye labels must sit in HTML ABOVE the image, not overlay calls.
+# Manual trim actions now stay in the visible left column instead of hidden.
+stopifnot(grepl('.peak-review-dye-legend', css, fixed = TRUE))
+stopifnot(grepl('.peak-review-trim-controls', css, fixed = TRUE))
+stopifnot(!grepl('tags$summary("Advanced trim options")', server, fixed = TRUE))
+stopifnot(grepl('"context_trim_left"', server, fixed = TRUE))
+stopifnot(grepl('"context_trim_right"', server, fixed = TRUE))
+seq_tools <- paste(readLines(file.path(root, "R", "domain", "sanger", "sequence_tools.R"),
+                             warn = FALSE), collapse = "\n")
+start <- regexpr("draw_chromatogram_focus_fast <- function", seq_tools, fixed = TRUE)[1]
+end <- regexpr("make_chromatogram_focus_plot <- function", seq_tools, fixed = TRUE)[1]
+stopifnot(start > 0L, end > start)
+local_plot <- substr(seq_tools, start, end - 1L)
+stopifnot(!grepl('graphics::legend(', local_plot, fixed = TRUE))
 
 # The old tall fixed layout caused routine scrolling. The CSS caps the modal
 # height for tiny viewports, but desktop opens with 2 columns and compact

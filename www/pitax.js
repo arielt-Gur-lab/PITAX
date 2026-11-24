@@ -105,6 +105,46 @@
         });
       })();
 
+      // Developer-only browser latency probe. Entirely dormant until
+      // "Enable diagnostics" is checked in QC. Measures from the click to
+      // Shiny's next idle event (network + server + binding work), NOT the
+      // final image paint. Never transmits DNA, filenames, samples or URLs.
+      (function() {
+        var pending = null;
+        function enabled() {
+          var checkbox = document.getElementById('pitax_perf_enabled');
+          return !!(checkbox && checkbox.checked);
+        }
+        document.addEventListener('click', function(event) {
+          if (!enabled()) return;
+          var target = event.target;
+          if (!target || !target.closest) return;
+          var action = null;
+          if (target.closest('#ambiguous_peak_table tbody tr')) action = 'guided.row';
+          else if (target.closest('#peak_review_start')) action = 'guided.start';
+          else if (target.closest('#peak_review_continue')) action = 'guided.continue';
+          else if (target.closest('#peak_review_flag')) action = 'guided.flag';
+          else if (target.closest('#confirm_curation_action')) action = 'guided.confirm';
+          else if (target.closest('#cancel_curation_action')) action = 'guided.cancel';
+          if (action) pending = {action: action, started: performance.now()};
+        }, true);
+
+        $(document).on('shiny:idle.pitaxDevPerf', function() {
+          if (!pending || !enabled() || !window.Shiny || !Shiny.setInputValue) return;
+          var current = pending;
+          pending = null;
+          var elapsed = performance.now() - current.started;
+          if (!isFinite(elapsed) || elapsed < 0) return;
+          Shiny.setInputValue('pitax_perf_browser_event', {
+            action: current.action, duration_ms: elapsed,
+            nonce: Date.now() + Math.random()
+          }, {priority: 'event'});
+        });
+        $(document).on('change.pitaxDevPerf', '#pitax_perf_enabled', function() {
+          if (!this.checked) pending = null;
+        });
+      })();
+
       (function() {
         var loaderShownAt = 0;
         var loaderFallback = null;

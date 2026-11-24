@@ -1306,9 +1306,8 @@ draw_chromatogram_focus_fast <- function(result, raw_position, window = 4L) {
   label_colors[labels %in% c("N", "B", "D", "H", "V", "R", "Y", "S", "W", "K", "M")] <- "#7c3aed"
   graphics::text(seq.int(left, right), rep(ymax * 1.09, right - left + 1L),
                  labels = labels, col = label_colors, cex = 0.92)
-  graphics::legend("top", legend = names(palette), col = palette,
-                   lty = 1, lwd = 1.5, horiz = TRUE, bty = "n",
-                   inset = c(0, -0.01), cex = 0.81)
+  # Dye legend is rendered OUTSIDE the graphics device in the modal header
+  # (CSS/HTML), so it cannot occlude the called base letters above peaks.
   invisible(TRUE)
 }
 

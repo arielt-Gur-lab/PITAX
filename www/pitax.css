@@ -968,6 +968,84 @@
         .peak-review-modal-grid { margin-bottom:2px; }
         .peak-review-callout { margin-bottom:2px; }
       }
+      /* Guided-review trace color key: separate from R graphics. The dye
+         labels never cover the 9 original called bases or their peaks. */
+      .peak-review-dye-legend {
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        flex-wrap:nowrap;
+        gap:15px;
+        min-height:18px;
+        margin:0 4px 2px;
+        font-size:11px;
+        font-weight:650;
+        line-height:1;
+        color:#475569;
+      }
+      .peak-review-dye-legend .dye-key { display:inline-flex; gap:4px; align-items:center; }
+      .peak-review-dye-legend .dye-key::before {
+        content:"";
+        display:inline-block;
+        width:16px;
+        height:0;
+        border-top:2px solid;
+      }
+      .peak-review-dye-legend .dye-a::before { border-color:#2ca02c; }
+      .peak-review-dye-legend .dye-c::before { border-color:#1f77b4; }
+      .peak-review-dye-legend .dye-g::before { border-color:#111111; }
+      .peak-review-dye-legend .dye-t::before { border-color:#d62728; }
+
+      /* The buttons to remove the left/right trace tails are routine
+         operator tools, not hidden advanced options. Keep them side by
+         side directly under the local chromatogram, visible by default. */
+      .peak-review-trim-inline {
+        border-top:1px solid #edf1f5;
+        padding:7px 3px 3px;
+        margin-top:2px;
+      }
+      .peak-review-trim-controls {
+        display:flex;
+        justify-content:center;
+        flex-wrap:wrap;
+        gap:7px;
+      }
+      .peak-review-trim-controls .btn {
+        flex:1 1 135px;
+        max-width:225px;
+        margin:0;
+        padding:5px 7px;
+        font-size:11.5px;
+        white-space:normal;
+      }
+      .peak-review-trim-unavailable { text-align:center; }
+      /* Development instrumentation is deliberately easy to remove and
+         closed by default; it does not change regular editing layout. */
+      .pitax-dev-performance-panel {
+        margin:12px 0;
+        padding:13px 17px;
+      }
+      .pitax-dev-performance-panel > summary {
+        display:list-item;
+        cursor:pointer;
+        color:#64748b;
+        font-size:12.5px;
+        font-weight:700;
+      }
+      .pitax-dev-performance-panel .curation-toolbar {
+        display:flex;
+        align-items:center;
+        gap:10px;
+        flex-wrap:wrap;
+        padding:8px 0;
+      }
+      .pitax-dev-performance-panel .form-group { margin-bottom:0; }
+      .pitax-dev-performance-panel table { font-size:11.5px; }
+      @media (max-width:550px) {
+        .peak-review-dye-legend { gap:9px; }
+        .peak-review-trim-controls .btn { flex-basis:120px; }
+      }
+
       .sequence-preview-card textarea { background:#fbfcfe; border-color:#dfe6ef !important; }
       .checkpoint-modern { display:flex; align-items:center; gap:18px; justify-content:space-between; background:#fffdf7; }
       .checkpoint-modern .card-title-row { margin-bottom:0; }

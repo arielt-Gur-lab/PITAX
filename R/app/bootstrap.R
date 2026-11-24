@@ -34,6 +34,7 @@ pitax_source(file.path("R", "export", "execute.R"), local = TRUE)
 pitax_source(file.path("R", "export", "dialog_ui.R"), local = TRUE)
 pitax_source(file.path("R", "services", "taxonomy_tools.R"), local = TRUE)
 pitax_source(file.path("R", "services", "blast_polling.R"), local = TRUE)
+pitax_source(file.path("R", "services", "perf_diagnostics.R"), local = TRUE)
 pitax_source(file.path("R", "services", "share_project.R"), local = TRUE)
 
 APP_VERSION <- tryCatch(trimws(readLines("VERSION.txt", warn = FALSE)[1]), error = function(e) "3.3.0")

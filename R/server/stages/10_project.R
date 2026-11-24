@@ -145,6 +145,17 @@
   }
 
   commit_curated_result <- function(sample_name, new_result, label = "Manual curation") {
+    # Measure total synchronous server work of a single curation transaction.
+    # Actual browser latency is captured separately by the opt-in JS probe.
+    started <- if (isTRUE(perf_store$enabled)) unname(proc.time()[["elapsed"]]) else NULL
+    on.exit({
+      if (!is.null(started)) {
+        if (isTRUE(pitax_perf_append(
+          perf_store, "Server", "qc.commit_curated_result",
+          (unname(proc.time()[["elapsed"]]) - started) * 1000
+        ))) perf_publish()
+      }
+    }, add = TRUE)
     old_result <- rv$results[[sample_name]]
     old_seq <- if (!is.null(old_result$seq)) as.character(old_result$seq) else ""
     new_seq <- if (!is.null(new_result$seq)) as.character(new_result$seq) else ""
@@ -152,7 +163,9 @@
     rv$results[[sample_name]] <- new_result
     # Curation already rebuilt this read; do not rebuild and publish every
     # unrelated sample's full trace/summary on every click.
-    sync_summary_from_results(sample_ids = sample_name)
+    perf_measure("qc.update_one_read_summary", {
+      sync_summary_from_results(sample_ids = sample_name)
+    })
 
     if (identical(input$inspect_sample, sample_name)) {
       updateTextAreaInput(session, "trimmed_sequence_preview", value = new_seq)
@@ -189,7 +202,9 @@
       # performs per-analysis-sequence comparison and invalidates only records
       # whose emitted analysis sequence actually changed.
       rebuild_ok <- tryCatch(
-        isTRUE(build_analysis_sequences(notify = FALSE, changed_source = sample_name)),
+        isTRUE(perf_measure("analysis.rebuild_after_edit", {
+          build_analysis_sequences(notify = FALSE, changed_source = sample_name)
+        })),
         error = function(e) {
           rv$project_status_text <- paste0(
             "Sequence changed, but analysis sequence rebuild failed: ",
@@ -487,13 +502,18 @@
 
   observeEvent(input$load_project, {
     req(input$load_project$datapath)
-    obj <- tryCatch(readRDS(input$load_project$datapath), error = function(e) structure(list(error = conditionMessage(e)), class = "project_load_error"))
+    obj <- perf_measure("project.read_saved_file", {
+      tryCatch(readRDS(input$load_project$datapath),
+               error = function(e) structure(list(error = conditionMessage(e)), class = "project_load_error"))
+    })
     if (inherits(obj, "project_load_error")) {
       showNotification(paste("Could not load project:", obj$error), type = "error", duration = 10)
       return()
     }
     rv$share_banner_text <- ""
-    apply_loaded_project_object(obj, source_label = input$load_project$name, notify = TRUE)
+    perf_measure("project.restore_workspace", {
+      apply_loaded_project_object(obj, source_label = input$load_project$name, notify = TRUE)
+    })
   })
 
   # ---------------- Share Project (immutable snapshot + tokenized URL) ----------------
