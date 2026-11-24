@@ -11,7 +11,8 @@
   or sequence data.
 - Measure server-side guided review open/next, local and full chromatogram
   rendering, peak-flag calculations, QC summary updates, curation commits,
-  incremental analysis-group rebuild and full-project fallback. Add a
+  incremental analysis-group rebuild and full-project fallback, plus saved
+  project read/restore and Assign table rendering. Add a
   separate opt-in browser click-to-Shiny-idle measurement for comparison;
   browser times include round-trip work but are not final image-paint times.
   Development diagnostics are only enabled by explicit opt-in.
