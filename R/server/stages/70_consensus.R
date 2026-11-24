@@ -37,26 +37,30 @@
     # the original full project rebuild (e.g. old project, renamed locus).
     built <- NULL
     if (!is.null(changed_source) && length(changed_source) == 1L) {
-      built <- stage3_rebuild_changed_source(
-        rv$consensus_set, rv$read_assignments, rv$results,
-        source_id = changed_source,
-        min_overlap = input$consensus_min_overlap,
-        min_identity = input$consensus_min_identity,
-        quality_delta = input$consensus_quality_delta,
-        strong_quality = input$consensus_strong_quality,
-        project_mode = rv$project_mode
-      )
-    }
-    if (is.null(built)) {
-      built <- tryCatch(
-        stage3_build_consensus_set(
-          rv$read_assignments, rv$results,
+      built <- perf_measure("analysis.single_group_rebuild", {
+        stage3_rebuild_changed_source(
+          rv$consensus_set, rv$read_assignments, rv$results,
+          source_id = changed_source,
           min_overlap = input$consensus_min_overlap,
           min_identity = input$consensus_min_identity,
           quality_delta = input$consensus_quality_delta,
           strong_quality = input$consensus_strong_quality,
           project_mode = rv$project_mode
-        ),
+        )
+      })
+    }
+    if (is.null(built)) {
+      built <- tryCatch(
+        perf_measure("analysis.full_project_rebuild", {
+          stage3_build_consensus_set(
+            rv$read_assignments, rv$results,
+            min_overlap = input$consensus_min_overlap,
+            min_identity = input$consensus_min_identity,
+            quality_delta = input$consensus_quality_delta,
+            strong_quality = input$consensus_strong_quality,
+            project_mode = rv$project_mode
+          )
+        }),
         error = function(e) structure(list(error = conditionMessage(e)), class = "consensus_build_error")
       )
     }
