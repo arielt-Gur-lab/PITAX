@@ -301,6 +301,22 @@ ui <- fluidPage(
           uiOutput("ambiguous_peak_summary"),
           div(class = "peak-review-table-scroll", DTOutput("ambiguous_peak_table"))
         ),
+        # DEVELOPMENT ONLY: on-demand, session-local performance timing.
+        # No data is collected until enabled; no metrics are saved in projects.
+        tags$details(class = "panel-box pitax-dev-performance-panel",
+          tags$summary(tagList(icon("tachometer"), " Developer tools | Performance diagnostics")),
+          div(class = "compact-hint",
+              "Opt-in session-only timings (milliseconds). No DNA or sample identifiers are recorded. Browser timing is click to Shiny idle, not full image paint. Disable during normal QC work."),
+          div(class = "curation-toolbar",
+            checkboxInput("pitax_perf_enabled", "Enable diagnostics", value = FALSE),
+            actionButton("pitax_perf_clear", "Clear timings", icon = icon("trash")),
+            downloadButton("pitax_perf_download", "Export CSV")
+          ),
+          h4("Operation summary"),
+          tableOutput("pitax_perf_summary"),
+          h4("Recent events"),
+          tableOutput("pitax_perf_recent")
+        ),
         div(class = "panel-box",
           card_title("QC signal metrics", "Called-base signal and called-peak / second-peak ratio. These plots are retained in QC exports.", "area-chart"),
           plotOutput("qc_plot", height = "650px")
