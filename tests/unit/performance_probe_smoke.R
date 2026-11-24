@@ -64,14 +64,24 @@ stopifnot(all(vapply(c(
 ), grepl, logical(1), x = server, fixed = TRUE)))
 stopifnot(all(vapply(c(
   "perf_measure", "qc.guided_plot_render", "guided.open_server",
-  "qc.peak_flags", "qc.full_chromatogram_build"
+  "qc.peak_flags", "qc.full_chromatogram_build",
+  "qc.ambiguous_peak_table_render", "qc.guided_side_ui_render",
+  "qc.ambiguous_peak_summary_render"
 ), grepl, logical(1), x = qc, fixed = TRUE)))
 stopifnot(grepl("qc.commit_curated_result", project, fixed = TRUE))
 stopifnot(grepl("analysis.rebuild_after_edit", project, fixed = TRUE))
 stopifnot(grepl("analysis.single_group_rebuild", consensus, fixed = TRUE))
 stopifnot(grepl("analysis.full_project_rebuild", consensus, fixed = TRUE))
+stopifnot(grepl("session$onFlushed", server, fixed = TRUE))
+stopifnot(grepl("qc.perf_summary_render", server, fixed = TRUE))
+stopifnot(grepl("publish = FALSE", server, fixed = TRUE))
+stopifnot(grepl("to_first_message", server, fixed = TRUE))
 stopifnot(grepl("performance.now()", js, fixed = TRUE))
 stopifnot(grepl("'shiny:idle.pitaxDevPerf'", js, fixed = TRUE))
+stopifnot(grepl("'shiny:message.pitaxDevPerf'", js, fixed = TRUE))
+stopifnot(grepl("'shiny:value.pitaxDevPerf'", js, fixed = TRUE))
+stopifnot(grepl("__pitaxPerfLog", js, fixed = TRUE))
+stopifnot(grepl("__PITAX_PERF_CONSOLE__", js, fixed = TRUE))
 
 # Do not silently persist diagnostics into .sangerproject payload.
 a <- regexpr("make_project_bundle <- function", project, fixed = TRUE)[1]
