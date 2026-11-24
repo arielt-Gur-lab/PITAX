@@ -1,5 +1,31 @@
 # Changelog
 
+## 3.8.9 — Development timing probes + guided QC trace layout
+
+- Add an **opt-in, removable developer-only Performance diagnostics** section
+  under Trim & QC (off by default). All measurements are kept only in the
+  current Shiny session; they are never saved in the project. Enable it to
+  see median, 95th percentile and maximum operation timings, recent events
+  and a CSV download; Clear removes current-session timing events.
+  The recorder holds at most 600 timing rows and records no DNA, read names
+  or sequence data.
+- Measure server-side guided review open/next, local and full chromatogram
+  rendering, peak-flag calculations, QC summary updates, curation commits,
+  incremental analysis-group rebuild and full-project fallback. Add a
+  separate opt-in browser click-to-Shiny-idle measurement for comparison;
+  browser times include round-trip work but are not final image-paint times.
+  Development diagnostics are only enabled by explicit opt-in.
+- Fix the four-channel **A/C/G/T trace legend occluding base labels**:
+  render a small, color-matched legend OUTSIDE the plot rather than drawing
+  it on top of the peak/base-call area.
+- Restore **always-visible left/right manual trim buttons** directly below
+  the local chromatogram for positions within the retained region. Keep
+  the existing confirmation and history behavior; when the position is
+  outside the retained sequence, clearly explain why trim is unavailable.
+- Keep the guided review compact. Add regression coverage for the visible
+  trim controls and legend, and performance-recorder behavior. The
+  scientific algorithms and project file schema remain unchanged.
+
 ## 3.8.8 — Compact, quick guided chromatogram review
 
 - Compact the Guided Review dialog for fast repetitive review without
