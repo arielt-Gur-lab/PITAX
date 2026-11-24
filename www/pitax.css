@@ -828,6 +828,146 @@
       @media (max-width: 900px) {
         .peak-review-modal-grid { grid-template-columns:1fr; }
       }
+      /* Fast guided QC: keep the frequent read/decide/next workflow fully
+         visible without page scrolling on ordinary desktop viewports.
+         Details are still available on demand and small displays retain a
+         safe internal scroll rather than clipping confirmation controls. */
+      #shiny-modal:has(.pitax-peak-review-shell-marker) .modal-dialog {
+        width:min(1060px, calc(100vw - 32px));
+        max-width:1060px;
+        margin:12px auto;
+      }
+      #shiny-modal:has(.pitax-peak-review-shell-marker) .modal-content {
+        max-height:calc(100dvh - 24px);
+        display:flex;
+        flex-direction:column;
+      }
+      #shiny-modal:has(.pitax-peak-review-shell-marker) .modal-header {
+        flex-shrink:0;
+        padding:9px 15px;
+      }
+      #shiny-modal:has(.pitax-peak-review-shell-marker) .modal-body {
+        flex:1 1 auto;
+        min-height:0;
+        padding:9px 14px;
+        overflow-y:auto;
+      }
+      #shiny-modal:has(.pitax-peak-review-shell-marker) .modal-footer {
+        flex-shrink:0;
+        padding:7px 14px;
+      }
+      .peak-review-modal-grid {
+        grid-template-columns:minmax(0,1.1fr) minmax(355px,1fr);
+        gap:12px;
+        margin-bottom:6px;
+      }
+      .peak-review-modal-plot { padding:5px; }
+      .peak-review-callout {
+        padding:6px 9px;
+        margin-bottom:5px;
+        border-radius:8px;
+      }
+      .peak-review-metrics-main,
+      .peak-review-metrics-extra {
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:0 12px;
+        margin-bottom:4px;
+      }
+      .peak-review-metric {
+        padding:3px 0;
+        gap:6px;
+        min-width:0;
+        font-size:11.5px;
+        line-height:1.3;
+      }
+      .peak-review-metric-label {
+        min-width:0;
+        overflow:hidden;
+        white-space:nowrap;
+        text-overflow:ellipsis;
+      }
+      .peak-review-metric-value {
+        min-width:0;
+        max-width:65%;
+        overflow:hidden;
+        white-space:nowrap;
+        text-overflow:ellipsis;
+      }
+      .peak-review-evidence-details,
+      .peak-review-trim-details {
+        font-size:11.5px;
+        color:#475569;
+        margin:3px 0 5px;
+      }
+      .peak-review-evidence-details > summary,
+      .peak-review-trim-details > summary {
+        display:list-item;
+        cursor:pointer;
+        width:fit-content;
+        font-weight:650;
+        color:#2563eb;
+        padding:3px 0;
+      }
+      .peak-review-evidence-details[open] .peak-review-metrics-extra {
+        max-height:140px;
+        overflow-y:auto;
+      }
+      .peak-review-modal-side .form-group { margin-bottom:4px; }
+      .peak-review-modal-side .control-label { margin-bottom:2px; font-size:11.5px; }
+      .peak-review-modal-side .shiny-options-group {
+        gap:3px 9px;
+        align-items:center;
+      }
+      .peak-review-modal-side .radio-inline {
+        padding-left:18px;
+        font-size:12px;
+      }
+      .peak-review-modal-side .curation-actions { flex-wrap:nowrap; gap:6px; }
+      .peak-review-modal-side .curation-actions .shiny-input-container {
+        flex:1 1 160px;
+        width:auto !important;
+        min-width:0;
+        margin:0;
+      }
+      .peak-review-modal-side .curation-actions .btn {
+        flex:0 0 auto;
+        align-self:flex-end;
+        white-space:nowrap;
+        margin-bottom:0;
+      }
+      .peak-review-modal-side .curation-actions .form-control { height:30px; padding:4px 8px; }
+      .peak-review-modal-side .compact-hint {
+        font-size:11px;
+        line-height:1.25;
+        margin:3px 0;
+      }
+      .peak-review-next-hint {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:8px;
+        color:#64748b;
+        font-size:11px;
+        margin:2px 0 5px;
+      }
+      .peak-review-next-hint span { white-space:nowrap; }
+      .peak-review-interpretation-note { opacity:.9; }
+      .peak-review-primary-actions {
+        margin-top:3px;
+        gap:6px;
+      }
+      .peak-review-primary-actions .btn { padding:5px 11px; }
+      .peak-review-trim-details .curation-actions { margin:2px 0 0; }
+      .peak-review-trim-details .compact-hint { margin:0 0 4px; }
+      @media (max-width:780px) {
+        .peak-review-modal-grid { grid-template-columns:1fr; }
+        .peak-review-modal-plot { max-width:100%; }
+      }
+      @media (max-height:650px) and (min-width:781px) {
+        #peak_review_local_plot { height:185px !important; }
+        .peak-review-modal-grid { margin-bottom:2px; }
+        .peak-review-callout { margin-bottom:2px; }
+      }
       .sequence-preview-card textarea { background:#fbfcfe; border-color:#dfe6ef !important; }
       .checkpoint-modern { display:flex; align-items:center; gap:18px; justify-content:space-between; background:#fffdf7; }
       .checkpoint-modern .card-title-row { margin-bottom:0; }
